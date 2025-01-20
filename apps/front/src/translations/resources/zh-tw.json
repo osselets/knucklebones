@@ -1,81 +1,81 @@
 {
-  "language": "English",
+  "language": "正體中文（臺灣）",
   "home": {
     "play": {
-      "friend": "Play against someone",
-      "ai": "Play against an AI"
+      "friend": "與他人對戰",
+      "ai": "與 AI 對戰"
     },
-    "footer": "The original Knucklebones game in Cult of the Lamb was created by Massive Monster.\nThis is a fan-site and not an official implementation by Massive Monster.\nYou can find the original game on the <0>Cult of the Lamb</0> website."
+    "footer": "《進擊羔羊傳說》中的原版 Knucklebones 遊戲由 Massive Monster 創作。\n這是一個粉絲網站，並非 Massive Monster 的官方實現。\n您可以在 <0>《進擊羔羊傳說》</0> 網站上找到原版遊戲。"
   },
   "guide": {
-    "label": "How to play",
-    "goal": "Each turn, you get a random dice to place in a column.\nThe goal is to score more points than your opponent when the game ends, which happens when one of the boards is full.",
-    "rule1": "You score even more points when stacking the same dice in a column.",
-    "rule2": "You remove all opponent's dice with the same value when placing a dice in the matching column."
+    "label": "遊戲說明",
+    "goal": "每回合，您會獲得一個隨機骰子放置在一列中。\n目標是在遊戲結束時獲得比對手更多的分數，當其中一個棋盤滿了時遊戲結束。",
+    "rule1": "在同一列中堆疊相同的骰子可以獲得更多分數。",
+    "rule2": "當在匹配的列中放置一個骰子時，會移除所有對手相同數值的骰子。"
   },
   "game-settings": {
-    "title": "Game settings",
+    "title": "遊戲設定",
     "difficulty": {
-      "label": "AI difficulty",
-      "easy": "Easy",
-      "medium": "Medium",
-      "hard": "Hard"
+      "label": "AI 難度",
+      "easy": "簡單",
+      "medium": "中等",
+      "hard": "困難"
     },
     "games": {
-      "label": "Number of rounds",
-      "indefinite": "Free play",
-      "1": "Best of 1",
-      "3": "Best of 3",
-      "5": "Best of 5"
+      "label": "回合數",
+      "indefinite": "自由遊戲",
+      "1": "一局定勝負",
+      "3": "三局兩勝",
+      "5": "五局三勝"
     },
-    "start": "Start game"
+    "start": "開始遊戲"
   },
   "menu": {
     "style": {
-      "system": "System theme",
-      "dark": "Dark theme",
-      "light": "Light theme"
+      "system": "系統主題",
+      "dark": "深色主題",
+      "light": "淺色主題"
     },
     "share": {
-      "label": "Share game",
-      "title": "Scan the QR code to share the room with other players",
-      "copy": "Copy link",
-      "copied": "Copied!"
+      "label": "分享遊戲",
+      "title": "掃描 QR 碼與其他玩家分享房間",
+      "copy": "複製連結",
+      "copied": "已複製！"
     },
     "logs": {
-      "label": "Logs",
-      "title": "Logs"
+      "label": "日誌",
+      "title": "日誌"
     },
     "history": {
-      "label": "Round {{current}} of {{boType}}",
-      "title": "History",
-      "empty-round": "The first round isn't finished yet!",
-      "tie": "This is a tie!",
-      "you-win": "You won!",
-      "opponent-win": "{{player}} won!",
-      "you-lead": "You are taking the lead!",
-      "opponent-lead": "{{player}} is taking the lead!"
+      "label": "第 {{current}} 局，共 {{boType}} 局",
+      "title": "歷史",
+      "empty-round": "第一局尚未完成！",
+      "tie": "平局！",
+      "you-win": "你贏了！",
+      "opponent-win": "{{player}} 贏了！",
+      "you-lead": "你領先了！",
+      "opponent-lead": "{{player}} 領先了！"
     }
   },
   "game": {
-    "total": "Total",
-    "you": "You",
+    "total": "總計",
+    "you": "你",
     "ai": "AI",
-    "rematch": "Play another game",
-    "continue": "Continue game",
-    "go-free-play": "Go into free play",
-    "waiting-rematch": "Waiting for {{player}}...",
-    "opponent-rematch": "{{player}} wants to rematch!",
+    "rematch": "再來一局",
+    "continue": "繼續遊戲",
+    "go-free-play": "進入自由遊戲",
+    "waiting-rematch": "等待 {{player}}...",
+    "opponent-rematch": "{{player}} 想要重賽！",
     "round": {
-      "tie": "This is a tie! Nobody wins this round!",
-      "you-win": "You won this round with {{points}} points!",
-      "opponent-win": "{{player}} won this round with {{points}} points!"
+      "tie": "平局！這回合沒有人贏！",
+      "you-win": "你以 {{points}} 分贏了這回合！",
+      "opponent-win": "{{player}} 以 {{points}} 分贏了這回合！"
     },
     "game": {
-      "tie": "This is a tie! Nobody wins!",
-      "you-win": "You won the game with {{points}} points!",
-      "opponent-win": "{{player}} won the game with {{points}} points!"
+      "tie": "平局！沒有人贏！",
+      "you-win": "你以 {{points}} 分贏了遊戲！",
+      "opponent-win": "{{player}} 以 {{points}} 分贏了遊戲！"
     }
   },
-  "loading": "Waiting for game to start"
+  "loading": "等待遊戲開始"
 }
