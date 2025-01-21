@@ -13,7 +13,8 @@ export default defineConfig({
         // https://vitejs.dev/guide/build.html#multi-page-app
         default: resolve(__dirname, 'index.html'),
         en: resolve(__dirname, 'en/index.html'),
-        fr: resolve(__dirname, 'fr/index.html')
+        fr: resolve(__dirname, 'fr/index.html'),
+        'zh-tw': resolve(__dirname, 'zh-tw/index.html')
       }
     }
   }

@@ -9,14 +9,14 @@ export const resources = {
   fr: {
     translation: fr
   },
-  "zh-tw": {
+  'zh-TW': {
     translation: zh_tw
   }
 } as const
 
 export const supportedLanguages = Object.entries(resources).map(
   ([lang, resource]) => ({
-    value: lang,
+    value: lang.toLocaleLowerCase(),
     label: resource.translation.language
   })
 )
