@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import {
   type IPlayer,
@@ -102,6 +103,7 @@ export function PlayerBoard({
   isDisplayNameEditable = false,
   outcome
 }: PlayerBoardProps) {
+  const { t } = useTranslation()
   return (
     <div
       className={clsx('flex items-center gap-1 md:gap-4', {
@@ -154,7 +156,9 @@ export function PlayerBoard({
           />
         </div>
         <div className='my-4'>
-          <p>Total: {score}</p>
+          <p>
+            {t('game.total')}: {score}
+          </p>
         </div>
       </div>
     </div>
