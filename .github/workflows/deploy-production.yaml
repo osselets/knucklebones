@@ -24,7 +24,6 @@ jobs:
       - name: Deploy Production
         uses: cloudflare/wrangler-action@v3
         with:
-          # Variables dépréciées, il faut utiliser `CLOUDFLARE_`
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           workingDirectory: 'apps/worker'
