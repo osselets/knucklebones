@@ -23,7 +23,7 @@ renamed_classes = [{from = "GameStateStore", to = "GameStateDurableObject"}, {fr
 
 [env.staging]
 name = "knucklebones-worker-staging"
-route = { pattern = "staging.api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
+# route = { pattern = "staging.api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
   { name = "WEB_SOCKET_DURABLE_OBJECT", class_name = "WebSocketDurableObject" }
@@ -31,7 +31,7 @@ durable_objects.bindings = [
 
 [env.production]
 name = "knucklebones-worker-production"
-route = { pattern = "api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
+# route = { pattern = "api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
   { name = "WEB_SOCKET_DURABLE_OBJECT", class_name = "WebSocketDurableObject" }
