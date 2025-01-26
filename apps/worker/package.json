@@ -5,7 +5,7 @@
   "type": "module",
   "module": "./dist/index.mjs",
   "scripts": {
-    "dev": "NODE_ENV=development wrangler dev"
+    "dev": "NODE_ENV=development wrangler dev --show-interactive-dev-session false"
   },
   "dependencies": {
     "@knucklebones/common": "workspace:*",

@@ -13,9 +13,11 @@ interface InitGameRequestParams extends Omit<GameSettings, 'boType'> {
 }
 export async function initGame(
   { playerId, roomKey }: IdentificationParams,
-  { boType, difficulty, playerType }: InitGameRequestParams
+  { boType, difficulty, gameMode, playerType }: InitGameRequestParams
 ) {
   const urlSearchParams = new URLSearchParams()
+
+  urlSearchParams.append('gameMode', gameMode)
 
   if (playerType === 'ai' && difficulty !== undefined) {
     urlSearchParams.append('difficulty', difficulty)

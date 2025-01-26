@@ -11,9 +11,15 @@ import {
   saveGameState,
   saveLobby
 } from '../utils/endpoints'
+import { type GameMode } from './../../../../packages/common/src/types/gameSettings'
 
 export interface InitRequest extends BaseRequestWithProps {
-  query?: { displayName?: string; difficulty?: Difficulty; boType?: BoType }
+  query?: {
+    displayName?: string
+    difficulty?: Difficulty
+    gameMode?: GameMode
+    boType?: BoType
+  }
 }
 
 export async function init(
@@ -40,6 +46,10 @@ export async function init(
 
     if (request.query?.boType !== undefined) {
       lobby.setBoType(request.query.boType)
+    }
+
+    if (request.query?.gameMode !== undefined) {
+      lobby.setGameMode(request.query.gameMode)
     }
 
     if (lobby.addPlayer(player)) {

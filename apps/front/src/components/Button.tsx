@@ -1,5 +1,6 @@
 import type * as React from 'react'
 import { clsx } from 'clsx'
+import { IconWrapper } from './IconWrapper'
 
 export interface ButtonProps<E extends React.ElementType> {
   // Not a fan of having this prop
@@ -46,13 +47,9 @@ export function Button<E extends React.ElementType = typeof defaultElement>({
         props.className
       )}
     >
-      {leftIcon !== undefined && (
-        <div className='aspect-square h-6'>{leftIcon}</div>
-      )}
+      {leftIcon !== undefined && <IconWrapper>{leftIcon}</IconWrapper>}
       <div className='translate-y-px'>{children}</div>
-      {rightIcon !== undefined && (
-        <div className='aspect-square h-6'>{rightIcon}</div>
-      )}
+      {rightIcon !== undefined && <IconWrapper>{rightIcon}</IconWrapper>}
     </Component>
   )
 }

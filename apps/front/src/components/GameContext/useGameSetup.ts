@@ -55,7 +55,11 @@ export function useGameSetup() {
     if (readyState === ReadyState.OPEN) {
       initGame(
         { roomKey, playerId },
-        { playerType: 'human', boType: state?.boType }
+        {
+          playerType: 'human',
+          boType: state?.boType,
+          gameMode: state?.gameMode ?? 'classic'
+        }
       )
         .then(async () => {
           // À déplacer côté serveur
@@ -65,7 +69,8 @@ export function useGameSetup() {
               {
                 playerType: 'ai',
                 difficulty: state?.difficulty,
-                boType: state?.boType
+                boType: state?.boType,
+                gameMode: state?.gameMode
               }
             )
           }

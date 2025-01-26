@@ -1,6 +1,23 @@
 import { t } from 'i18next'
-import { type BoType, type Difficulty } from '@knucklebones/common'
+import {
+  type GameMode,
+  type BoType,
+  type Difficulty
+} from '@knucklebones/common'
 import { type Option } from '../ToggleGroup'
+
+export function getGameModeOptions(): Array<Option<GameMode>> {
+  return [
+    {
+      value: 'classic',
+      label: t('game-settings.game-mode.classic')
+    },
+    {
+      value: 'dice-pool',
+      label: t('game-settings.game-mode.dice-pool')
+    }
+  ]
+}
 
 export function getDifficultyOptions(): Array<Option<Difficulty>> {
   return [

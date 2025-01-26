@@ -15,6 +15,12 @@
   },
   "game-settings": {
     "title": "Game settings",
+    "game-mode": {
+      "label": "Game mode",
+      "info": "Classic : Rolling dice randomly.\nDice pool : Rolling dice from a dice pool generated when the game starts. Removed dice during the game are put back in the group.",
+      "classic": "Classic",
+      "dice-pool": "Dice pool"
+    },
     "difficulty": {
       "label": "AI difficulty",
       "easy": "Easy",

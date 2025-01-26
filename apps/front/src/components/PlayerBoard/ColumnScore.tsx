@@ -16,7 +16,7 @@ interface CountedDiceProps {
 
 function CountedDice({ value, count }: CountedDiceProps) {
   if (count === 1) {
-    return <Dice value={value} count={count} variant='small' />
+    return <Dice value={value} count={count} size='small' />
   }
   return (
     // TODO: div (dice) shouldn't be in p
@@ -24,7 +24,7 @@ function CountedDice({ value, count }: CountedDiceProps) {
       <span>(</span>
       {Array.from({ length: count }).map((_, i) => (
         <React.Fragment key={i}>
-          <Dice value={value} count={count} variant='small' />
+          <Dice value={value} count={count} size='small' />
           {i + 1 < count && <span>+</span>}
         </React.Fragment>
       ))}

@@ -2,13 +2,19 @@ import * as React from 'react'
 import { clsx } from 'clsx'
 import { Transition } from '@headlessui/react'
 
-type DiceVariant = 'base' | 'small'
-interface DiceProps {
+type DiceSize = 'medium' | 'small'
+type DiceVariant = 'solid' | 'outline'
+
+interface DiceStyle {
+  size?: DiceSize
+  variant?: DiceVariant
+}
+
+interface DiceProps extends DiceStyle {
   value?: number
   className?: string
   count?: number
   showUndefined?: boolean
-  variant?: DiceVariant
 }
 interface DotProps {
   className?: string
@@ -18,28 +24,31 @@ const baseClassName =
   'aspect-square h-12 portrait:md:h-16 landscape:md:h-12 landscape:lg:h-16'
 const smallClassName = 'aspect-square h-6'
 
-const VariantContext = React.createContext<DiceVariant>('base')
+const DiceStyleContext = React.createContext<Required<DiceStyle>>({
+  size: 'medium',
+  variant: 'solid'
+})
 
 function DicePlaceholder({ className }: DotProps) {
-  const variant = React.useContext(VariantContext)
+  const { size } = React.useContext(DiceStyleContext)
   return (
     <div
       className={clsx(className, {
-        [baseClassName]: variant === 'base',
-        [smallClassName]: variant === 'small'
+        [baseClassName]: size === 'medium',
+        [smallClassName]: size === 'small'
       })}
     ></div>
   )
 }
 
 function DiceContainer({ children }: React.PropsWithChildren) {
-  const variant = React.useContext(VariantContext)
+  const { size } = React.useContext(DiceStyleContext)
   return (
     <div
       className={clsx(
         'grid h-full w-full grid-cols-3 grid-rows-3 place-items-center p-1',
         {
-          'lg:p-2': variant === 'base'
+          'lg:p-2': size === 'medium'
         }
       )}
     >
@@ -49,7 +58,7 @@ function DiceContainer({ children }: React.PropsWithChildren) {
 }
 
 function Dot({ className }: DotProps) {
-  const variant = React.useContext(VariantContext)
+  const { size } = React.useContext(DiceStyleContext)
   return (
     <div
       className={clsx(
@@ -57,8 +66,8 @@ function Dot({ className }: DotProps) {
         className,
         {
           'h-2 portrait:md:h-3 landscape:md:h-2 landscape:lg:h-3':
-            variant === 'base',
-          'h-1': variant === 'small'
+            size === 'medium',
+          'h-1': size === 'small'
         }
       )}
     ></div>
@@ -150,13 +159,17 @@ const DiceMap: Record<number | 'undefined', React.ComponentType> = {
 
 function SimpleDice({ value, className, count = 1 }: DiceProps) {
   const DiceValue = DiceMap[value ?? 'undefined']
-  const variant = React.useContext(VariantContext)
+  const { size, variant } = React.useContext(DiceStyleContext)
   return (
     <div
+      // cva pour rendre ça plus lisible avec une meilleur définition des variantes composites
       className={clsx(
         'flex select-none flex-row items-center justify-center rounded border',
         className,
         {
+          'border-slate-900 dark:border-slate-50': variant === 'outline'
+        },
+        variant === 'solid' && {
           'border-stone-400 bg-stone-300 shadow-stone-400 dark:border-stone-600 dark:bg-stone-500 dark:shadow-stone-600':
             count === 1,
           'border-amber-400 bg-amber-300 shadow-amber-400 dark:border-amber-700 dark:bg-amber-600 dark:shadow-amber-700':
@@ -165,9 +178,9 @@ function SimpleDice({ value, className, count = 1 }: DiceProps) {
             count === 3
         },
         {
-          [baseClassName]: variant === 'base',
-          shadow: variant === 'base',
-          [smallClassName]: variant === 'small'
+          [baseClassName]: size === 'medium',
+          shadow: size === 'medium',
+          [smallClassName]: size === 'small'
         }
       )}
     >
@@ -181,7 +194,8 @@ export function Dice({
   className,
   count = 1,
   showUndefined = false,
-  variant = 'base'
+  variant = 'solid',
+  size = 'medium'
 }: DiceProps) {
   // Temporarily store the dice value to keep the dice shown during the
   // transition after it has been unset. While the animation is done, the cached
@@ -198,7 +212,7 @@ export function Dice({
 
   return (
     // Sharing the variant in a context so it's easier to drill it down
-    <VariantContext.Provider value={variant}>
+    <DiceStyleContext.Provider value={{ variant, size }}>
       <Transition
         show={Boolean(value) || showUndefined}
         className={clsx('transition duration-100 ease-in-out', className)}
@@ -219,6 +233,6 @@ export function Dice({
       {cachedValue === undefined && !showUndefined && (
         <DicePlaceholder className={className} />
       )}
-    </VariantContext.Provider>
+    </DiceStyleContext.Provider>
   )
 }
