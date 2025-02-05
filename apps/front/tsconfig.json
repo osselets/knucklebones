@@ -2,12 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "Bundler"
   },
-  "include": [
-    "src",
-    "@types"
-  ],
+  "include": ["src", "@types", "./theme.js"],
   "references": [
     {
       "path": "./tsconfig.node.json"

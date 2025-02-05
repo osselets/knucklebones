@@ -13,17 +13,10 @@ plugins:
   - react
   - react-hooks
   - import
-overrides:
-  -
-    # quick and dirty way to disable typescript eslint on .js file
-    files: *.js
 parserOptions:
   ecmaVersion: latest
   sourceType: module
-  project:
-    - apps/front/tsconfig.json
-    - apps/worker/tsconfig.json
-    - packages/common/tsconfig.json
+  project: true
 settings:
   import/resolver:
     typescript: true
