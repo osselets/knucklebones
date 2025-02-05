@@ -1,0 +1,11 @@
+/*
+  allow to quickly style the index.html before the full app loads, and avoid
+  flashes during refreshes
+*/
+body.dark {
+  /* bg-slate-900 */
+  background-color: #020617;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
