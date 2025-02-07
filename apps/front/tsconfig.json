@@ -4,7 +4,7 @@
     "jsx": "react-jsx",
     "moduleResolution": "Bundler"
   },
-  "include": ["src", "@types", "./theme.js"],
+  "include": ["src", "@types", "public/theme.js"],
   "references": [
     {
       "path": "./tsconfig.node.json"
