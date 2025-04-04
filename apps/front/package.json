@@ -14,7 +14,6 @@
     "@heroicons/react": "^2.1.1",
     "@knucklebones/common": "workspace:*",
     "@radix-ui/react-toggle-group": "^1.0.4",
-    "@use-gesture/react": "^10.3.0",
     "clsx": "^2.1.0",
     "i18next": "^23.10.1",
     "qrcode.react": "^3.1.0",

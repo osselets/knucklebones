@@ -12,7 +12,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240314.0",
+    "@cloudflare/workers-types": "^4.20240405.0",
     "@sentry/types": "^7.107.0",
     "@types/crypto-js": "^4.2.2",
     "@types/itty-router-extras": "^0.4.3",
@@ -45,7 +45,7 @@
     "turbo": "^1.12.5",
     "typescript": "^5.4.2",
     "vite": "^5.1.6",
-    "wrangler": "^3.34.2"
+    "wrangler": "^3.48.0"
   },
   "volta": {
     "node": "20.9.0"

@@ -19,7 +19,7 @@ export function HomePage() {
 
   return (
     <>
-      <div className='mx-4 flex flex-col items-center justify-center gap-4 md:gap-8'>
+      <div className='mx-4 flex flex-col items-center justify-center gap-8 md:gap-12'>
         <div className='flex flex-row items-center gap-2 md:gap-4'>
           <img
             src={KnucklebonesLogo}
