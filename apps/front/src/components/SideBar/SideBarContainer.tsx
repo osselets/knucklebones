@@ -6,6 +6,7 @@ import { useDrag } from '@use-gesture/react'
 import { useIsOnMobile } from '../../hooks/detectDevice'
 import KnucklebonesLogo from '../../svgs/logo.svg'
 import { IconButton } from '../IconButton'
+import { IconWrapper } from '../IconWrapper'
 import { Text } from '../Text'
 import { SideBarActionContainer } from './SideBarActions'
 
@@ -80,13 +81,11 @@ export function SideBarContainer({
           <div className='flex h-screen w-64 flex-col gap-12 border-r border-slate-300 bg-slate-50 p-2 pl-4 pt-4 shadow-lg transition-colors duration-150 ease-in-out lg:border-0 lg:shadow-none dark:border-slate-600 dark:bg-slate-900'>
             <Link
               to='/'
-              className='flex flex-row items-center gap-2 underline decoration-transparent decoration-4 underline-offset-2 transition-all duration-100 ease-in-out hover:decoration-slate-900'
+              className='flex flex-row items-center gap-2 underline decoration-transparent decoration-4 underline-offset-2 transition-all duration-100 ease-in-out hover:decoration-slate-900 dark:hover:decoration-slate-50'
             >
-              <img
-                src={KnucklebonesLogo}
-                alt='Knucklebones Logo'
-                className='aspect-square h-6'
-              />
+              <IconWrapper>
+                <img src={KnucklebonesLogo} alt='Knucklebones Logo' />
+              </IconWrapper>
               <Text
                 as='h1'
                 className='font-mona text-2xl font-bold tracking-tight'

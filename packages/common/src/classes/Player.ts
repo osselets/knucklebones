@@ -49,14 +49,23 @@ export class Player {
     }
   }
 
+  /**
+   * Returns how many dice have been removed from column
+   */
   removeDice(dice: number, column: number) {
     if (column < 0 || column > 2) {
       throw new Error('Invalid column. Value must be between 0 and 2.')
     }
 
+    const columnSizeBefore = this.columns[column].length
+
     this.columns[column] = this.columns[column].filter(
       (existingDice) => existingDice !== dice
     )
+
+    const columnSizeAfter = this.columns[column].length
+
+    return columnSizeBefore - columnSizeAfter
   }
 
   areColumnsFilled(): boolean {

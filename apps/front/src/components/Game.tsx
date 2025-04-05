@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useIsOnMobile } from '../hooks/detectDevice'
 import { useNoIndex } from '../hooks/useNoIndex'
 import { useGameWhileLoading } from './GameContext'
+import { GameMode } from './GameMode'
 import { GameOutcome } from './GameOutcome'
 import { HowToPlayModal } from './HowToPlay'
 import { Loading } from './Loading'
@@ -23,20 +24,18 @@ export function Game() {
 
   const { errorMessage, clearErrorMessage } = gameStore
 
-  // Pas tip top je trouve, mais virtuellement ça marche
-  const gameOutcome = <GameOutcome />
-
   return (
     <>
       <SideBarActions>
         <HowToPlayModal />
         <QRCodeModal />
         <OutcomeHistory />
-        {isOnMobile && gameOutcome}
+        {isOnMobile && <GameOutcome />}
+        <GameMode />
       </SideBarActions>
       <div ref={gameRef} className='flex flex-col items-center justify-around'>
         <PlayerTwoBoard />
-        {!isOnMobile && gameOutcome}
+        {!isOnMobile && <GameOutcome />}
         <PlayerOneBoard />
         <WarningToast message={errorMessage} onDismiss={clearErrorMessage} />
       </div>

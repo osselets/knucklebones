@@ -1,5 +1,6 @@
 import { Trans } from 'react-i18next'
 import { CodeBracketIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
+import { IconWrapper } from './IconWrapper'
 
 export function Footer() {
   return (
@@ -23,9 +24,9 @@ export function Footer() {
           target='_blank'
           rel='noreferrer'
         >
-          <div className='aspect-square h-6'>
+          <IconWrapper>
             <CodeBracketIcon />
-          </div>
+          </IconWrapper>
         </a>
         <a
           className='text-slate-900 transition-all hover:text-slate-900/80 dark:text-slate-200 dark:hover:text-slate-50/80'
@@ -33,9 +34,9 @@ export function Footer() {
           target='_blank'
           rel='noreferrer'
         >
-          <div className='aspect-square h-6'>
+          <IconWrapper>
             <EnvelopeIcon />
-          </div>
+          </IconWrapper>
         </a>
       </div>
     </>

@@ -15,6 +15,12 @@
   },
   "game-settings": {
     "title": "Paramètres de la partie",
+    "game-mode": {
+      "label": "Mode de jeu",
+      "info": "Classique : Tirage de dés aléatoire.\nPoule de dés : Tirage de dés depuis un groupe de dés générés en début de partie. Les dés retirés pendant la partie sont remis dans le groupe.",
+      "classic": "Classique",
+      "dice-pool": "Poule de dés"
+    },
     "difficulty": {
       "label": "Difficulté de l'IA",
       "easy": "Facile",
