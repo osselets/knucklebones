@@ -1,12 +1,11 @@
 import { error, status } from 'itty-router'
-import { type GameSettings, GameState, Player } from '@knucklebones/common'
+import { type GameSettings, GameState } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
-  getGameState,
-  saveGameState
+  getGameStateDurableObject
 } from '../utils/endpoints'
 
 export interface RematchRequest extends BaseRequestWithProps {
@@ -18,43 +17,26 @@ export async function rematch(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
-  const gameState = await getGameState(request)
+  const result = await getGameStateDurableObject(request).rematch(
+    request.playerId,
+    request.query
+  )
 
-  if (gameState.outcome === 'ongoing') {
+  if (result.status === 'game-ongoing') {
     return error(400, "The game is still ongoing. Can't rematch.")
   }
 
-  if (
-    (gameState.rematchVote === undefined && gameState.playerTwo.isAi()) || // Player one vote for rematch and player two is AI
-    (gameState.rematchVote !== undefined && // A player already voted for rematch and the other player is voting as well
-      gameState.rematchVote !== request.playerId)
-  ) {
-    const newGameState = new GameState({
-      playerOne: new Player(
-        gameState.playerOne.id,
-        gameState.playerOne.displayName
-      ),
-      playerTwo: new Player(
-        gameState.playerTwo.id,
-        gameState.playerTwo.displayName,
-        gameState.playerTwo.difficulty
-      )
-    })
-    newGameState.initialize({ ...gameState, ...request.query })
-
-    await saveGameState(newGameState, request)
-    await broadcastGameState(newGameState, request, cloudflareEnvironment)
+  if (result.status === 'updated') {
+    const gameState = GameState.fromJson(result.gameState)
+    await broadcastGameState(result.gameState, request, cloudflareEnvironment)
 
     if (
-      newGameState.playerTwo.isAi() &&
-      newGameState.nextPlayer.equals(newGameState.playerTwo)
+      gameState.outcome === 'ongoing' &&
+      gameState.playerTwo.isAi() &&
+      gameState.nextPlayer.equals(gameState.playerTwo)
     ) {
-      makeAiPlay(newGameState, request, cloudflareEnvironment, context)
+      makeAiPlay(gameState, request, cloudflareEnvironment, context)
     }
-  } else if (gameState.rematchVote === undefined) {
-    gameState.rematchVote = request.playerId
-    await saveGameState(gameState, request)
-    await broadcastGameState(gameState, request, cloudflareEnvironment)
   }
 
   return status(200)

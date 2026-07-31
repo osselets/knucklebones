@@ -3,8 +3,7 @@ import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import {
   broadcastGameState,
-  getGameState,
-  saveGameState
+  getGameStateDurableObject
 } from '../utils/endpoints'
 
 interface DisplayNameRequest extends BaseRequestWithProps {
@@ -15,18 +14,16 @@ export async function displayName(
   request: DisplayNameRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ) {
-  const gameState = await getGameState(request)
+  const result = await getGameStateDurableObject(request).updateDisplayName(
+    request.playerId,
+    request.displayName
+  )
 
-  if (gameState.playerOne?.id === request.playerId) {
-    gameState.playerOne.displayName = request.displayName
-  } else if (gameState.playerTwo?.id === request.playerId) {
-    gameState.playerTwo.displayName = request.displayName
-  } else {
+  if (result.status === 'unknown-player') {
     return error(400, 'Unexpected playerId received.')
   }
 
-  await saveGameState(gameState, request)
-  await broadcastGameState(gameState, request, cloudflareEnvironment)
+  await broadcastGameState(result.gameState, request, cloudflareEnvironment)
 
   return status(200)
 }

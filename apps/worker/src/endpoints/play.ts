@@ -1,11 +1,11 @@
 import { status } from 'itty-router'
+import { GameState } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
-  getGameState,
-  saveGameState
+  getGameStateDurableObject
 } from '../utils/endpoints'
 
 interface PlayRequest extends BaseRequestWithProps {
@@ -18,18 +18,15 @@ export async function play(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
-  const gameState = await getGameState(request)
-
   const play = {
     dice: Number(request.dice),
     column: Number(request.column),
     author: request.playerId
   }
 
-  gameState.applyPlay(play)
-
-  await saveGameState(gameState, request)
-  await broadcastGameState(gameState, request, cloudflareEnvironment)
+  const iGameState = await getGameStateDurableObject(request).play(play)
+  const gameState = GameState.fromJson(iGameState)
+  await broadcastGameState(iGameState, request, cloudflareEnvironment)
 
   if (
     gameState.outcome === 'ongoing' &&

@@ -1,15 +1,11 @@
 import { status } from 'itty-router'
-import { type Difficulty, Player, type BoType } from '@knucklebones/common'
+import { GameState, type Difficulty, type BoType } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
-  getGameState,
-  getLobby,
-  isGameStateInitialized,
-  saveGameState,
-  saveLobby
+  getGameStateDurableObject
 } from '../utils/endpoints'
 
 export interface InitRequest extends BaseRequestWithProps {
@@ -21,43 +17,23 @@ export async function init(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
-  if (await isGameStateInitialized(request)) {
-    const gameState = await getGameState(request)
+  const result = await getGameStateDurableObject(request).initializeGame({
+    playerId: request.playerId,
+    displayName: request.query?.displayName,
+    difficulty: request.query?.difficulty,
+    boType: request.query?.boType
+  })
 
-    if (gameState.addSpectator(request.playerId)) {
-      await saveGameState(gameState, request)
-    }
+  if (result.status !== 'waiting') {
+    const gameState = GameState.fromJson(result.gameState)
+    await broadcastGameState(result.gameState, request, cloudflareEnvironment)
 
-    await broadcastGameState(gameState, request, cloudflareEnvironment)
-  } else {
-    const lobby = await getLobby(request)
-
-    const player = new Player(
-      request.playerId,
-      request.query?.displayName,
-      request.query?.difficulty
-    )
-
-    if (request.query?.boType !== undefined) {
-      lobby.setBoType(request.query.boType)
-    }
-
-    if (lobby.addPlayer(player)) {
-      await saveLobby(lobby, request)
-    }
-
-    if (lobby.isReady()) {
-      const gameState = lobby.toGameState()
-
-      await saveGameState(gameState, request)
-      await broadcastGameState(gameState, request, cloudflareEnvironment)
-
-      if (
-        gameState.playerTwo.isAi() &&
-        gameState.nextPlayer.equals(gameState.playerTwo)
-      ) {
-        makeAiPlay(gameState, request, cloudflareEnvironment, context)
-      }
+    if (
+      result.status === 'created' &&
+      gameState.playerTwo.isAi() &&
+      gameState.nextPlayer.equals(gameState.playerTwo)
+    ) {
+      makeAiPlay(gameState, request, cloudflareEnvironment, context)
     }
   }
 

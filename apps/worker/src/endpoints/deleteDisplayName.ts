@@ -3,26 +3,23 @@ import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import {
   broadcastGameState,
-  getGameState,
-  saveGameState
+  getGameStateDurableObject
 } from '../utils/endpoints'
 
 export async function deleteDisplayName(
   request: BaseRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ) {
-  const gameState = await getGameState(request)
+  const result = await getGameStateDurableObject(request).updateDisplayName(
+    request.playerId,
+    undefined
+  )
 
-  if (gameState.playerOne?.id === request.playerId) {
-    gameState.playerOne.displayName = undefined
-  } else if (gameState.playerTwo?.id === request.playerId) {
-    gameState.playerTwo.displayName = undefined
-  } else {
+  if (result.status === 'unknown-player') {
     return error(400, 'Unexpected playerId received.')
   }
 
-  await saveGameState(gameState, request)
-  await broadcastGameState(gameState, request, cloudflareEnvironment)
+  await broadcastGameState(result.gameState, request, cloudflareEnvironment)
 
   return status(200)
 }
