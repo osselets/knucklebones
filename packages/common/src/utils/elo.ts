@@ -14,6 +14,7 @@ export function calculateEloRatings(
   const playerOneChange = Math.round(
     ELO_K_FACTOR * (playerOneScore - playerOneExpectedScore)
   )
+  const playerTwoChange = playerOneChange === 0 ? 0 : -playerOneChange
 
   return {
     playerOne: {
@@ -23,8 +24,8 @@ export function calculateEloRatings(
     },
     playerTwo: {
       before: playerTwoRating,
-      after: playerTwoRating - playerOneChange,
-      change: -playerOneChange
+      after: playerTwoRating + playerTwoChange,
+      change: playerTwoChange
     }
   }
 }
