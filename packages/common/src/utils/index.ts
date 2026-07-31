@@ -1,6 +1,7 @@
 export * from './array'
 export * from './count'
 export * from './outcomeHistory'
+export * from './playerIdentity'
 export * from './random'
 export * from './score'
 export * from './sleep'
