@@ -71,12 +71,8 @@ export class WebSocketDurableObject {
     this.state.acceptWebSocket(webSocket)
   }
 
-  async webSocketMessage(webSocket: WebSocket, message: string | ArrayBuffer) {
-    try {
-      this.broadcast(JSON.stringify(message))
-    } catch (error) {
-      this.sentry.captureException(error)
-    }
+  async webSocketMessage(webSocket: WebSocket) {
+    webSocket.close(1008, 'Client messages are not supported.')
   }
 
   async webSocketClose(
