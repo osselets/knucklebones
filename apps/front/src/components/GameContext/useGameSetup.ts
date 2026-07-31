@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useLocation } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
+  AI_PLAYER_ID,
   compatibleGameStateMessageSchema,
   GameState,
   type IGameState,
@@ -111,7 +112,7 @@ export function useGameSetup() {
           // À déplacer côté serveur
           if (state?.playerType === 'ai') {
             await initGame(
-              { roomKey, playerId: 'beep-boop' },
+              { roomKey, playerId: AI_PLAYER_ID },
               {
                 playerType: 'ai',
                 difficulty: state?.difficulty,
