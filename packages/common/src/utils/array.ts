@@ -1,37 +1,29 @@
-export function getMaxBy<T extends Record<string, unknown>>(
-  array: T[],
-  key: keyof T
-) {
+type NumberSelector<T> = (value: T) => number
+
+export function getMaxBy<T>(array: T[], selectNumber: NumberSelector<T>) {
   return array.reduce((acc, current) => {
-    return current[key] > acc[key] ? current : acc
+    return selectNumber(current) > selectNumber(acc) ? current : acc
   })
 }
 
-export function getMinBy<T extends Record<string, unknown>>(
-  array: T[],
-  key: keyof T
-) {
+export function getMinBy<T>(array: T[], selectNumber: NumberSelector<T>) {
   return array.reduce((acc, current) => {
-    return current[key] < acc[key] ? current : acc
+    return selectNumber(current) < selectNumber(acc) ? current : acc
   })
 }
 
-export function sortBy<T extends Record<string, unknown>>(
+export function sortBy<T>(
   array: T[],
-  key: keyof T,
+  selectNumber: NumberSelector<T>,
   order: 'ascending' | 'descending' = 'ascending'
 ) {
-  array = array.slice()
+  const sortedArray = array.slice()
 
-  return array.sort((a, b) => {
-    if (typeof a[key] === 'number' && typeof b[key] === 'number') {
-      if (order === 'ascending') {
-        return a[key] > b[key] ? 1 : -1
-      } else {
-        return a[key] > b[key] ? -1 : 1
-      }
+  return sortedArray.sort((a, b) => {
+    if (order === 'ascending') {
+      return selectNumber(a) - selectNumber(b)
     } else {
-      throw new Error('Unsupported type for comparison')
+      return selectNumber(b) - selectNumber(a)
     }
   })
 }

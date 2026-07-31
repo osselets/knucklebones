@@ -10,10 +10,9 @@ import { coinflip, getRandomDice, getWinHistory } from '../utils'
 import { Log } from './Log'
 import { Player } from './Player'
 
-interface GameStateConstructorArg
-  extends Partial<
-    Omit<IGameState, 'playerOne' | 'playerTwo' | 'logs' | 'nextPlayer'>
-  > {
+interface GameStateConstructorArg extends Partial<
+  Omit<IGameState, 'playerOne' | 'playerTwo' | 'logs' | 'nextPlayer'>
+> {
   playerOne: Player
   playerTwo: Player
   nextPlayer?: Player
