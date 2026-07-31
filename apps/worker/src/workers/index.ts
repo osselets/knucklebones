@@ -3,6 +3,7 @@ import { Router, cors, withParams } from 'itty-router'
 import { Toucan } from 'toucan-js'
 import {
   createPlayer,
+  createWebSocketTicket,
   deleteDisplayName,
   displayName,
   init,
@@ -34,6 +35,7 @@ router
 
   .post('/players', createPlayer)
   .all('/:roomKey/:playerId/*', authenticatePlayerMutation)
+  .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
   .post('/:roomKey/:playerId/init', init)
   .post('/:roomKey/:playerId/play/:column/:dice', play)
   .post('/:roomKey/:playerId/rematch', rematch)
@@ -94,7 +96,7 @@ export default {
 }
 
 function isWebSocketEndpointCalled(request: Request) {
-  const webSocketEndpointRegex = /\/[a-zA-Z0-9-]+\/websocket/
+  const webSocketEndpointRegex = /^\/[a-zA-Z0-9-]+\/websocket$/
   const pathname = new URL(request.url).pathname
   return webSocketEndpointRegex.test(pathname)
 }
