@@ -2,8 +2,8 @@ import * as React from 'react'
 import { useLocation } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
+  compatibleGameStateMessageSchema,
   GameState,
-  gameStateSchema,
   type IGameState,
   isEmptyOrBlank,
   type GameSettings
@@ -53,7 +53,8 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     if (lastJsonMessage !== null) {
-      const parsedGameState = gameStateSchema.safeParse(lastJsonMessage)
+      const parsedGameState =
+        compatibleGameStateMessageSchema.safeParse(lastJsonMessage)
 
       if (!parsedGameState.success) {
         console.error('Ignored an invalid game-state message.')
