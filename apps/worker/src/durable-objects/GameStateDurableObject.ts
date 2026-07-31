@@ -8,7 +8,8 @@ import {
   type ILobby,
   Lobby,
   Player,
-  type Play
+  type Play,
+  type PlayRejectionReason
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
@@ -30,6 +31,10 @@ export type RematchGameResult =
 
 export type UpdateDisplayNameResult =
   { status: 'unknown-player' } | { status: 'updated'; gameState: IGameState }
+
+export type PlayGameResult =
+  | { status: 'rejected'; reason: PlayRejectionReason }
+  | { status: 'updated'; gameState: IGameState }
 
 export class GameStateDurableObject extends createDurable({
   autoPersist: true
@@ -82,11 +87,17 @@ export class GameStateDurableObject extends createDurable({
     return { status: 'created', gameState }
   }
 
-  play(play: Play): IGameState {
+  play(play: Play): PlayGameResult {
     const gameState = this.getInitializedGameState()
+    const rejectionReason = gameState.getPlayRejectionReason(play)
+
+    if (rejectionReason !== undefined) {
+      return { status: 'rejected', reason: rejectionReason }
+    }
+
     gameState.applyPlay(play)
     this.gameState = gameState.toJson()
-    return this.gameState
+    return { status: 'updated', gameState: this.gameState }
   }
 
   rematch(
