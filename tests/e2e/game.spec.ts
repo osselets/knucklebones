@@ -111,6 +111,13 @@ test('synchronizes a human game across independent browser identities', async ({
       secondPlayer.getByText('Waiting for game to start...')
     ).toHaveCount(0)
 
+    const firstIdentity = await readIdentity(firstPlayer)
+    await firstPlayer.reload()
+    await expect(
+      firstPlayer.getByText('Waiting for game to start...')
+    ).toHaveCount(0)
+    expect(await readIdentity(firstPlayer)).toEqual(firstIdentity)
+
     const firstColumns = firstPlayer.locator('div[role="button"]')
     const secondColumns = secondPlayer.locator('div[role="button"]')
     await expect
@@ -131,6 +138,28 @@ test('synchronizes a human game across independent browser identities', async ({
     await firstContext.close()
     await secondContext.close()
   }
+})
+
+test('keeps the same identity and home route across language changes', async ({
+  page
+}) => {
+  await waitForHome(page)
+  const identity = await readIdentity(page)
+
+  await page.getByRole('link', { name: 'English' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Jouer contre une IA' })
+  ).toBeVisible()
+  await expect(page).toHaveURL(/\/fr\/$/)
+  expect(await readIdentity(page)).toEqual(identity)
+
+  await page.getByRole('link', { name: 'Français' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Play against an AI' })
+  ).toBeVisible()
+  await expect(page).toHaveURL(/\/en\/$/)
+  expect(await readIdentity(page)).toEqual(identity)
+  await expect(page.getByText('Waiting for game to start...')).toHaveCount(0)
 })
 
 test('transfers an identity between independent browsers', async ({
