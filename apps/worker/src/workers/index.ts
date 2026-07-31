@@ -7,7 +7,10 @@ import {
   deleteDisplayName,
   displayName,
   getRankedProfile,
+  getMatchmakingStatus,
   init,
+  joinMatchmaking,
+  leaveMatchmaking,
   play,
   rematch,
   verifyPlayer,
@@ -24,6 +27,7 @@ import {
 import { withMutationId } from '../utils/idempotency'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
+export { MatchmakingDurableObject } from '../durable-objects/MatchmakingDurableObject'
 export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObject'
 
 const router = Router()
@@ -40,6 +44,10 @@ router
   .all('/players/:playerId/*', authenticatePlayerRequest)
   .post('/players/:playerId/verify', verifyPlayer)
   .get('/players/:playerId/rating', getRankedProfile)
+  .all('/matchmaking/:playerId/*', authenticatePlayerRequest)
+  .post('/matchmaking/:playerId/join', joinMatchmaking)
+  .get('/matchmaking/:playerId/status', getMatchmakingStatus)
+  .delete('/matchmaking/:playerId/queue', leaveMatchmaking)
   .all('/:roomKey/:playerId/*', authenticatePlayerRequest)
   .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
   .post('/:roomKey/:playerId/init', withMutationId, init)
