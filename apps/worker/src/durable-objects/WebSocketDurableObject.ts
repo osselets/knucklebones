@@ -1,5 +1,6 @@
 import { Toucan } from 'toucan-js'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
+import { apiError } from '../utils/http'
 
 export class WebSocketDurableObject {
   state: DurableObjectState
@@ -19,16 +20,20 @@ export class WebSocketDurableObject {
   }
 
   async fetch(request: Request) {
+    const requestId = request.headers.get('X-Request-Id') ?? crypto.randomUUID()
+
     try {
       const url = new URL(request.url)
 
       switch (url.pathname) {
         case '/websocket': {
           if (request.headers.get('Upgrade') !== 'websocket') {
-            return new Response(
-              'Expected Upgrade header with webSocket value but found nothing',
-              { status: 400 }
-            )
+            return apiError({
+              status: 426,
+              code: 'WEBSOCKET_UPGRADE_REQUIRED',
+              message: 'Expected a WebSocket upgrade request.',
+              requestId
+            })
           }
 
           const [client, server] = Object.values(new WebSocketPair())
@@ -42,12 +47,22 @@ export class WebSocketDurableObject {
           return new Response(null, { status: 200 })
         }
         default:
-          return new Response('Not found', { status: 404 })
+          return apiError({
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'The requested resource was not found.',
+            requestId
+          })
       }
     } catch (error) {
+      this.sentry.setTag('request_id', requestId)
       this.sentry.captureException(error)
-      return new Response('Something went wrong! Team has been notified.', {
-        status: 500
+      return apiError({
+        status: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'Something went wrong. The team has been notified.',
+        requestId,
+        retryable: true
       })
     }
   }

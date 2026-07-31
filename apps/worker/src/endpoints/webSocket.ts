@@ -1,7 +1,8 @@
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
+import { type RequestWithId } from '../types/itty'
 
 export async function webSocket(
-  request: Request,
+  request: Request & RequestWithId,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
   const pathname = new URL(request.url).pathname
@@ -11,6 +12,11 @@ export async function webSocket(
 
   const id = cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.idFromName(roomKey)
   const webSocketStore = cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.get(id)
+  const durableObjectRequest = new Request(
+    'https://dummy-url/websocket',
+    request
+  )
+  durableObjectRequest.headers.set('X-Request-Id', request.requestId)
 
-  return await webSocketStore.fetch('https://dummy-url/websocket', request)
+  return await webSocketStore.fetch(durableObjectRequest)
 }

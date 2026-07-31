@@ -1,5 +1,5 @@
 import { withDurables } from 'itty-durable'
-import { Router, cors, error, withParams } from 'itty-router'
+import { Router, cors, withParams } from 'itty-router'
 import { Toucan } from 'toucan-js'
 import {
   deleteDisplayName,
@@ -10,6 +10,12 @@ import {
   webSocket
 } from '../endpoints'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
+import { type RequestWithId } from '../types/itty'
+import {
+  apiError,
+  sanitizeRequestForSentry,
+  withRequestId
+} from '../utils/http'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
 export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObject'
@@ -30,7 +36,14 @@ router
 
   .delete('/:roomKey/:playerId/displayName', deleteDisplayName)
 
-  .all('*', () => error(404, 'Are you sure about that?'))
+  .all('*', (request: RequestWithId) =>
+    apiError({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: 'The requested resource was not found.',
+      requestId: request.requestId
+    })
+  )
 
 export default {
   async fetch(
@@ -38,24 +51,40 @@ export default {
     cloudflareEnvironment: CloudflareEnvironment,
     context: ExecutionContext
   ) {
+    const requestId = crypto.randomUUID()
+    const requestWithId = Object.assign(request, {
+      requestId
+    }) as Request & RequestWithId
     const sentry = new Toucan({
       dsn: cloudflareEnvironment.SENTRY_DSN,
       context,
-      request
+      request: sanitizeRequestForSentry(request, requestId)
     })
+    sentry.setTag('request_id', requestId)
 
-    if (isWebSocketEndpointCalled(request)) {
-      return await webSocket(request, cloudflareEnvironment).catch((error) => {
-        sentry.captureException(error)
+    try {
+      if (isWebSocketEndpointCalled(requestWithId)) {
+        const response = await webSocket(requestWithId, cloudflareEnvironment)
+        return withRequestId(response, requestId)
+      }
+
+      const response = await router.fetch(
+        requestWithId,
+        cloudflareEnvironment,
+        context
+      )
+      return withRequestId(corsify(response, requestWithId), requestId)
+    } catch (error: unknown) {
+      sentry.captureException(error)
+      const response = apiError({
+        status: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'Something went wrong. The team has been notified.',
+        requestId,
+        retryable: true
       })
+      return withRequestId(corsify(response, requestWithId), requestId)
     }
-
-    return await router
-      .fetch(request, cloudflareEnvironment, context)
-      .then((response) => corsify(response, request))
-      .catch((error: unknown) => {
-        sentry.captureException(error)
-      })
   }
 }
 

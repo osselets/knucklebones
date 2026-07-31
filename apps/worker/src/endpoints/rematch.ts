@@ -1,4 +1,4 @@
-import { error, status } from 'itty-router'
+import { status } from 'itty-router'
 import { type GameSettings, GameState } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
@@ -7,6 +7,7 @@ import {
   broadcastGameState,
   getGameStateDurableObject
 } from '../utils/endpoints'
+import { apiError } from '../utils/http'
 
 export interface RematchRequest extends BaseRequestWithProps {
   query?: Omit<GameSettings, 'playerType'>
@@ -23,7 +24,12 @@ export async function rematch(
   )
 
   if (result.status === 'game-ongoing') {
-    return error(400, "The game is still ongoing. Can't rematch.")
+    return apiError({
+      status: 409,
+      code: 'GAME_STILL_ONGOING',
+      message: "The game is still ongoing. Can't rematch.",
+      requestId: request.requestId
+    })
   }
 
   if (result.status === 'updated') {

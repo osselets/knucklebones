@@ -36,6 +36,7 @@ export function makeAiPlay(
         column: nextMove.column,
         roomKey: request.roomKey,
         playerId: gameState.playerTwo.id,
+        requestId: request.requestId,
         GAME_STATE_DURABLE_OBJECT: request.GAME_STATE_DURABLE_OBJECT
       },
       cloudflareEnvironment,
