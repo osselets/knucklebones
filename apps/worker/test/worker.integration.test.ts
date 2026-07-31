@@ -4,6 +4,7 @@ import {
   matchmakingStatusSchema,
   playerCredentialsSchema,
   rankedProfileSchema,
+  webSocketTicketSchema,
   type PlayerCredentials
 } from '@knucklebones/common'
 
@@ -40,6 +41,16 @@ async function createPlayer(): Promise<PlayerCredentials> {
   const response = await request('/players', { method: 'POST' })
   expect(response.status).toBe(201)
   return playerCredentialsSchema.parse(await response.json())
+}
+
+async function setRating(playerId: string, rating: number): Promise<void> {
+  const environment = await server.getWorker().getEnv()
+  const result = await environment.PLAYERS_DB.prepare(
+    'UPDATE player_ratings SET rating = ? WHERE player_id = ?'
+  )
+    .bind(rating, playerId)
+    .run()
+  expect(result.meta.changes).toBe(1)
 }
 
 function authorization({ credential }: PlayerCredentials): HeadersInit {
@@ -96,6 +107,30 @@ describe('player identities and ranked profiles', () => {
     })
     expect(error.error.requestId).toEqual(expect.any(String))
   })
+
+  it('rejects malformed credentials and accepts only the issued secret', async () => {
+    const player = await createPlayer()
+    const path = `/players/${player.playerId}/verify`
+
+    const missing = await request(path, { method: 'POST' })
+    const malformed = await request(path, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer not-a-credential' }
+    })
+    const incorrect = await request(path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${'b'.repeat(64)}` }
+    })
+    const valid = await request(path, {
+      method: 'POST',
+      headers: authorization(player)
+    })
+
+    expect(missing.status).toBe(401)
+    expect(malformed.status).toBe(401)
+    expect(incorrect.status).toBe(401)
+    expect(valid.status).toBe(204)
+  })
 })
 
 describe('atomic idempotent room mutations', () => {
@@ -112,14 +147,16 @@ describe('atomic idempotent room mutations', () => {
       }
     }
 
-    const first = await request(
-      `/${roomKey}/${playerOne.playerId}/init?boType=1`,
-      playerOneRequest
-    )
-    const replay = await request(
-      `/${roomKey}/${playerOne.playerId}/init?boType=1`,
-      playerOneRequest
-    )
+    const [first, replay] = await Promise.all([
+      request(
+        `/${roomKey}/${playerOne.playerId}/init?boType=1`,
+        playerOneRequest
+      ),
+      request(
+        `/${roomKey}/${playerOne.playerId}/init?boType=1`,
+        playerOneRequest
+      )
+    ])
     const conflict = await request(`/${roomKey}/${playerTwo.playerId}/init`, {
       method: 'POST',
       headers: {
@@ -137,7 +174,82 @@ describe('atomic idempotent room mutations', () => {
   })
 })
 
+describe('WebSocket tickets', () => {
+  it('rejects missing, malformed, and wrong-room tickets', async () => {
+    const player = await createPlayer()
+    const roomKey = crypto.randomUUID()
+    const ticketResponse = await request(
+      `/${roomKey}/${player.playerId}/websocket-ticket`,
+      { method: 'POST', headers: authorization(player) }
+    )
+    const { ticket } = webSocketTicketSchema.parse(await ticketResponse.json())
+
+    const missing = await request(`/${roomKey}/websocket`, {
+      headers: { Upgrade: 'websocket' }
+    })
+    const malformed = await request(
+      `/${roomKey}/websocket?ticket=not-a-ticket`,
+      { headers: { Upgrade: 'websocket' } }
+    )
+    const wrongRoom = await request(
+      `/${crypto.randomUUID()}/websocket?ticket=${ticket}`,
+      { headers: { Upgrade: 'websocket' } }
+    )
+
+    expect(missing.status).toBe(401)
+    expect(malformed.status).toBe(401)
+    expect(wrongRoom.status).toBe(401)
+  })
+})
+
 describe('ranked matchmaking', () => {
+  it('keeps both players waiting during the fast selection window', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    const [playerOneJoin, playerTwoJoin] = await Promise.all([
+      request(`/matchmaking/${playerOne.playerId}/join`, {
+        method: 'POST',
+        headers: authorization(playerOne)
+      }),
+      request(`/matchmaking/${playerTwo.playerId}/join`, {
+        method: 'POST',
+        headers: authorization(playerTwo)
+      })
+    ])
+
+    expect(
+      matchmakingStatusSchema.parse(await playerOneJoin.json()).status
+    ).toBe('waiting')
+    expect(
+      matchmakingStatusSchema.parse(await playerTwoJoin.json()).status
+    ).toBe('waiting')
+  })
+
+  it('does not reset the selection window when a player joins twice', async () => {
+    const player = await createPlayer()
+
+    const first = matchmakingStatusSchema.parse(
+      await (
+        await request(`/matchmaking/${player.playerId}/join`, {
+          method: 'POST',
+          headers: authorization(player)
+        })
+      ).json()
+    )
+    const duplicate = matchmakingStatusSchema.parse(
+      await (
+        await request(`/matchmaking/${player.playerId}/join`, {
+          method: 'POST',
+          headers: authorization(player)
+        })
+      ).json()
+    )
+
+    expect(first.status).toBe('waiting')
+    expect(duplicate).toEqual(first)
+  })
+
   it('assigns two waiting players to the same BO1 room', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
@@ -195,13 +307,89 @@ describe('ranked matchmaking', () => {
       method: 'DELETE',
       headers: authorization(player)
     })
+    const duplicateLeave = await request(
+      `/matchmaking/${player.playerId}/queue`,
+      { method: 'DELETE', headers: authorization(player) }
+    )
     const status = await request(`/matchmaking/${player.playerId}/status`, {
       headers: authorization(player)
     })
 
     expect(leave.status).toBe(204)
+    expect(duplicateLeave.status).toBe(204)
     expect(matchmakingStatusSchema.parse(await status.json())).toEqual({
       status: 'idle'
     })
+
+    const rejoin = await request(`/matchmaking/${player.playerId}/join`, {
+      method: 'POST',
+      headers: authorization(player)
+    })
+    expect(matchmakingStatusSchema.parse(await rejoin.json()).status).toBe(
+      'waiting'
+    )
+  })
+
+  it('chooses the closest rating after the selection window', async () => {
+    const player = await createPlayer()
+    const distantOpponent = await createPlayer()
+    const closeOpponent = await createPlayer()
+    await setRating(player.playerId, 1200)
+    await setRating(distantOpponent.playerId, 1800)
+    await setRating(closeOpponent.playerId, 1225)
+
+    const joinResponses = await Promise.all(
+      [player, distantOpponent, closeOpponent].map(async (candidate) =>
+        request(`/matchmaking/${candidate.playerId}/join`, {
+          method: 'POST',
+          headers: authorization(candidate)
+        })
+      )
+    )
+    for (const response of joinResponses) {
+      expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(
+        'waiting'
+      )
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const response = await request(`/matchmaking/${player.playerId}/status`, {
+      headers: authorization(player)
+    })
+    const match = matchmakingStatusSchema.parse(await response.json())
+
+    expect(match.status).toBe('matched')
+    if (match.status !== 'matched') {
+      throw new Error('Expected the player to be matched.')
+    }
+    expect([match.match.playerOneId, match.match.playerTwoId]).toEqual([
+      player.playerId,
+      closeOpponent.playerId
+    ])
+  })
+
+  it('falls back to a distant opponent instead of waiting indefinitely', async () => {
+    const player = await createPlayer()
+    const opponent = await createPlayer()
+    await setRating(player.playerId, 800)
+    await setRating(opponent.playerId, 2400)
+
+    await Promise.all(
+      [player, opponent].map(async (candidate) =>
+        request(`/matchmaking/${candidate.playerId}/join`, {
+          method: 'POST',
+          headers: authorization(candidate)
+        })
+      )
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const response = await request(`/matchmaking/${player.playerId}/status`, {
+      headers: authorization(player)
+    })
+
+    expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(
+      'matched'
+    )
   })
 })

@@ -14,6 +14,15 @@ interface PendingWebSocketTicket {
 
 type PendingWebSocketTickets = Record<string, PendingWebSocketTicket>
 
+export function removeExpiredWebSocketTickets(
+  tickets: PendingWebSocketTickets,
+  now: number
+): PendingWebSocketTickets {
+  return Object.fromEntries(
+    Object.entries(tickets).filter(([, ticket]) => ticket.expiresAt > now)
+  )
+}
+
 interface WebSocketSession {
   playerId: string
   connectedAt: number
@@ -154,7 +163,7 @@ export class WebSocketDurableObject {
       const tickets = await transaction.get<PendingWebSocketTickets>(
         WEB_SOCKET_TICKETS_STORAGE_KEY
       )
-      const activeTickets = this.removeExpiredTickets(tickets ?? {}, now)
+      const activeTickets = removeExpiredWebSocketTickets(tickets ?? {}, now)
       activeTickets[ticketHash] = { playerId, expiresAt }
       await transaction.put(WEB_SOCKET_TICKETS_STORAGE_KEY, activeTickets)
     })
@@ -179,7 +188,7 @@ export class WebSocketDurableObject {
       const tickets = await transaction.get<PendingWebSocketTickets>(
         WEB_SOCKET_TICKETS_STORAGE_KEY
       )
-      const activeTickets = this.removeExpiredTickets(tickets ?? {}, now)
+      const activeTickets = removeExpiredWebSocketTickets(tickets ?? {}, now)
       const pendingTicket = activeTickets[ticketHash]
 
       delete activeTickets[ticketHash]
@@ -196,14 +205,5 @@ export class WebSocketDurableObject {
 
       return { playerId: pendingTicket.playerId, connectedAt: now }
     })
-  }
-
-  private removeExpiredTickets(
-    tickets: PendingWebSocketTickets,
-    now: number
-  ): PendingWebSocketTickets {
-    return Object.fromEntries(
-      Object.entries(tickets).filter(([, ticket]) => ticket.expiresAt > now)
-    )
   }
 }
