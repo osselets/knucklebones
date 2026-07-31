@@ -153,7 +153,11 @@ importers:
         specifier: ^4.1.1
         version: 4.1.1
 
-  packages/common: {}
+  packages/common:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
 packages:
 
