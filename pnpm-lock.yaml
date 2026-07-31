@@ -131,9 +131,6 @@ importers:
       react-use-websocket:
         specifier: ^4.13.0
         version: 4.13.0
-      unique-names-generator:
-        specifier: ^4.7.1
-        version: 4.7.1
       uuid:
         specifier: ^14.0.1
         version: 14.0.1
@@ -2816,10 +2813,6 @@ packages:
   unenv@2.0.0-rc.24:
     resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
 
-  unique-names-generator@4.7.1:
-    resolution: {integrity: sha512-lMx9dX+KRmG8sq6gulYYpKWZc9RlGsgBR6aoO8Qsm3qvkSJ+3rAymr+TnV8EDMrIrwuFJ4kruzMWM/OpYzPoow==}
-    engines: {node: '>=8'}
-
   unrs-resolver@1.12.2:
     resolution: {integrity: sha512-dmlRxBJJayXjqTwC+JtF1HhJmgf3ftQ3YejFcZrf4+KKtJv0qDsK1pjqaaVjG7wJ5NJ6UVP1OqRMQ71Z4C3rxQ==}
 
@@ -5424,8 +5417,6 @@ snapshots:
   unenv@2.0.0-rc.24:
     dependencies:
       pathe: 2.0.3
-
-  unique-names-generator@4.7.1: {}
 
   unrs-resolver@1.12.2:
     dependencies:

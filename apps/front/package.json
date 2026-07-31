@@ -23,7 +23,6 @@
     "react-i18next": "^17.0.11",
     "react-router-dom": "7.18.2",
     "react-use-websocket": "^4.13.0",
-    "unique-names-generator": "^4.7.1",
     "uuid": "^14.0.1"
   }
 }
