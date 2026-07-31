@@ -85,7 +85,7 @@ export async function deleteDisplayName({
   await sendApiRequest(path, 'DELETE')
 }
 
-async function sendApiRequest(path: string, method: Method, body?: any) {
+async function sendApiRequest(path: string, method: Method, body?: unknown) {
   const headers = {
     Accept: 'application/json',
     ...(body !== undefined && { 'Content-Type': 'application/json' })

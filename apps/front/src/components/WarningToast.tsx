@@ -19,6 +19,7 @@ export function WarningToast({ message, onDismiss }: WarningToastProps) {
 
   return (
     <Transition
+      as='div'
       show={message !== null}
       enter='transition duration-200'
       enterFrom='opacity-0 translate-y-8'

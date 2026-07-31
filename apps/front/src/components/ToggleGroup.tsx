@@ -8,7 +8,8 @@ export interface Option<V = string> {
 }
 
 interface ToggleGroupProps<V = string>
-  extends RadixToggleGroup.ToggleGroupSingleProps,
+  extends
+    RadixToggleGroup.ToggleGroupSingleProps,
     Pick<ButtonProps<'button'>, 'size' | 'variant'> {
   options: Array<Option<V>>
   mandatory?: boolean

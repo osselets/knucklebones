@@ -4,7 +4,7 @@ import { CodeBracketIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
 export function Footer() {
   return (
     <>
-      <div className='whitespace-pre-line text-center text-xs'>
+      <div className='text-center text-xs whitespace-pre-line'>
         <Trans i18nKey='home.footer'>
           <a
             href='https://www.cultofthelamb.com/'

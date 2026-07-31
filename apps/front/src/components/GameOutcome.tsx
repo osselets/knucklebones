@@ -6,7 +6,7 @@ import { Button } from './Button'
 import { useGame, type InGameContext } from './GameContext'
 import { ShortcutModal } from './ShortcutModal'
 
-interface GetWinMessageArgs extends Pick<InGameContext, 'outcome' | 'winner'> {}
+type GetWinMessageArgs = Pick<InGameContext, 'outcome' | 'winner'>
 
 function getWinMessage({ outcome, winner }: GetWinMessageArgs) {
   if (outcome !== 'ongoing') {

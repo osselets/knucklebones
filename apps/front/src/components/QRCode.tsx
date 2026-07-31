@@ -1,8 +1,7 @@
-import type * as React from 'react'
+import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { QrCodeIcon, LinkIcon } from '@heroicons/react/24/outline'
 import { QRCodeSVG } from 'qrcode.react'
-import { useClipboard } from 'use-clipboard-copy'
 import { Button } from './Button'
 import { Modal } from './Modal'
 import { ShortcutModal } from './ShortcutModal'
@@ -12,8 +11,25 @@ interface QRCodeBaseProps {
 }
 
 function QRCodeBase({ title }: QRCodeBaseProps) {
-  const { copy, copied } = useClipboard({ copiedTimeout: 750 })
+  const [copied, setCopied] = React.useState(false)
+  const copiedTimeout = React.useRef<ReturnType<typeof setTimeout>>(undefined)
   const { t } = useTranslation()
+
+  React.useEffect(() => {
+    return () => {
+      clearTimeout(copiedTimeout.current)
+    }
+  }, [])
+
+  async function copyUrl() {
+    await navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+
+    clearTimeout(copiedTimeout.current)
+    copiedTimeout.current = setTimeout(() => {
+      setCopied(false)
+    }, 750)
+  }
 
   return (
     <>
@@ -26,7 +42,7 @@ function QRCodeBase({ title }: QRCodeBaseProps) {
           className='flex flex-row items-center gap-2 text-lg'
           leftIcon={copied ? undefined : <LinkIcon />}
           onClick={() => {
-            copy(window.location.href)
+            void copyUrl()
           }}
         >
           {t(copied ? 'menu.share.copied' : 'menu.share.copy')}

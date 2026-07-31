@@ -12,7 +12,7 @@ const PLAYER_TWO_REMOVE_EXAMPLE_COLUMNS = [[], [], [6, 6]]
 
 function ExplanationText({ children }: React.PropsWithChildren) {
   return (
-    <p className='whitespace-pre-line text-center text-lg font-medium leading-tight'>
+    <p className='text-center text-lg leading-tight font-medium whitespace-pre-line'>
       {children}
     </p>
   )

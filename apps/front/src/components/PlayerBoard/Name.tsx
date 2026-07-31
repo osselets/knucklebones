@@ -117,7 +117,7 @@ export function Name({
   } else {
     return (
       <div className='flex flex-wrap items-center justify-center gap-2'>
-        <p className='break-all text-center'>
+        <p className='text-center break-all'>
           {name}
           {isPlayerOne && isEditable && ` (${t('game.you')})`}
         </p>

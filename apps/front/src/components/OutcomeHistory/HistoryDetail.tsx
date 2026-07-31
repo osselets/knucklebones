@@ -5,8 +5,10 @@ import { type InGameContext } from '../GameContext'
 import { Text } from '../Text'
 import { PlayerHistoryDetail } from './PlayerHistoryDetail'
 
-interface HistoryDetailProps
-  extends Pick<InGameContext, 'playerOne' | 'playerTwo'> {
+interface HistoryDetailProps extends Pick<
+  InGameContext,
+  'playerOne' | 'playerTwo'
+> {
   detailedHistory: DetailedHistory
 }
 

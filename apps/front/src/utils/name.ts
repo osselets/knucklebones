@@ -32,8 +32,7 @@ function getAiName(difficulty: Difficulty) {
   return `${t('game.ai')} (${t(`game-settings.difficulty.${difficulty}`)})`
 }
 
-export interface PlayerNameProps
-  extends Pick<IPlayer, 'displayName' | 'id' | 'difficulty'> {}
+export type PlayerNameProps = Pick<IPlayer, 'displayName' | 'id' | 'difficulty'>
 
 export function getName({ difficulty, displayName, id }: PlayerNameProps) {
   if (difficulty !== undefined) {
