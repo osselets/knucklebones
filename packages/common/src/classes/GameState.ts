@@ -256,6 +256,8 @@ export class GameState implements IGameState {
     playerTwo,
     nextPlayer,
     logs,
+    spectators,
+    outcomeHistory,
     ...rest
   }: IGameState) {
     return new GameState({
@@ -263,7 +265,12 @@ export class GameState implements IGameState {
       playerOne: Player.fromJson(playerOne),
       playerTwo: Player.fromJson(playerTwo),
       nextPlayer: Player.fromJson(nextPlayer),
-      logs: logs.map((iLog) => Log.fromJson(iLog))
+      logs: logs.map((iLog) => Log.fromJson(iLog)),
+      spectators: [...spectators],
+      outcomeHistory: outcomeHistory.map((outcome) => ({
+        playerOne: { ...outcome.playerOne },
+        playerTwo: { ...outcome.playerTwo }
+      }))
     })
   }
 

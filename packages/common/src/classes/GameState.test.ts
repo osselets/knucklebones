@@ -24,6 +24,16 @@ describe('GameState play validation', () => {
     expect(gameState.nextPlayer.id).toBe('player-two')
   })
 
+  it('does not mutate serialized state while applying an optimistic move', () => {
+    const serializedState = createGameState().toJson()
+    const hydratedState = GameState.fromJson(serializedState)
+
+    hydratedState.applyPlay({ author: 'player-one', column: 1, dice: 4 }, false)
+
+    expect(hydratedState.playerOne.columns).toEqual([[], [4], []])
+    expect(serializedState.playerOne.columns).toEqual([[], [], []])
+  })
+
   it.each([
     ['unknown-player', { author: 'spectator', column: 0, dice: 4 }],
     ['not-player-turn', { author: 'player-two', column: 0, dice: 4 }],
@@ -60,6 +70,40 @@ describe('GameState play validation', () => {
         author: 'player-one',
         column: 0,
         dice: 4
+      })
+    ).toBe('game-ended')
+  })
+
+  it('records the final outcome when a BO1 board is completed', () => {
+    const playerOne = new Player('player-one', 'Player One', undefined, 6, [
+      [1, 2, 3],
+      [1, 2, 3],
+      [4, 5]
+    ])
+    const playerTwo = new Player('player-two', 'Player Two')
+    const gameState = new GameState({
+      playerOne,
+      playerTwo,
+      nextPlayer: playerOne,
+      outcome: 'ongoing',
+      boType: 1
+    })
+
+    gameState.applyPlay({ author: 'player-one', column: 2, dice: 6 })
+
+    expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.winnerId).toBe('player-one')
+    expect(gameState.outcomeHistory).toEqual([
+      {
+        playerOne: { id: 'player-one', score: 27 },
+        playerTwo: { id: 'player-two', score: 0 }
+      }
+    ])
+    expect(
+      gameState.getPlayRejectionReason({
+        author: 'player-two',
+        column: 0,
+        dice: 1
       })
     ).toBe('game-ended')
   })
