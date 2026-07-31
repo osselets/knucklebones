@@ -1,6 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-mona: 'Mona Sans';
+}
+
+@utility grid-cols-3-central {
+  grid-template-columns: 1fr auto 1fr;
+}
 
 @font-face {
   font-family: 'Hubot Sans';
@@ -21,8 +29,10 @@
 }
 
 @layer base {
-  html, button, input {
+  html,
+  button,
+  input {
     font-family: 'Hubot Sans', system-ui, sans-serif;
-    font-feature-settings: "ss01", "ss04", "tnum";
+    font-feature-settings: 'ss01', 'ss04', 'tnum';
   }
 }

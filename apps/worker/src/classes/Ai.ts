@@ -44,7 +44,11 @@ export class Ai {
     weightedPlays: WeightedPlay[],
     strategy: Strategy
   ): WeightedPlay {
-    const sortedWeightedPlays = sortBy(weightedPlays, 'score', 'ascending')
+    const sortedWeightedPlays = sortBy(
+      weightedPlays,
+      ({ score }) => score,
+      'ascending'
+    )
     // Defaults when there's not enough plays (e.g. column is full)
     const [easy, medium = easy, hard = medium] = sortedWeightedPlays
 
@@ -68,9 +72,9 @@ export class Ai {
 
     if (duplicatePlays.length > 1) {
       if (strategy === 'offensive') {
-        return getMaxBy(duplicatePlays, 'gain')
+        return getMaxBy(duplicatePlays, ({ gain }) => gain)
       } else {
-        return getMinBy(duplicatePlays, 'risk')
+        return getMinBy(duplicatePlays, ({ risk }) => risk)
       }
     } else {
       return recommendedPlay

@@ -3,8 +3,10 @@ import { type GameOutcome } from '@knucklebones/common'
 import { getPlayerFromId } from '../../utils/player'
 import { type InGameContext } from '../GameContext'
 
-interface GetLeadMessageArgs
-  extends Pick<InGameContext, 'playerOne' | 'playerTwo' | 'boType'> {
+interface GetLeadMessageArgs extends Pick<
+  InGameContext,
+  'playerOne' | 'playerTwo' | 'boType'
+> {
   gameOutcome: GameOutcome
 }
 export function getLeadMessage({

@@ -154,7 +154,7 @@ function SimpleDice({ value, className, count = 1 }: DiceProps) {
   return (
     <div
       className={clsx(
-        'flex select-none flex-row items-center justify-center rounded border',
+        'flex flex-row items-center justify-center rounded border select-none',
         className,
         {
           'border-stone-400 bg-stone-300 shadow-stone-400 dark:border-stone-600 dark:bg-stone-500 dark:shadow-stone-600':
@@ -200,6 +200,7 @@ export function Dice({
     // Sharing the variant in a context so it's easier to drill it down
     <VariantContext.Provider value={variant}>
       <Transition
+        as='div'
         show={Boolean(value) || showUndefined}
         className={clsx('transition duration-100 ease-in-out', className)}
         enterFrom='opacity-0 scale-75'

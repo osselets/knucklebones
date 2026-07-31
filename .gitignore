@@ -15,6 +15,9 @@ dist-ssr
 .idea
 .DS_Store
 
+# Local agent instructions
+/AGENTS.md
+
 # Local environment variables for CloudFlare workers
 .dev.vars
 .turbo

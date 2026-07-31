@@ -5,11 +5,12 @@
     "alwaysStrict": true,
     "strict": true,
     "noEmitOnError": true,
-    "moduleResolution": "node",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "outDir": "dist",
     "preserveConstEnums": true,
     "esModuleInterop": true,
-    "types": ["@cloudflare/workers-types", "node"]
+    "types": ["@cloudflare/workers-types"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

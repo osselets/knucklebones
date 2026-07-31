@@ -75,7 +75,7 @@ export class WebSocketDurableObject {
     }
   }
 
-  async webSocketError(webSocket: WebSocket, error: any) {
+  async webSocketError(webSocket: WebSocket, error: unknown) {
     this.sentry.captureException(error)
   }
 

@@ -9,23 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@floating-ui/react": "^0.26.9",
-    "@headlessui/react": "^1.7.18",
-    "@heroicons/react": "^2.1.1",
+    "@floating-ui/react": "^0.27.20",
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
     "@knucklebones/common": "workspace:*",
-    "@radix-ui/react-toggle-group": "^1.0.4",
-    "@use-gesture/react": "^10.3.0",
-    "clsx": "^2.1.0",
-    "i18next": "^23.10.1",
-    "qrcode.react": "^3.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-i18next": "^14.1.0",
-    "react-router-dom": "6.18.0",
-    "react-use": "^17.5.0",
-    "react-use-websocket": "^4.8.1",
+    "@radix-ui/react-toggle-group": "^1.1.19",
+    "@use-gesture/react": "^10.3.1",
+    "clsx": "^2.1.1",
+    "i18next": "^26.3.6",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.11",
+    "react-router-dom": "7.18.2",
+    "react-use-websocket": "^4.13.0",
     "unique-names-generator": "^4.7.1",
-    "use-clipboard-copy": "^0.2.0",
-    "uuid": "^9.0.1"
+    "uuid": "^14.0.1"
   }
 }

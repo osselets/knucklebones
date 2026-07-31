@@ -11,14 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy Staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          version: 8
-          # Possibilité d'utiliser un cache si nécessaire
-          run_install: true
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm lint
 
@@ -30,4 +34,5 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           workingDirectory: 'apps/worker'
           packageManager: pnpm
+          wranglerVersion: '4.116.0'
           environment: staging

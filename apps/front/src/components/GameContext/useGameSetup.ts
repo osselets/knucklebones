@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation } from 'react-router-dom'
-import useWebSocket, { ReadyState } from 'react-use-websocket'
+import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
   GameState,
   type IGameState,
@@ -17,6 +17,15 @@ import {
 } from '../../utils/api'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
 import { getWebSocketUrl, preparePlayers } from './utils'
+
+// react-use-websocket 4.13 publishes a CommonJS object containing its default
+// export. Vite 8 exposes that object directly when the importer is ESM.
+const useWebSocket =
+  (
+    useWebSocketImport as unknown as {
+      default?: typeof useWebSocketImport
+    }
+  ).default ?? useWebSocketImport
 
 export function useGameSetup() {
   const [gameState, setGameState] = React.useState<IGameState | null>(null)

@@ -35,7 +35,7 @@ export function Modal({
           leaveFrom='opacity-100'
           leaveTo='opacity-0'
         >
-          <div className='fixed inset-0 bg-slate-900/10 bg-opacity-75 transition-opacity dark:bg-slate-50/10' />
+          <div className='bg-opacity-75 fixed inset-0 bg-slate-900/10 transition-opacity dark:bg-slate-50/10' />
         </Transition.Child>
 
         <div className='fixed inset-0 overflow-y-auto'>
@@ -52,7 +52,7 @@ export function Modal({
                 <IconButton
                   onClick={onClose}
                   icon={<XMarkIcon />}
-                  className='absolute right-0 top-0 p-2'
+                  className='absolute top-0 right-0 p-2'
                 />
                 {children}
               </Dialog.Panel>

@@ -74,7 +74,6 @@ export function Theme() {
   // Update the dark mode and the local storage when theme changes
   React.useEffect(() => {
     computeDarkMode(theme)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme])
 
   // On initial mount, we read from the local storage to update the theme
@@ -85,7 +84,6 @@ export function Theme() {
     } else {
       computeDarkMode('default')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Detects theme changes and update the theme if using the default theme
@@ -103,7 +101,6 @@ export function Theme() {
     return () => {
       mediaQuery.removeEventListener('change', update)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme])
 
   return (
