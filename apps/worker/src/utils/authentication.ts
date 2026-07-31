@@ -1,6 +1,6 @@
 import { AI_PLAYER_ID } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type RequestWithId } from '../types/itty'
 import { hashCredential } from './credentials'
 import { apiError } from './http'
 
@@ -8,8 +8,12 @@ interface PlayerIdentityRow {
   player_id: string
 }
 
-export async function authenticatePlayerMutation(
-  request: Request & BaseRequestWithProps,
+interface PlayerRequest extends RequestWithId {
+  playerId: string
+}
+
+export async function authenticatePlayerRequest(
+  request: Request & PlayerRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response | undefined> {
   const credential = getBearerCredential(request.headers.get('Authorization'))
