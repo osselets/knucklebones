@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
   GameState,
+  gameStateSchema,
   type IGameState,
   isEmptyOrBlank,
   type GameSettings
@@ -52,9 +53,14 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     if (lastJsonMessage !== null) {
-      // Can use Zod to parse the message safely
-      const gameState = lastJsonMessage as IGameState
-      setGameState(gameState)
+      const parsedGameState = gameStateSchema.safeParse(lastJsonMessage)
+
+      if (!parsedGameState.success) {
+        console.error('Ignored an invalid game-state message.')
+        return
+      }
+
+      setGameState(parsedGameState.data)
       setIsLoading(false)
       setErrorMessage(null)
     }
