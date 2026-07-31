@@ -1,5 +1,6 @@
 export * from './array'
 export * from './count'
+export * from './elo'
 export * from './outcomeHistory'
 export * from './playerIdentity'
 export * from './random'
