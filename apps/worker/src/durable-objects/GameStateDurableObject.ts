@@ -58,12 +58,13 @@ export class GameStateDurableObject extends createDurable({
   }: InitializeGameCommand): InitializeGameResult {
     if (this.gameState !== undefined) {
       const gameState = GameState.fromJson(this.gameState)
+      let serializedGameState = gameState.toJson()
 
       if (gameState.addSpectator(playerId)) {
-        this.gameState = gameState.toJson()
+        serializedGameState = this.commitGameState(gameState)
       }
 
-      return { status: 'existing', gameState: gameState.toJson() }
+      return { status: 'existing', gameState: serializedGameState }
     }
 
     const lobby = Lobby.fromJson(this.lobby)
@@ -81,8 +82,7 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'waiting' }
     }
 
-    const gameState = lobby.toGameState().toJson()
-    this.gameState = gameState
+    const gameState = this.commitGameState(lobby.toGameState())
 
     return { status: 'created', gameState }
   }
@@ -96,8 +96,7 @@ export class GameStateDurableObject extends createDurable({
     }
 
     gameState.applyPlay(play)
-    this.gameState = gameState.toJson()
-    return { status: 'updated', gameState: this.gameState }
+    return { status: 'updated', gameState: this.commitGameState(gameState) }
   }
 
   rematch(
@@ -127,14 +126,18 @@ export class GameStateDurableObject extends createDurable({
         )
       })
       newGameState.initialize({ ...gameState, ...gameSettings })
-      this.gameState = newGameState.toJson()
-      return { status: 'updated', gameState: this.gameState }
+      return {
+        status: 'updated',
+        gameState: this.commitGameState(newGameState)
+      }
     }
 
     if (gameState.rematchVote === undefined) {
       gameState.rematchVote = playerId
-      this.gameState = gameState.toJson()
-      return { status: 'updated', gameState: this.gameState }
+      return {
+        status: 'updated',
+        gameState: this.commitGameState(gameState)
+      }
     }
 
     return { status: 'unchanged' }
@@ -154,8 +157,16 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'unknown-player' }
     }
 
+    return {
+      status: 'updated',
+      gameState: this.commitGameState(gameState)
+    }
+  }
+
+  private commitGameState(gameState: GameState): IGameState {
+    gameState.revision = (this.gameState?.revision ?? 0) + 1
     this.gameState = gameState.toJson()
-    return { status: 'updated', gameState: this.gameState }
+    return this.gameState
   }
 
   private getInitializedGameState(): GameState {
