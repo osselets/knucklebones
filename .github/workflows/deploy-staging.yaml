@@ -36,4 +36,3 @@ jobs:
           packageManager: pnpm
           wranglerVersion: '4.116.0'
           environment: staging
-          preCommands: wrangler d1 migrations apply PLAYERS_DB --remote --env staging
