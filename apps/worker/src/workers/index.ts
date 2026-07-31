@@ -2,6 +2,7 @@ import { withDurables } from 'itty-durable'
 import { Router, cors, withParams } from 'itty-router'
 import { Toucan } from 'toucan-js'
 import {
+  createPlayer,
   deleteDisplayName,
   displayName,
   init,
@@ -29,6 +30,7 @@ const { preflight, corsify } = cors({
 router
   .all('*', withDurables({ parse: true }), preflight, withParams)
 
+  .post('/players', createPlayer)
   .post('/:roomKey/:playerId/init', init)
   .post('/:roomKey/:playerId/play/:column/:dice', play)
   .post('/:roomKey/:playerId/rematch', rematch)

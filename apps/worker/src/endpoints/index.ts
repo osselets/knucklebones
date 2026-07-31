@@ -1,3 +1,4 @@
+export * from './createPlayer'
 export * from './displayName'
 export * from './init'
 export * from './play'
