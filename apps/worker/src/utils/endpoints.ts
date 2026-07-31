@@ -18,6 +18,6 @@ export async function broadcastGameState(
   return await webSocketStore.fetch('https://dummy-url/broadcast', {
     method: 'POST',
     headers: { 'X-Request-Id': request.requestId },
-    body: JSON.stringify(toGameStateMessage(gameState))
+    body: JSON.stringify(toGameStateMessage(gameState, roomKey))
   })
 }
