@@ -14,7 +14,7 @@ export function preparePlayers(
   ]
 }
 
-export function getWebSocketUrl(roomKey: string) {
+export function getWebSocketUrl(roomKey: string, ticket: string) {
   let hostname = import.meta.env.VITE_WORKER_URL
 
   if (hostname.startsWith('http://')) {
@@ -23,5 +23,5 @@ export function getWebSocketUrl(roomKey: string) {
     hostname = hostname.replace('https', 'wss')
   }
 
-  return `${hostname}/${roomKey}/websocket`
+  return `${hostname}/${roomKey}/websocket?ticket=${ticket}`
 }
