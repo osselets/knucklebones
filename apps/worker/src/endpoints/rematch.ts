@@ -1,15 +1,16 @@
 import { status } from 'itty-router'
 import { type GameSettings, GameState } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type MutationRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
   getGameStateDurableObject
 } from '../utils/endpoints'
 import { apiError } from '../utils/http'
+import { idempotencyConflict } from '../utils/idempotency'
 
-export interface RematchRequest extends BaseRequestWithProps {
+export interface RematchRequest extends MutationRequestWithProps {
   query?: Omit<GameSettings, 'playerType'>
 }
 
@@ -19,11 +20,18 @@ export async function rematch(
   context: ExecutionContext
 ) {
   const result = await getGameStateDurableObject(request).rematch(
+    request.mutationId,
     request.playerId,
     request.query
   )
 
-  if (result.status === 'game-ongoing') {
+  if (result.idempotencyStatus === 'conflict') {
+    return idempotencyConflict(request.requestId)
+  }
+
+  const mutation = result.value
+
+  if (mutation.status === 'game-ongoing') {
     return apiError({
       status: 409,
       code: 'GAME_STILL_ONGOING',
@@ -32,9 +40,9 @@ export async function rematch(
     })
   }
 
-  if (result.status === 'updated') {
-    const gameState = GameState.fromJson(result.gameState)
-    await broadcastGameState(result.gameState, request, cloudflareEnvironment)
+  if (mutation.status === 'updated') {
+    const gameState = GameState.fromJson(mutation.gameState)
+    await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
 
     if (
       gameState.outcome === 'ongoing' &&

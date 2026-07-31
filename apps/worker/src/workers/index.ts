@@ -20,6 +20,7 @@ import {
   sanitizeRequestForSentry,
   withRequestId
 } from '../utils/http'
+import { withMutationId } from '../utils/idempotency'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
 export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObject'
@@ -28,7 +29,7 @@ const router = Router()
 
 const { preflight, corsify } = cors({
   allowMethods: ['POST', 'DELETE'],
-  allowHeaders: ['Authorization', 'Content-Type']
+  allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key']
 })
 
 router
@@ -39,12 +40,16 @@ router
   .post('/players/:playerId/verify', verifyPlayer)
   .all('/:roomKey/:playerId/*', authenticatePlayerRequest)
   .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
-  .post('/:roomKey/:playerId/init', init)
-  .post('/:roomKey/:playerId/play/:column/:dice', play)
-  .post('/:roomKey/:playerId/rematch', rematch)
-  .post('/:roomKey/:playerId/displayName/:displayName', displayName)
+  .post('/:roomKey/:playerId/init', withMutationId, init)
+  .post('/:roomKey/:playerId/play/:column/:dice', withMutationId, play)
+  .post('/:roomKey/:playerId/rematch', withMutationId, rematch)
+  .post(
+    '/:roomKey/:playerId/displayName/:displayName',
+    withMutationId,
+    displayName
+  )
 
-  .delete('/:roomKey/:playerId/displayName', deleteDisplayName)
+  .delete('/:roomKey/:playerId/displayName', withMutationId, deleteDisplayName)
 
   .all('*', (request: RequestWithId) =>
     apiError({
