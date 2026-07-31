@@ -77,5 +77,10 @@
       "opponent-win": "{{player}} won the game with {{points}} points!"
     }
   },
-  "loading": "Waiting for game to start"
+  "loading": "Waiting for game to start",
+  "identity": {
+    "loading": "Creating your player identity…",
+    "error": "We couldn't create your player identity.",
+    "retry": "Try again"
+  }
 }
