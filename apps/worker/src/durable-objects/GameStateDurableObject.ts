@@ -145,7 +145,7 @@ export class GameStateDurableObject extends createDurable({
   rematch(
     mutationId: string,
     playerId: string,
-    gameSettings?: Omit<GameSettings, 'playerType'>
+    gameSettings?: Partial<Omit<GameSettings, 'playerType'>>
   ): IdempotentMutationResult<RematchGameResult> {
     return this.runIdempotently(
       mutationId,
@@ -157,7 +157,7 @@ export class GameStateDurableObject extends createDurable({
 
   private applyRematch(
     playerId: string,
-    gameSettings?: Omit<GameSettings, 'playerType'>
+    gameSettings?: Partial<Omit<GameSettings, 'playerType'>>
   ): RematchGameResult {
     const gameState = this.getInitializedGameState()
 
