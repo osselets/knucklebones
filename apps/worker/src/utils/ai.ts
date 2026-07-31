@@ -25,7 +25,9 @@ export function makeAiPlay(
     const nextMove = ai.suggestNextPlay()
 
     const [min, max] =
-      process.env.NODE_ENV === 'development' ? [100, 200] : [500, 1000]
+      cloudflareEnvironment.ENVIRONMENT === 'development'
+        ? [100, 200]
+        : [500, 1000]
     await sleep(getRandomIntInclusive(min, max))
 
     await play(

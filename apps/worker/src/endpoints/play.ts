@@ -32,6 +32,7 @@ export async function play(
   await broadcastGameState(gameState, request, cloudflareEnvironment)
 
   if (
+    gameState.outcome === 'ongoing' &&
     gameState.playerTwo.isAi() &&
     gameState.nextPlayer.equals(gameState.playerTwo)
   ) {

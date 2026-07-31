@@ -1,8 +1,8 @@
 import { type GameStateDurableObjectProps } from '../durable-objects/GameStateDurableObject'
 
 export type PromisifyPublicFunctions<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+  [K in keyof T]: T[K] extends (...args: infer Args) => infer Result
+    ? (...args: Args) => Promise<Awaited<Result>>
     : never
 }
 

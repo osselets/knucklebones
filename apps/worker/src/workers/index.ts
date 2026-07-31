@@ -1,5 +1,5 @@
 import { withDurables } from 'itty-durable'
-import { Router, error, withParams, createCors } from 'itty-router'
+import { Router, cors, error, withParams } from 'itty-router'
 import { Toucan } from 'toucan-js'
 import {
   deleteDisplayName,
@@ -16,8 +16,8 @@ export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObjec
 
 const router = Router()
 
-const { preflight, corsify } = createCors({
-  methods: ['POST', 'DELETE']
+const { preflight, corsify } = cors({
+  allowMethods: ['POST', 'DELETE']
 })
 
 router
@@ -51,9 +51,9 @@ export default {
     }
 
     return await router
-      .handle(request, cloudflareEnvironment, context)
-      .then(corsify)
-      .catch((error) => {
+      .fetch(request, cloudflareEnvironment, context)
+      .then((response) => corsify(response, request))
+      .catch((error: unknown) => {
         sentry.captureException(error)
       })
   }
