@@ -21,6 +21,7 @@ interface GameStateConstructorArg extends Partial<
 }
 
 export class GameState implements IGameState {
+  revision: number
   playerOne: Player
   playerTwo: Player
   spectators: string[]
@@ -40,10 +41,12 @@ export class GameState implements IGameState {
     rematchVote,
     winnerId,
     boType = 'indefinite',
+    revision = 0,
     logs = [],
     spectators = [],
     outcomeHistory = []
   }: GameStateConstructorArg) {
+    this.revision = revision
     this.playerOne = playerOne
     this.playerTwo = playerTwo
     this.logs = logs
@@ -266,6 +269,7 @@ export class GameState implements IGameState {
 
   toJson(): IGameState {
     return {
+      revision: this.revision,
       playerOne: this.playerOne.toJson(),
       playerTwo: this.playerTwo.toJson(),
       logs: this.logs.map((log) => log.toJson()),
