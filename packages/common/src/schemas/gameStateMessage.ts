@@ -108,3 +108,17 @@ export function toGameStateMessage(
     payload: { roomKey, gameState }
   }
 }
+
+export function toGamePresenceMessage(
+  roomKey: string,
+  playerId: string,
+  connected: boolean,
+  requestId?: string
+): GamePresenceEvent {
+  return {
+    version: PROTOCOL_VERSION,
+    type: 'game.presence',
+    ...(requestId !== undefined && { requestId }),
+    payload: { roomKey, playerId, connected }
+  }
+}

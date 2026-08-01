@@ -5,6 +5,7 @@ import {
   GameState,
   Player,
   toGameStateMessage,
+  toGamePresenceMessage,
   type IGameState
 } from '@knucklebones/common'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -120,6 +121,23 @@ describe('useGameSetup', () => {
       rerender()
     })
     await waitFor(() => expect(initGame).toHaveBeenCalledTimes(2))
+  })
+
+  it('tracks valid room presence without replacing game state', async () => {
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+    emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
+    await waitFor(() => expect(result.current?.revision).toBe(1))
+
+    emitMessage(toGamePresenceMessage(roomKey, playerId, true), rerender)
+    await waitFor(() =>
+      expect(result.current?.presenceByPlayerId[playerId]).toBe(true)
+    )
+    expect(result.current?.revision).toBe(1)
+
+    emitMessage(toGamePresenceMessage(roomKey, playerId, false), rerender)
+    await waitFor(() =>
+      expect(result.current?.presenceByPlayerId[playerId]).toBe(false)
+    )
   })
 
   it('rolls an optimistic move back after a network failure', async () => {

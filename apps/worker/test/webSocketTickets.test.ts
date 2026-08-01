@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import { PROTOCOL_VERSION } from '@knucklebones/common'
 import { removeExpiredWebSocketTickets } from '../src/durable-objects/WebSocketDurableObject'
+
+const credentialId = '44444444-4444-4444-8444-444444444444'
+const roomKey = '11111111-1111-4111-8111-111111111111'
+
+function ticket(playerId: string, expiresAt: number) {
+  return {
+    playerId,
+    credentialId,
+    roomKey,
+    protocolVersion: PROTOCOL_VERSION,
+    expiresAt
+  }
+}
 
 describe('removeExpiredWebSocketTickets', () => {
   it('removes tickets at and before their expiry time', () => {
@@ -11,14 +25,14 @@ describe('removeExpiredWebSocketTickets', () => {
     expect(
       removeExpiredWebSocketTickets(
         {
-          [expiredHash]: { playerId, expiresAt: 99 },
-          [boundaryHash]: { playerId, expiresAt: 100 },
-          [activeHash]: { playerId, expiresAt: 101 }
+          [expiredHash]: ticket(playerId, 99),
+          [boundaryHash]: ticket(playerId, 100),
+          [activeHash]: ticket(playerId, 101)
         },
         100
       )
     ).toEqual({
-      [activeHash]: { playerId, expiresAt: 101 }
+      [activeHash]: ticket(playerId, 101)
     })
   })
 
@@ -28,6 +42,9 @@ describe('removeExpiredWebSocketTickets', () => {
         {
           malformed: {
             playerId: 'not-a-player-id',
+            credentialId,
+            roomKey,
+            protocolVersion: PROTOCOL_VERSION,
             expiresAt: 101
           }
         },
