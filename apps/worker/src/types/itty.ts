@@ -14,8 +14,15 @@ export interface RequestWithId {
   requestId: string
 }
 
+export interface RequestWithMutationId {
+  mutationId: string
+}
+
 export interface BaseRequestWithProps
   extends GameStateDurableObjectProps, RequestWithId {
   roomKey: string
   playerId: string
 }
+
+export interface MutationRequestWithProps
+  extends BaseRequestWithProps, RequestWithMutationId {}

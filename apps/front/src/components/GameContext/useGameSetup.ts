@@ -2,6 +2,8 @@ import * as React from 'react'
 import { useLocation } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
+  AI_PLAYER_ID,
+  compatibleGameStateMessageSchema,
   GameState,
   type IGameState,
   isEmptyOrBlank,
@@ -9,6 +11,7 @@ import {
 } from '@knucklebones/common'
 import { useRoomKey } from '../../hooks/useRoomKey'
 import {
+  createWebSocketTicket,
   deleteDisplayName,
   updateDisplayName,
   initGame,
@@ -32,12 +35,19 @@ export function useGameSetup() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const roomKey = useRoomKey()
+  const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
-  const { lastJsonMessage, readyState } = useWebSocket(getWebSocketUrl(roomKey))
+  const playerId = localStorage.getItem('playerId')!
+  const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
+    const { ticket } = await createWebSocketTicket({ roomKey, playerId })
+    return getWebSocketUrl(roomKey, ticket)
+  }, [playerId, roomKey])
+  const { lastJsonMessage, readyState } = useWebSocket(
+    getAuthenticatedWebSocketUrl
+  )
 
   const isGameStateReady = gameState !== null
 
-  const playerId = localStorage.getItem('playerId')!
   const playerSide = isGameStateReady
     ? getPlayerSide(playerId, gameState)
     : 'spectator'
@@ -52,13 +62,52 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     if (lastJsonMessage !== null) {
-      // Can use Zod to parse the message safely
-      const gameState = lastJsonMessage as IGameState
-      setGameState(gameState)
+      const parsedGameState =
+        compatibleGameStateMessageSchema.safeParse(lastJsonMessage)
+
+      if (!parsedGameState.success) {
+        console.error('Ignored an invalid game-state message.')
+        return
+      }
+
+      const hasRevision =
+        typeof lastJsonMessage === 'object' &&
+        lastJsonMessage !== null &&
+        'revision' in lastJsonMessage
+
+      const messageRoomKey =
+        typeof lastJsonMessage === 'object' &&
+        lastJsonMessage !== null &&
+        'roomKey' in lastJsonMessage &&
+        typeof lastJsonMessage.roomKey === 'string'
+          ? lastJsonMessage.roomKey
+          : undefined
+
+      if (messageRoomKey !== undefined && messageRoomKey !== roomKey) {
+        return
+      }
+
+      const latestRoomRevision =
+        latestRevision.current.roomKey === roomKey
+          ? latestRevision.current.value
+          : -1
+
+      if (hasRevision && parsedGameState.data.revision <= latestRoomRevision) {
+        return
+      }
+
+      if (hasRevision) {
+        latestRevision.current = {
+          roomKey,
+          value: parsedGameState.data.revision
+        }
+      }
+
+      setGameState(parsedGameState.data)
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage])
+  }, [lastJsonMessage, roomKey])
 
   React.useEffect(() => {
     if (readyState === ReadyState.OPEN) {
@@ -70,7 +119,7 @@ export function useGameSetup() {
           // À déplacer côté serveur
           if (state?.playerType === 'ai') {
             await initGame(
-              { roomKey, playerId: 'beep-boop' },
+              { roomKey, playerId: AI_PLAYER_ID },
               {
                 playerType: 'ai',
                 difficulty: state?.difficulty,

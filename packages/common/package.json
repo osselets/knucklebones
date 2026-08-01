@@ -2,5 +2,8 @@
   "name": "@knucklebones/common",
   "version": "0.1.0",
   "main": "src/index.ts",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
 }
