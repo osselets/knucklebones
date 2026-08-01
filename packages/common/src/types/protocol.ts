@@ -20,6 +20,13 @@ export interface ApiErrorBody {
   error: ApiErrorDetails
 }
 
+export type ClientProtocolDiagnosticCode =
+  'INVALID_GAME_STATE_MESSAGE' | 'UNSUPPORTED_PROTOCOL_VERSION'
+
+export interface ClientProtocolDiagnostic {
+  code: ClientProtocolDiagnosticCode
+}
+
 export interface GameStateEventPayload {
   roomKey: string
   gameState: IGameState

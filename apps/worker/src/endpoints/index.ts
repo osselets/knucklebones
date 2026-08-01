@@ -1,3 +1,4 @@
+export * from './clientProtocolDiagnostic'
 export * from './createPlayer'
 export * from './displayName'
 export * from './getRankedProfile'

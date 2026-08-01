@@ -20,6 +20,7 @@ import {
   updateDisplayName,
   initGame,
   play,
+  reportClientProtocolDiagnostic,
   voteRematch
 } from '../../utils/api'
 import { getStoredPlayerId } from '../../utils/identityStorage'
@@ -79,6 +80,9 @@ export function useGameSetup() {
         'version' in lastJsonMessage &&
         lastJsonMessage.version !== PROTOCOL_VERSION
       ) {
+        void reportClientProtocolDiagnostic(
+          'UNSUPPORTED_PROTOCOL_VERSION'
+        ).catch(() => undefined)
         console.error(
           'Ignored a message using an unsupported protocol version.'
         )
@@ -122,6 +126,9 @@ export function useGameSetup() {
         compatibleGameStateMessageSchema.safeParse(lastJsonMessage)
 
       if (!parsedGameState.success) {
+        void reportClientProtocolDiagnostic('INVALID_GAME_STATE_MESSAGE').catch(
+          () => undefined
+        )
         console.error('Ignored an invalid game-state message.')
         return
       }

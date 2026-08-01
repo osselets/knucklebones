@@ -1,5 +1,5 @@
 import { z } from 'zod/mini'
-import { type ApiErrorBody } from '../types'
+import { type ApiErrorBody, type ClientProtocolDiagnostic } from '../types'
 import { boTypeSchema, difficultySchema } from './gameState'
 import {
   displayNameSchema,
@@ -18,6 +18,10 @@ export const apiErrorDetailsSchema = z.object({
 export const apiErrorBodySchema = z.object({
   error: apiErrorDetailsSchema
 }) satisfies z.ZodMiniType<ApiErrorBody>
+
+export const clientProtocolDiagnosticSchema = z.strictObject({
+  code: z.enum(['INVALID_GAME_STATE_MESSAGE', 'UNSUPPORTED_PROTOCOL_VERSION'])
+}) satisfies z.ZodMiniType<ClientProtocolDiagnostic>
 
 export const playerRouteParamsSchema = z.object({
   playerId: playerIdSchema

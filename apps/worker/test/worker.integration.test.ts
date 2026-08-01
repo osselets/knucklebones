@@ -95,6 +95,38 @@ describe('environment request policy', () => {
   })
 })
 
+describe('client protocol diagnostics', () => {
+  it('accepts only authenticated fixed diagnostic codes', async () => {
+    const player = await createPlayer()
+    const diagnostic = { code: 'INVALID_GAME_STATE_MESSAGE' }
+    const missingCredential = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(diagnostic)
+    })
+    const invalid = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code: 'RAW_PAYLOAD', payload: 'secret' })
+    })
+    const valid = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(diagnostic)
+    })
+
+    expect(missingCredential.status).toBe(401)
+    expect(invalid.status).toBe(400)
+    expect(valid.status).toBe(204)
+  })
+})
+
 describe('player identities and ranked profiles', () => {
   it('creates an authenticated UUID identity with a default rating', async () => {
     const player = await createPlayer()

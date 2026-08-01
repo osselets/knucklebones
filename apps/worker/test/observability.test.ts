@@ -15,6 +15,9 @@ describe('operational events', () => {
         '/v1/identity/credentials/22222222-2222-4222-8222-222222222222'
       )
     ).toBe('/v1/identity/credentials/:credentialId')
+    expect(classifyRoute('/v1/diagnostics/protocol')).toBe(
+      '/v1/diagnostics/:type'
+    )
   })
 
   it('logs structured outcomes without request secrets', () => {

@@ -10,7 +10,12 @@ import {
   type IGameState
 } from '@knucklebones/common'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { createWebSocketTicket, initGame, play } from '../../utils/api'
+import {
+  createWebSocketTicket,
+  initGame,
+  play,
+  reportClientProtocolDiagnostic
+} from '../../utils/api'
 import { useGameSetup } from './useGameSetup'
 
 const socket = vi.hoisted(() => ({
@@ -30,6 +35,7 @@ vi.mock('../../utils/api', () => ({
   deleteDisplayName: vi.fn(),
   initGame: vi.fn(),
   play: vi.fn(),
+  reportClientProtocolDiagnostic: vi.fn(),
   updateDisplayName: vi.fn(),
   voteRematch: vi.fn()
 }))
@@ -74,6 +80,9 @@ describe('useGameSetup', () => {
     vi.mocked(createWebSocketTicket).mockReset()
     vi.mocked(initGame).mockReset().mockResolvedValue(undefined)
     vi.mocked(play).mockReset().mockResolvedValue(undefined)
+    vi.mocked(reportClientProtocolDiagnostic)
+      .mockReset()
+      .mockResolvedValue(undefined)
   })
 
   it('ignores stale, foreign-room, and malformed state messages', async () => {
@@ -101,6 +110,11 @@ describe('useGameSetup', () => {
     expect(consoleError).toHaveBeenCalledWith(
       'Ignored an invalid game-state message.'
     )
+    await waitFor(() =>
+      expect(reportClientProtocolDiagnostic).toHaveBeenCalledWith(
+        'INVALID_GAME_STATE_MESSAGE'
+      )
+    )
   })
 
   it('keeps valid state and reports an unsupported protocol version', async () => {
@@ -121,6 +135,11 @@ describe('useGameSetup', () => {
     expect(result.current?.errorMessage).toBe('errors.unsupported-protocol')
     expect(consoleError).toHaveBeenCalledWith(
       'Ignored a message using an unsupported protocol version.'
+    )
+    await waitFor(() =>
+      expect(reportClientProtocolDiagnostic).toHaveBeenCalledWith(
+        'UNSUPPORTED_PROTOCOL_VERSION'
+      )
     )
   })
 
