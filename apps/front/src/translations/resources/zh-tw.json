@@ -98,9 +98,28 @@
       "import-warning": "這將取代目前儲存在此瀏覽器中的玩家身分。",
       "import-placeholder": "貼上轉移代碼",
       "import": "使用此身分",
+      "revoke-others": "轉移後撤銷此身分在所有其他裝置上的授權",
       "invalid": "此轉移代碼無效。",
       "error": "此轉移代碼已過期、已使用或無效。",
       "create-error": "無法建立轉移代碼。請再試一次。"
+    },
+    "recovery": {
+      "title": "復原短語",
+      "warning": "請將此短語保存在私密位置。若所有已授權裝置遺失，這是復原身分的唯一方式。任何取得短語的人都能控制您的身分。",
+      "phrase-label": "玩家身分復原短語",
+      "copy": "複製復原短語",
+      "show": "顯示短語",
+      "hide": "隱藏短語",
+      "saved": "我已儲存",
+      "generate": "建立復原短語",
+      "regenerate": "更換復原短語",
+      "use-title": "復原身分",
+      "placeholder": "貼上復原短語",
+      "revoke-others": "復原後撤銷所有其他裝置",
+      "use": "復原此身分",
+      "invalid": "此復原短語無效。",
+      "error": "此復原短語無效或已被更換。",
+      "rotate-error": "無法建立復原短語。請再試一次。"
     }
   }
 }

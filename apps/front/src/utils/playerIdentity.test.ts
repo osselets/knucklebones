@@ -12,6 +12,11 @@ const credentials = {
   playerId: '22222222-2222-4222-8222-222222222222',
   credential: 'a'.repeat(64)
 }
+const bootstrap = {
+  ...credentials,
+  recoveryPhrase:
+    'knucklebones-recovery-v1.aaaa.aaaa.aaaa.aaaa.aaaa.aaaa.aaaa.aaaa'
+}
 
 describe('ensurePlayerIdentity', () => {
   beforeEach(() => {
@@ -19,10 +24,13 @@ describe('ensurePlayerIdentity', () => {
   })
 
   it('creates credentials and a friendly name for a new browser', async () => {
-    vi.mocked(createPlayer).mockResolvedValue(credentials)
+    vi.mocked(createPlayer).mockResolvedValue(bootstrap)
 
-    await expect(ensurePlayerIdentity()).resolves.toEqual(credentials)
+    await expect(ensurePlayerIdentity()).resolves.toEqual(bootstrap)
     expect(getStoredPlayerCredentials()).toEqual(credentials)
+    expect(
+      localStorage.getItem('knucklebones.identity.v1.pendingRecoveryPhrase')
+    ).toBe(bootstrap.recoveryPhrase)
     expect(localStorage.getItem('displayName')).toBe('BraveBlueFox')
   })
 

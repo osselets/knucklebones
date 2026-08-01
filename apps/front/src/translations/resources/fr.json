@@ -99,9 +99,28 @@
       "import-warning": "Cette opération remplace l'identité de joueur actuellement enregistrée dans ce navigateur.",
       "import-placeholder": "Collez un code de transfert",
       "import": "Utiliser cette identité",
+      "revoke-others": "Révoquer cette identité sur tous les autres appareils après le transfert",
       "invalid": "Ce code de transfert est invalide.",
       "error": "Ce code de transfert a expiré, a déjà été utilisé ou est invalide.",
       "create-error": "Impossible de créer un code de transfert. Réessayez."
+    },
+    "recovery": {
+      "title": "Phrase de récupération",
+      "warning": "Enregistrez cette phrase dans un endroit privé. C'est le seul moyen de récupérer votre identité si tous les appareils autorisés sont perdus. Toute personne qui la possède peut prendre le contrôle de votre identité.",
+      "phrase-label": "Phrase de récupération de l'identité du joueur",
+      "copy": "Copier la phrase de récupération",
+      "show": "Afficher la phrase",
+      "hide": "Masquer la phrase",
+      "saved": "Je l'ai enregistrée",
+      "generate": "Créer une phrase de récupération",
+      "regenerate": "Remplacer la phrase de récupération",
+      "use-title": "Récupérer une identité",
+      "placeholder": "Collez une phrase de récupération",
+      "revoke-others": "Révoquer tous les autres appareils après la récupération",
+      "use": "Récupérer cette identité",
+      "invalid": "Cette phrase de récupération est invalide.",
+      "error": "Cette phrase de récupération est invalide ou a déjà été remplacée.",
+      "rotate-error": "Impossible de créer une phrase de récupération. Réessayez."
     }
   }
 }

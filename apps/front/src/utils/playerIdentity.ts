@@ -8,6 +8,9 @@ import { randomName } from './name'
 const PLAYER_ID_KEY = 'playerId'
 const PLAYER_CREDENTIAL_KEY = 'playerCredential'
 const DISPLAY_NAME_KEY = 'displayName'
+const PENDING_RECOVERY_PHRASE_KEY =
+  'knucklebones.identity.v1.pendingRecoveryPhrase'
+const RECOVERY_CONFIRMED_KEY = 'knucklebones.identity.v1.recoveryConfirmed'
 
 export function getStoredPlayerCredentials(): PlayerCredentials | undefined {
   const result = playerCredentialsSchema.safeParse({
@@ -31,8 +34,23 @@ export async function ensurePlayerIdentity(): Promise<PlayerCredentials> {
 
   const credentials = await createPlayer()
   storePlayerCredentials(credentials)
+  storePendingRecoveryPhrase(credentials.recoveryPhrase)
   ensurePlayerDisplayName()
   return credentials
+}
+
+export function getPendingRecoveryPhrase(): string | undefined {
+  return localStorage.getItem(PENDING_RECOVERY_PHRASE_KEY) ?? undefined
+}
+
+export function storePendingRecoveryPhrase(recoveryPhrase: string): void {
+  localStorage.setItem(PENDING_RECOVERY_PHRASE_KEY, recoveryPhrase)
+  localStorage.removeItem(RECOVERY_CONFIRMED_KEY)
+}
+
+export function confirmRecoveryPhrase(): void {
+  localStorage.removeItem(PENDING_RECOVERY_PHRASE_KEY)
+  localStorage.setItem(RECOVERY_CONFIRMED_KEY, 'true')
 }
 
 function ensurePlayerDisplayName(): void {
