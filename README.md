@@ -45,7 +45,7 @@ pnpm dev
 Wrangler keeps local D1 data separate from Cloudflare. Branch previews use the
 shared staging Worker and staging identity database; production has separate
 Worker, Durable Object, and D1 resources. Database migrations are append-only
-and are applied automatically before each staging or production deployment.
+and must be applied before deploying compatible staging or production code.
 
 `SENTRY_DSN` is an environment-scoped Worker secret. Deployment credentials
 remain in the repository's GitHub Actions secrets and must never be committed.
