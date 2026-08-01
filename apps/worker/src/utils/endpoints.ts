@@ -1,14 +1,16 @@
 import { type IGameState, toGameStateMessage } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type DurableRoomRequestWithProps } from '../types/itty'
 
-export function getGameStateDurableObject(request: BaseRequestWithProps) {
+export function getGameStateDurableObject(
+  request: DurableRoomRequestWithProps
+) {
   return request.GAME_STATE_DURABLE_OBJECT.get(request.roomKey)
 }
 
 export async function broadcastGameState(
   gameState: IGameState,
-  request: BaseRequestWithProps,
+  request: DurableRoomRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ) {
   const roomKey = request.roomKey

@@ -4,13 +4,17 @@ import {
   sleep
 } from '@knucklebones/common'
 import { Ai } from '../classes/Ai'
-import { play } from '../endpoints'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type MutationRequestWithProps } from '../types/itty'
+import {
+  type DurableRoomRequestWithProps,
+  type RequestWithMutationId
+} from '../types/itty'
+import { broadcastGameState } from './endpoints'
+import { applyAuthoritativePlay, getAppliedPlayResult } from './play'
 
 export function makeAiPlay(
   gameState: GameState,
-  request: MutationRequestWithProps,
+  request: DurableRoomRequestWithProps & RequestWithMutationId,
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
@@ -30,19 +34,27 @@ export function makeAiPlay(
         : [500, 1000]
     await sleep(getRandomIntInclusive(min, max))
 
-    await play(
-      {
-        dice: gameState.playerTwo.dice!,
-        column: nextMove.column,
-        roomKey: request.roomKey,
-        playerId: gameState.playerTwo.id,
-        requestId: request.requestId,
-        mutationId: `${request.mutationId}:ai`,
-        GAME_STATE_DURABLE_OBJECT: request.GAME_STATE_DURABLE_OBJECT
-      },
-      cloudflareEnvironment,
-      context
+    const aiRequest = {
+      GAME_STATE_DURABLE_OBJECT: request.GAME_STATE_DURABLE_OBJECT,
+      roomKey: request.roomKey,
+      requestId: request.requestId,
+      mutationId: crypto.randomUUID()
+    }
+    const result = await applyAuthoritativePlay(
+      aiRequest,
+      gameState.playerTwo.id,
+      nextMove.column,
+      gameState.revision
     )
+    const mutation = getAppliedPlayResult(result)
+
+    if (mutation?.status === 'updated') {
+      await broadcastGameState(
+        mutation.gameState,
+        request,
+        cloudflareEnvironment
+      )
+    }
   }
 
   context.waitUntil(aiPlay())

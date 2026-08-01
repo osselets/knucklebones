@@ -216,6 +216,56 @@ describe('runtime request validation', () => {
       expect(response.headers.get('X-Request-Id')).toBe(body.error.requestId)
     }
   })
+
+  it('accepts only column intent and derives the actor from authentication', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const spectator = await createPlayer()
+    const roomKey = crypto.randomUUID()
+
+    for (const player of [playerOne, playerTwo]) {
+      const response = await request(`/${roomKey}/${player.playerId}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Idempotency-Key': crypto.randomUUID()
+        }
+      })
+      expect(response.status).toBe(200)
+    }
+
+    const submittedFacts = await request(`/v1/rooms/${roomKey}/play`, {
+      method: 'POST',
+      headers: {
+        ...authorization(playerOne),
+        'Content-Type': 'application/json',
+        'Idempotency-Key': crypto.randomUUID()
+      },
+      body: JSON.stringify({
+        column: 0,
+        author: playerTwo.playerId,
+        dice: 6
+      })
+    })
+    const spectatorMove = await request(`/v1/rooms/${roomKey}/play`, {
+      method: 'POST',
+      headers: {
+        ...authorization(spectator),
+        'Content-Type': 'application/json',
+        'Idempotency-Key': crypto.randomUUID()
+      },
+      body: JSON.stringify({ column: 0 })
+    })
+
+    expect(submittedFacts.status).toBe(400)
+    await expect(submittedFacts.json()).resolves.toMatchObject({
+      error: { code: 'INVALID_PLAY_INTENT' }
+    })
+    expect(spectatorMove.status).toBe(403)
+    await expect(spectatorMove.json()).resolves.toMatchObject({
+      error: { code: 'NOT_A_PLAYER' }
+    })
+  })
 })
 
 describe('WebSocket tickets', () => {

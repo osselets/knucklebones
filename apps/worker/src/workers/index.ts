@@ -12,6 +12,7 @@ import {
   joinMatchmaking,
   leaveMatchmaking,
   play,
+  playIntent,
   rematch,
   verifyPlayer,
   webSocket
@@ -24,7 +25,10 @@ import {
   sanitizeRequestForSentry,
   withRequestId
 } from '../utils/http'
-import { withMutationId } from '../utils/idempotency'
+import {
+  withAuthenticatedMutationId,
+  withMutationId
+} from '../utils/idempotency'
 import { validateRequestPath } from '../utils/validation'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
@@ -49,6 +53,12 @@ router
   .post('/matchmaking/:playerId/join', joinMatchmaking)
   .get('/matchmaking/:playerId/status', getMatchmakingStatus)
   .delete('/matchmaking/:playerId/queue', leaveMatchmaking)
+  .all(
+    '/v1/rooms/:roomKey/*',
+    withDurables({ parse: true }),
+    authenticatePlayerRequest
+  )
+  .post('/v1/rooms/:roomKey/play', withAuthenticatedMutationId, playIntent)
   .all(
     '/:roomKey/:playerId/*',
     withDurables({ parse: true }),

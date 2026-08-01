@@ -4,7 +4,10 @@ import {
   playerIdSchema
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type RequestWithId } from '../types/itty'
+import {
+  type AuthenticatedRequestWithProps,
+  type RequestWithId
+} from '../types/itty'
 import { hashCredential } from './credentials'
 import { apiError } from './http'
 
@@ -13,7 +16,8 @@ interface PlayerIdentityRow {
 }
 
 interface PlayerRequest extends RequestWithId {
-  playerId: string
+  playerId?: string
+  principal?: AuthenticatedRequestWithProps['principal']
 }
 
 export async function authenticatePlayerRequest(
@@ -49,11 +53,17 @@ export async function authenticatePlayerRequest(
     })
   }
 
+  request.principal = { playerId: authenticatedPlayerId.data }
+
   const isAiSetup =
     request.playerId === AI_PLAYER_ID &&
     new URL(request.url).pathname.endsWith(`/${AI_PLAYER_ID}/init`)
 
-  if (request.playerId !== authenticatedPlayerId.data && !isAiSetup) {
+  if (
+    request.playerId !== undefined &&
+    request.playerId !== authenticatedPlayerId.data &&
+    !isAiSetup
+  ) {
     return apiError({
       status: 403,
       code: 'PLAYER_ID_MISMATCH',

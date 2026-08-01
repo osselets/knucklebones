@@ -31,11 +31,9 @@ export const initializeGameCommandSchema = z.object({
 
 export const playGameCommandSchema = z.object({
   mutationId: mutationIdSchema,
-  play: z.object({
-    dice: z.int().check(z.minimum(1), z.maximum(6)),
-    column: z.int().check(z.minimum(0), z.maximum(2)),
-    author: gamePlayerIdSchema
-  })
+  actorId: gamePlayerIdSchema,
+  column: z.int().check(z.minimum(0), z.maximum(2)),
+  expectedRevision: z.optional(z.int().check(z.minimum(0)))
 })
 
 export const rematchGameCommandSchema = z.object({
@@ -77,12 +75,14 @@ export const playGameResultSchema = z.union([
   z.object({
     status: z.literal('rejected'),
     reason: z.enum([
+      'game-not-initialized',
       'game-ended',
       'unknown-player',
       'not-player-turn',
-      'unexpected-die',
       'invalid-column',
-      'column-full'
+      'column-full',
+      'invalid-game-state',
+      'stale-revision'
     ])
   }),
   updatedGameStateResultSchema

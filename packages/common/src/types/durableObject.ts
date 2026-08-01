@@ -1,6 +1,6 @@
 import { type IGameState } from '../interfaces'
 import { type BoType, type Difficulty, type GameSettings } from './gameSettings'
-import { type Play, type PlayRejectionReason } from './play'
+import { type PlayIntentRejectionReason } from './play'
 
 export interface InitializeGameCommand {
   mutationId: string
@@ -12,7 +12,9 @@ export interface InitializeGameCommand {
 
 export interface PlayGameCommand {
   mutationId: string
-  play: Play
+  actorId: string
+  column: number
+  expectedRevision?: number
 }
 
 export interface RematchGameCommand {
@@ -39,7 +41,7 @@ export type UpdateDisplayNameResult =
   { status: 'unknown-player' } | { status: 'updated'; gameState: IGameState }
 
 export type PlayGameResult =
-  | { status: 'rejected'; reason: PlayRejectionReason }
+  | { status: 'rejected'; reason: PlayIntentRejectionReason }
   | { status: 'updated'; gameState: IGameState }
 
 export type GameStateMutationResult =

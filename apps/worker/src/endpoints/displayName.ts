@@ -1,10 +1,12 @@
 import { status } from 'itty-router'
 import {
   displayNameRouteParamsSchema,
+  GameState,
   idempotentUpdateDisplayNameResultSchema
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
+import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
   getGameStateDurableObject
@@ -19,7 +21,8 @@ interface DisplayNameRequest extends MutationRequestWithProps {
 
 export async function displayName(
   request: DisplayNameRequest,
-  cloudflareEnvironment: CloudflareEnvironment
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
 ) {
   const params = displayNameRouteParamsSchema.safeParse({
     roomKey: request.roomKey,
@@ -54,6 +57,15 @@ export async function displayName(
   }
 
   await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
+
+  const gameState = GameState.fromJson(mutation.gameState)
+  if (
+    gameState.outcome === 'ongoing' &&
+    gameState.playerTwo.isAi() &&
+    gameState.nextPlayer.equals(gameState.playerTwo)
+  ) {
+    makeAiPlay(gameState, request, cloudflareEnvironment, context)
+  }
 
   return status(200)
 }

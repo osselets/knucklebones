@@ -40,6 +40,10 @@ export const playRouteParamsSchema = z.object({
   dice: z.enum(['1', '2', '3', '4', '5', '6'])
 })
 
+export const playIntentSchema = z.strictObject({
+  column: z.union([z.literal(0), z.literal(1), z.literal(2)])
+})
+
 export const gameSettingsQuerySchema = z.object({
   boType: z.optional(z.enum(['indefinite', '1', '3', '5'])),
   difficulty: z.optional(z.enum(['easy', 'medium', 'hard']))

@@ -30,6 +30,12 @@ export function validateRequestPath(
       : invalidRouteParameters(request.requestId)
   }
 
+  if (segments[0] === 'v1' && segments[1] === 'rooms') {
+    return roomKeySchema.safeParse(segments[2]).success
+      ? undefined
+      : invalidRouteParameters(request.requestId)
+  }
+
   if (segments.length >= 3) {
     const isValid =
       roomKeySchema.safeParse(segments[0]).success &&

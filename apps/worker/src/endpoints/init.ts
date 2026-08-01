@@ -69,7 +69,6 @@ export async function init(
     await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
 
     if (
-      mutation.status === 'created' &&
       gameState.playerTwo.isAi() &&
       gameState.nextPlayer.equals(gameState.playerTwo)
     ) {

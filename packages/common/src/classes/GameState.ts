@@ -2,6 +2,7 @@ import { type IGameState, type IPlayer } from '../interfaces'
 import {
   type Outcome,
   type Play,
+  type PlayIntentRejectionReason,
   type OutcomeHistory,
   type PlayRejectionReason,
   type PlayerOutcome,
@@ -148,6 +149,77 @@ export class GameState implements IGameState {
 
     const [player] = this.getPlayers(play.author)
     if (player.columns[play.column].length >= 3) {
+      return 'column-full'
+    }
+  }
+
+  applyPlayIntent(
+    actorId: string,
+    column: number
+  ): PlayIntentRejectionReason | undefined {
+    const rejectionReason = this.getPlayIntentRejectionReason(actorId, column)
+    if (rejectionReason !== undefined) {
+      return rejectionReason
+    }
+
+    this.applyPlay({
+      author: actorId,
+      column,
+      dice: this.nextPlayer.dice!
+    })
+  }
+
+  private getPlayIntentRejectionReason(
+    actorId: string,
+    column: number
+  ): PlayIntentRejectionReason | undefined {
+    if (this.outcome !== 'ongoing') {
+      return 'game-ended'
+    }
+
+    if (this.playerOne.id === this.playerTwo.id) {
+      return 'invalid-game-state'
+    }
+
+    const actor =
+      actorId === this.playerOne.id
+        ? this.playerOne
+        : actorId === this.playerTwo.id
+          ? this.playerTwo
+          : undefined
+
+    if (actor === undefined) {
+      return 'unknown-player'
+    }
+
+    const nextPlayerId = this.nextPlayer.id
+    if (
+      nextPlayerId !== this.playerOne.id &&
+      nextPlayerId !== this.playerTwo.id
+    ) {
+      return 'invalid-game-state'
+    }
+
+    if (actorId !== nextPlayerId) {
+      return 'not-player-turn'
+    }
+
+    const dice = this.nextPlayer.dice
+    if (
+      dice === undefined ||
+      !Number.isInteger(dice) ||
+      dice < 1 ||
+      dice > 6 ||
+      actor.dice !== dice
+    ) {
+      return 'invalid-game-state'
+    }
+
+    if (!Number.isInteger(column) || column < 0 || column > 2) {
+      return 'invalid-column'
+    }
+
+    if (actor.columns[column].length >= 3) {
       return 'column-full'
     }
   }
