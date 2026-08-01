@@ -33,6 +33,7 @@ export function useGameSetup() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const roomKey = useRoomKey()
+  const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
   const { lastJsonMessage, readyState } = useWebSocket(getWebSocketUrl(roomKey))
 
@@ -61,11 +62,44 @@ export function useGameSetup() {
         return
       }
 
+      const hasRevision =
+        typeof lastJsonMessage === 'object' &&
+        lastJsonMessage !== null &&
+        'revision' in lastJsonMessage
+
+      const messageRoomKey =
+        typeof lastJsonMessage === 'object' &&
+        lastJsonMessage !== null &&
+        'roomKey' in lastJsonMessage &&
+        typeof lastJsonMessage.roomKey === 'string'
+          ? lastJsonMessage.roomKey
+          : undefined
+
+      if (messageRoomKey !== undefined && messageRoomKey !== roomKey) {
+        return
+      }
+
+      const latestRoomRevision =
+        latestRevision.current.roomKey === roomKey
+          ? latestRevision.current.value
+          : -1
+
+      if (hasRevision && parsedGameState.data.revision <= latestRoomRevision) {
+        return
+      }
+
+      if (hasRevision) {
+        latestRevision.current = {
+          roomKey,
+          value: parsedGameState.data.revision
+        }
+      }
+
       setGameState(parsedGameState.data)
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage])
+  }, [lastJsonMessage, roomKey])
 
   React.useEffect(() => {
     if (readyState === ReadyState.OPEN) {

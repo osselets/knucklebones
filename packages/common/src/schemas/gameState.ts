@@ -61,6 +61,7 @@ const outcomeHistoryEntrySchema = z.object({
 }) satisfies z.ZodMiniType<OutcomeHistoryEntry>
 
 export const gameStateSchema = z.object({
+  revision: z._default(z.int().check(z.minimum(0)), 0),
   playerOne: playerSchema,
   playerTwo: playerSchema,
   spectators: z.array(playerIdSchema),
