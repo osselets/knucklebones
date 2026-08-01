@@ -6,11 +6,11 @@ import {
 import { Ai } from '../classes/Ai'
 import { play } from '../endpoints'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type MutationRequestWithProps } from '../types/itty'
 
 export function makeAiPlay(
   gameState: GameState,
-  request: BaseRequestWithProps,
+  request: MutationRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
@@ -37,6 +37,7 @@ export function makeAiPlay(
         roomKey: request.roomKey,
         playerId: gameState.playerTwo.id,
         requestId: request.requestId,
+        mutationId: `${request.mutationId}:ai`,
         GAME_STATE_DURABLE_OBJECT: request.GAME_STATE_DURABLE_OBJECT
       },
       cloudflareEnvironment,

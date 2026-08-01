@@ -1,17 +1,18 @@
 import { status } from 'itty-router'
 import { GameState, type PlayRejectionReason } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type MutationRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
   getGameStateDurableObject
 } from '../utils/endpoints'
 import { apiError } from '../utils/http'
+import { idempotencyConflict } from '../utils/idempotency'
 
-interface PlayRequest extends BaseRequestWithProps {
-  dice: number
-  column: number
+interface PlayRequest extends MutationRequestWithProps {
+  dice?: number
+  column?: number
 }
 
 export async function play(
@@ -25,14 +26,23 @@ export async function play(
     author: request.playerId
   }
 
-  const result = await getGameStateDurableObject(request).play(play)
+  const result = await getGameStateDurableObject(request).play(
+    request.mutationId,
+    play
+  )
 
-  if (result.status === 'rejected') {
-    return playError(result.reason, request.requestId)
+  if (result.idempotencyStatus === 'conflict') {
+    return idempotencyConflict(request.requestId)
   }
 
-  const gameState = GameState.fromJson(result.gameState)
-  await broadcastGameState(result.gameState, request, cloudflareEnvironment)
+  const mutation = result.value
+
+  if (mutation.status === 'rejected') {
+    return playError(mutation.reason, request.requestId)
+  }
+
+  const gameState = GameState.fromJson(mutation.gameState)
+  await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
 
   if (
     gameState.outcome === 'ongoing' &&
