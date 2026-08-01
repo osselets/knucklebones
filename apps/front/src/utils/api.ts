@@ -1,6 +1,8 @@
 import {
   apiErrorBodySchema,
   type GameSettings,
+  type IdentityTransfer,
+  identityTransferSchema,
   type PlayerCredentials,
   playerCredentialsSchema,
   type WebSocketTicket,
@@ -35,6 +37,36 @@ export async function verifyPlayer({
     undefined,
     credential
   )
+}
+
+export async function createIdentityTransfer(): Promise<IdentityTransfer> {
+  const response = await sendApiRequest('/v1/identity/transfers', 'POST')
+  const result = identityTransferSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid identity transfer.')
+  }
+
+  return result.data
+}
+
+export async function redeemIdentityTransfer(
+  transferToken: string,
+  revokeOtherDevices = false
+): Promise<PlayerCredentials> {
+  const response = await sendApiRequest(
+    '/v1/identity/transfers/redeem',
+    'POST',
+    { transferToken, revokeOtherDevices },
+    null
+  )
+  const result = playerCredentialsSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned invalid player credentials.')
+  }
+
+  return result.data
 }
 
 export async function createWebSocketTicket({

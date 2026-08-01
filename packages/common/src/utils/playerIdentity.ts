@@ -1,28 +1,21 @@
-import { playerCredentialsSchema } from '../schemas'
-import { type PlayerCredentials } from '../types'
+import { credentialSchema } from '../schemas'
 
-const PLAYER_TRANSFER_CODE_PREFIX = 'knucklebones-player-v1'
+const IDENTITY_TRANSFER_CODE_PREFIX = 'knucklebones-transfer-v1'
 
-export function createPlayerTransferCode({
-  playerId,
-  credential
-}: PlayerCredentials): string {
-  return `${PLAYER_TRANSFER_CODE_PREFIX}.${playerId}.${credential}`
+export function createIdentityTransferCode(transferToken: string): string {
+  return `${IDENTITY_TRANSFER_CODE_PREFIX}.${transferToken}`
 }
 
-export function parsePlayerTransferCode(
+export function parseIdentityTransferCode(
   transferCode: string
-): PlayerCredentials | undefined {
+): string | undefined {
   const parts = transferCode.trim().split('.')
 
-  if (parts.length !== 3 || parts[0] !== PLAYER_TRANSFER_CODE_PREFIX) {
+  if (parts.length !== 2 || parts[0] !== IDENTITY_TRANSFER_CODE_PREFIX) {
     return undefined
   }
 
-  const result = playerCredentialsSchema.safeParse({
-    playerId: parts[1],
-    credential: parts[2]
-  })
+  const result = credentialSchema.safeParse(parts[1])
 
   return result.success ? result.data : undefined
 }

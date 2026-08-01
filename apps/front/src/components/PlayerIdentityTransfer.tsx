@@ -7,24 +7,21 @@ import {
   IdentificationIcon
 } from '@heroicons/react/24/outline'
 import {
-  createPlayerTransferCode,
-  parsePlayerTransferCode
+  createIdentityTransferCode,
+  parseIdentityTransferCode
 } from '@knucklebones/common'
-import { verifyPlayer } from '../utils/api'
-import {
-  getStoredPlayerCredentials,
-  storePlayerCredentials
-} from '../utils/playerIdentity'
+import { createIdentityTransfer, redeemIdentityTransfer } from '../utils/api'
+import { storePlayerCredentials } from '../utils/playerIdentity'
 import { Button } from './Button'
 import { Modal } from './Modal'
 import { ShortcutModal } from './ShortcutModal'
 
 export function PlayerIdentityTransfer() {
   const { t } = useTranslation()
-  const credentials = getStoredPlayerCredentials()!
-  const transferCode = createPlayerTransferCode(credentials)
+  const [transferCode, setTransferCode] = React.useState('')
   const [copied, setCopied] = React.useState(false)
   const [isCodeVisible, setIsCodeVisible] = React.useState(false)
+  const [isExporting, setIsExporting] = React.useState(false)
   const [importCode, setImportCode] = React.useState('')
   const [importError, setImportError] = React.useState<string>()
   const [isImporting, setIsImporting] = React.useState(false)
@@ -36,8 +33,29 @@ export function PlayerIdentityTransfer() {
     }
   }, [])
 
+  async function issueTransferCode(): Promise<string | undefined> {
+    setIsExporting(true)
+
+    try {
+      const transfer = await createIdentityTransfer()
+      const code = createIdentityTransferCode(transfer.transferToken)
+      setTransferCode(code)
+      return code
+    } catch {
+      setImportError(t('identity.transfer.create-error'))
+      return undefined
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   async function copyTransferCode() {
-    await navigator.clipboard.writeText(transferCode)
+    const code = transferCode || (await issueTransferCode())
+    if (code === undefined) {
+      return
+    }
+
+    await navigator.clipboard.writeText(code)
     setCopied(true)
 
     clearTimeout(copiedTimeout.current)
@@ -46,10 +64,23 @@ export function PlayerIdentityTransfer() {
     }, 750)
   }
 
-  async function importPlayerIdentity() {
-    const importedCredentials = parsePlayerTransferCode(importCode)
+  async function toggleTransferCode() {
+    if (isCodeVisible) {
+      setIsCodeVisible(false)
+      return
+    }
 
-    if (importedCredentials === undefined) {
+    if (transferCode === '' && (await issueTransferCode()) === undefined) {
+      return
+    }
+
+    setIsCodeVisible(true)
+  }
+
+  async function importPlayerIdentity() {
+    const transferToken = parseIdentityTransferCode(importCode)
+
+    if (transferToken === undefined) {
       setImportError(t('identity.transfer.invalid'))
       return
     }
@@ -58,7 +89,7 @@ export function PlayerIdentityTransfer() {
     setIsImporting(true)
 
     try {
-      await verifyPlayer(importedCredentials)
+      const importedCredentials = await redeemIdentityTransfer(transferToken)
       storePlayerCredentials(importedCredentials)
       window.location.reload()
     } catch {
@@ -95,6 +126,7 @@ export function PlayerIdentityTransfer() {
           />
           <div className='flex flex-wrap gap-2'>
             <Button
+              disabled={isExporting}
               leftIcon={<ClipboardDocumentIcon />}
               onClick={() => void copyTransferCode()}
             >
@@ -103,9 +135,10 @@ export function PlayerIdentityTransfer() {
               )}
             </Button>
             <Button
+              disabled={isExporting}
               variant='secondary'
               leftIcon={isCodeVisible ? <EyeSlashIcon /> : <EyeIcon />}
-              onClick={() => setIsCodeVisible((visible) => !visible)}
+              onClick={() => void toggleTransferCode()}
             >
               {t(
                 isCodeVisible
@@ -114,6 +147,9 @@ export function PlayerIdentityTransfer() {
               )}
             </Button>
           </div>
+          <p className='text-sm text-slate-600 dark:text-slate-300'>
+            {t('identity.transfer.expiry')}
+          </p>
         </section>
 
         <section className='flex flex-col gap-3 border-t-2 border-slate-200 pt-6 dark:border-slate-700'>

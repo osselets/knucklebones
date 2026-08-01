@@ -85,20 +85,22 @@
     "transfer": {
       "label": "Transfer identity",
       "title": "Transfer your player identity",
-      "warning": "Knucklebones has no accounts. Your player identity exists only in this browser. Clearing its site data will lose it unless you save this transfer code.",
-      "secret-warning": "Anyone with this code can use your identity. Keep it private.",
+      "warning": "Knucklebones has no accounts. Your player identity exists only in this browser. Clearing its site data will lose it unless you transfer it first.",
+      "secret-warning": "Anyone with this code can add a device to your identity. Keep it private.",
       "export-title": "Copy from this device",
       "code-label": "Player identity transfer code",
       "copy": "Copy transfer code",
       "copied": "Copied!",
       "show": "Show code",
       "hide": "Hide code",
+      "expiry": "Transfer codes expire after 10 minutes and can only be used once.",
       "import-title": "Use a code on this device",
       "import-warning": "This replaces the player identity currently stored in this browser.",
       "import-placeholder": "Paste a transfer code",
       "import": "Use this identity",
       "invalid": "This transfer code is invalid.",
-      "error": "The identity could not be verified. Check the code and try again."
+      "error": "This transfer code has expired, was already used, or is invalid.",
+      "create-error": "A transfer code could not be created. Try again."
     }
   }
 }
