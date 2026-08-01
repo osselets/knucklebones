@@ -9,3 +9,8 @@ export interface WebSocketTicket {
   ticket: string
   expiresAt: number
 }
+
+export interface AuthenticatedPrincipal {
+  playerId: string
+  credentialId?: string
+}

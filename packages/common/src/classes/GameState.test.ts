@@ -15,6 +15,40 @@ function createGameState() {
 }
 
 describe('GameState play validation', () => {
+  it('derives the die and actor state from a column-only intent', () => {
+    const gameState = createGameState()
+
+    expect(gameState.applyPlayIntent('player-one', 1)).toBeUndefined()
+
+    expect(gameState.playerOne.columns).toEqual([[], [4], []])
+    expect(gameState.nextPlayer.id).toBe('player-two')
+  })
+
+  it.each([
+    ['unknown-player', 'spectator', 0],
+    ['not-player-turn', 'player-two', 0],
+    ['invalid-column', 'player-one', 3]
+  ] as const)(
+    'rejects a %s play intent without changing state',
+    (reason, actorId, column) => {
+      const gameState = createGameState()
+      const originalState = gameState.toJson()
+
+      expect(gameState.applyPlayIntent(actorId, column)).toBe(reason)
+      expect(gameState.toJson()).toEqual(originalState)
+    }
+  )
+
+  it('rejects an inconsistent server-issued die', () => {
+    const gameState = createGameState()
+    gameState.nextPlayer = new Player('player-one', 'Player One', undefined, 3)
+
+    expect(gameState.applyPlayIntent('player-one', 0)).toBe(
+      'invalid-game-state'
+    )
+    expect(gameState.playerOne.columns).toEqual([[], [], []])
+  })
+
   it('applies a valid move and advances the turn', () => {
     const gameState = createGameState()
 

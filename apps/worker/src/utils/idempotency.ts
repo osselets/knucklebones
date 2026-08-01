@@ -1,17 +1,24 @@
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type MutationRequestWithProps } from '../types/itty'
+import {
+  type AuthenticatedMutationRoomRequestWithProps,
+  type MutationRequestWithProps,
+  type RequestWithId,
+  type RequestWithMutationId
+} from '../types/itty'
 import { apiError } from './http'
 
 const IDEMPOTENCY_KEY_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
-type MutationMiddleware = (
-  request: Request & MutationRequestWithProps,
+type MutationMiddleware<TRequest> = (
+  request: Request & TRequest,
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) => Response | undefined
 
-export const withMutationId: MutationMiddleware = (request) => {
+function assignMutationId(
+  request: Request & RequestWithId & Partial<RequestWithMutationId>
+): Response | undefined {
   const mutationId = request.headers.get('Idempotency-Key')
 
   if (mutationId === null) {
@@ -30,6 +37,12 @@ export const withMutationId: MutationMiddleware = (request) => {
 
   request.mutationId = mutationId
 }
+
+export const withMutationId: MutationMiddleware<MutationRequestWithProps> =
+  assignMutationId
+
+export const withAuthenticatedMutationId: MutationMiddleware<AuthenticatedMutationRoomRequestWithProps> =
+  assignMutationId
 
 export function idempotencyConflict(requestId: string): Response {
   return apiError({

@@ -149,7 +149,7 @@ export function useGameSetup() {
 
       setGameState(mutatedGameState)
 
-      await play({ roomKey, playerId }, { column, dice }).catch((error) => {
+      await play({ roomKey, playerId }, { column }).catch((error) => {
         setErrorMessage(error.message)
         setGameState(previousGameState)
         setIsLoading(false)

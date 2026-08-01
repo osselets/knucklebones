@@ -25,18 +25,18 @@ describe('Durable Object result contracts', () => {
     expect(
       playGameCommandSchema.parse({
         mutationId: '11111111-1111-4111-8111-111111111111',
-        play: {
-          author: '22222222-2222-4222-8222-222222222222',
-          column: 2,
-          dice: 6
-        }
+        actorId: '22222222-2222-4222-8222-222222222222',
+        column: 2,
+        expectedRevision: 4
       })
-    ).toMatchObject({ play: { column: 2, dice: 6 } })
+    ).toMatchObject({ column: 2, expectedRevision: 4 })
 
     expect(
       playGameCommandSchema.safeParse({
         mutationId: 'not-a-mutation-id',
-        play: { author: 'not-a-player-id', column: 3, dice: 7 }
+        actorId: 'not-a-player-id',
+        column: 3,
+        expectedRevision: -1
       }).success
     ).toBe(false)
   })
@@ -56,11 +56,11 @@ describe('Durable Object result contracts', () => {
     expect(
       idempotentPlayGameResultSchema.parse({
         idempotencyStatus: 'replayed',
-        value: { status: 'rejected', reason: 'not-player-turn' }
+        value: { status: 'rejected', reason: 'stale-revision' }
       })
     ).toEqual({
       idempotencyStatus: 'replayed',
-      value: { status: 'rejected', reason: 'not-player-turn' }
+      value: { status: 'rejected', reason: 'stale-revision' }
     })
     expect(
       idempotentPlayGameResultSchema.parse({

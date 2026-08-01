@@ -1,7 +1,11 @@
 import { status } from 'itty-router'
-import { idempotentUpdateDisplayNameResultSchema } from '@knucklebones/common'
+import {
+  GameState,
+  idempotentUpdateDisplayNameResultSchema
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
+import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
   getGameStateDurableObject
@@ -11,7 +15,8 @@ import { idempotencyConflict } from '../utils/idempotency'
 
 export async function deleteDisplayName(
   request: MutationRequestWithProps,
-  cloudflareEnvironment: CloudflareEnvironment
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
 ) {
   const result = idempotentUpdateDisplayNameResultSchema.parse(
     await getGameStateDurableObject(request).updateDisplayName(
@@ -37,6 +42,15 @@ export async function deleteDisplayName(
   }
 
   await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
+
+  const gameState = GameState.fromJson(mutation.gameState)
+  if (
+    gameState.outcome === 'ongoing' &&
+    gameState.playerTwo.isAi() &&
+    gameState.nextPlayer.equals(gameState.playerTwo)
+  ) {
+    makeAiPlay(gameState, request, cloudflareEnvironment, context)
+  }
 
   return status(200)
 }

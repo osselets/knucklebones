@@ -13,7 +13,7 @@ import {
   Lobby,
   lobbySchema,
   Player,
-  type Play,
+  type PlayGameCommand,
   type PlayGameResult,
   playGameCommandSchema,
   playGameResultSchema,
@@ -26,6 +26,7 @@ import {
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
+import { applyPlayCommand } from '../utils/authoritativeGame'
 
 interface ProcessedMutation {
   fingerprint: string
@@ -128,31 +129,32 @@ export class GameStateDurableObject extends createDurable({
     return { status: 'created', gameState }
   }
 
-  play(
-    mutationId: string,
-    play: Play
-  ): IdempotentMutationResult<PlayGameResult> {
-    const command = playGameCommandSchema.parse({ mutationId, play })
+  play(command: PlayGameCommand): IdempotentMutationResult<PlayGameResult> {
+    const parsedCommand = playGameCommandSchema.parse(command)
 
     return this.runIdempotently(
-      command.mutationId,
+      parsedCommand.mutationId,
       'play',
-      command.play,
+      {
+        actorId: parsedCommand.actorId,
+        column: parsedCommand.column,
+        expectedRevision: parsedCommand.expectedRevision
+      },
       playGameResultSchema,
-      () => this.applyPlay(command.play)
+      () => this.applyPlayIntent(parsedCommand)
     )
   }
 
-  private applyPlay(play: Play): PlayGameResult {
-    const gameState = this.getInitializedGameState()
-    const rejectionReason = gameState.getPlayRejectionReason(play)
-
-    if (rejectionReason !== undefined) {
-      return { status: 'rejected', reason: rejectionReason }
+  private applyPlayIntent(command: PlayGameCommand): PlayGameResult {
+    const result = applyPlayCommand(this.gameState, command)
+    if (result.status === 'rejected') {
+      return result
     }
 
-    gameState.applyPlay(play)
-    return { status: 'updated', gameState: this.commitGameState(gameState) }
+    return {
+      status: 'updated',
+      gameState: this.commitGameState(result.gameState)
+    }
   }
 
   rematch(
