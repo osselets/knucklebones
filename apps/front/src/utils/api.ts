@@ -24,6 +24,18 @@ export async function createPlayer(): Promise<PlayerCredentials> {
   return result.data
 }
 
+export async function verifyPlayer({
+  playerId,
+  credential
+}: PlayerCredentials): Promise<void> {
+  await sendApiRequest(
+    `/players/${playerId}/verify`,
+    'POST',
+    undefined,
+    credential
+  )
+}
+
 export async function createWebSocketTicket({
   playerId,
   roomKey
@@ -119,11 +131,16 @@ export async function deleteDisplayName({
   await sendApiRequest(path, 'DELETE')
 }
 
-async function sendApiRequest(path: string, method: Method, body?: unknown) {
+async function sendApiRequest(
+  path: string,
+  method: Method,
+  body?: unknown,
+  credential = localStorage.getItem('playerCredential')
+) {
   const headers = {
     Accept: 'application/json',
-    ...(localStorage.getItem('playerCredential') !== null && {
-      Authorization: `Bearer ${localStorage.getItem('playerCredential')}`
+    ...(credential !== null && {
+      Authorization: `Bearer ${credential}`
     }),
     ...(body !== undefined && { 'Content-Type': 'application/json' })
   }

@@ -3,8 +3,14 @@ import { BrowserRouter } from 'react-router-dom'
 import { getPathLanguage } from '../translations'
 import { Language } from './Language'
 import { PlayerIdentityGate } from './PlayerIdentityGate'
+import { PlayerIdentityTransfer } from './PlayerIdentityTransfer'
 import { Router } from './Router'
-import { MainContent, SideBarContainer, SideBarLayout } from './SideBar'
+import {
+  MainContent,
+  SideBarActions,
+  SideBarContainer,
+  SideBarLayout
+} from './SideBar'
 import { Theme } from './Theme'
 
 export function App() {
@@ -26,7 +32,12 @@ export function App() {
 
           <MainContent ref={mainContentRef}>
             <PlayerIdentityGate>
-              <Router />
+              <>
+                <SideBarActions>
+                  <PlayerIdentityTransfer />
+                </SideBarActions>
+                <Router />
+              </>
             </PlayerIdentityGate>
           </MainContent>
         </SideBarLayout>

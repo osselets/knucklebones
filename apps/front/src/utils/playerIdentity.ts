@@ -15,6 +15,11 @@ export function getStoredPlayerCredentials(): PlayerCredentials | undefined {
   return result.success ? result.data : undefined
 }
 
+export function storePlayerCredentials(credentials: PlayerCredentials): void {
+  localStorage.setItem(PLAYER_ID_KEY, credentials.playerId)
+  localStorage.setItem(PLAYER_CREDENTIAL_KEY, credentials.credential)
+}
+
 export async function ensurePlayerIdentity(): Promise<PlayerCredentials> {
   const storedCredentials = getStoredPlayerCredentials()
   if (storedCredentials !== undefined) {
@@ -22,7 +27,6 @@ export async function ensurePlayerIdentity(): Promise<PlayerCredentials> {
   }
 
   const credentials = await createPlayer()
-  localStorage.setItem(PLAYER_ID_KEY, credentials.playerId)
-  localStorage.setItem(PLAYER_CREDENTIAL_KEY, credentials.credential)
+  storePlayerCredentials(credentials)
   return credentials
 }

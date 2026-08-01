@@ -81,6 +81,24 @@
   "identity": {
     "loading": "正在建立您的玩家身分…",
     "error": "無法建立您的玩家身分。",
-    "retry": "再試一次"
+    "retry": "再試一次",
+    "transfer": {
+      "label": "轉移身分",
+      "title": "轉移您的玩家身分",
+      "warning": "Knucklebones 沒有帳號系統。您的玩家身分只存在於此瀏覽器中。若清除網站資料且未儲存此轉移代碼，身分將會遺失。",
+      "secret-warning": "任何取得此代碼的人都能使用您的身分。請妥善保密。",
+      "export-title": "從此裝置複製",
+      "code-label": "玩家身分轉移代碼",
+      "copy": "複製轉移代碼",
+      "copied": "已複製！",
+      "show": "顯示代碼",
+      "hide": "隱藏代碼",
+      "import-title": "在此裝置使用代碼",
+      "import-warning": "這將取代目前儲存在此瀏覽器中的玩家身分。",
+      "import-placeholder": "貼上轉移代碼",
+      "import": "使用此身分",
+      "invalid": "此轉移代碼無效。",
+      "error": "無法驗證身分。請檢查代碼後再試一次。"
+    }
   }
 }

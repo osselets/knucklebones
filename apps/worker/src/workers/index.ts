@@ -9,11 +9,12 @@ import {
   init,
   play,
   rematch,
+  verifyPlayer,
   webSocket
 } from '../endpoints'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type RequestWithId } from '../types/itty'
-import { authenticatePlayerMutation } from '../utils/authentication'
+import { authenticatePlayerRequest } from '../utils/authentication'
 import {
   apiError,
   sanitizeRequestForSentry,
@@ -34,7 +35,9 @@ router
   .all('*', withDurables({ parse: true }), preflight, withParams)
 
   .post('/players', createPlayer)
-  .all('/:roomKey/:playerId/*', authenticatePlayerMutation)
+  .all('/players/:playerId/*', authenticatePlayerRequest)
+  .post('/players/:playerId/verify', verifyPlayer)
+  .all('/:roomKey/:playerId/*', authenticatePlayerRequest)
   .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
   .post('/:roomKey/:playerId/init', init)
   .post('/:roomKey/:playerId/play/:column/:dice', play)
