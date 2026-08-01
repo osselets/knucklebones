@@ -34,6 +34,7 @@ import { type RequestWithId } from '../types/itty'
 import { authenticatePlayerRequest } from '../utils/authentication'
 import {
   apiError,
+  resolveFrontendOrigin,
   sanitizeRequestForSentry,
   withRequestId
 } from '../utils/http'
@@ -49,13 +50,8 @@ export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObjec
 
 const router = Router()
 
-const { preflight, corsify } = cors({
-  allowMethods: ['GET', 'POST', 'DELETE'],
-  allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key']
-})
-
 router
-  .all('*', preflight, withParams)
+  .all('*', applyCorsPreflight, withParams)
 
   .post('/players', createPlayer)
   .post('/v1/identity/transfers/redeem', redeemIdentityTransfer)
@@ -135,6 +131,7 @@ export default {
       request: sanitizeRequestForSentry(request, requestId)
     })
     sentry.setTag('request_id', requestId)
+    const { corsify } = createCors(cloudflareEnvironment.ENVIRONMENT)
 
     try {
       if (isWebSocketEndpointCalled(requestWithId)) {
@@ -168,6 +165,22 @@ export default {
       return withRequestId(corsify(response, requestWithId), requestId)
     }
   }
+}
+
+function createCors(environment: CloudflareEnvironment['ENVIRONMENT']) {
+  return cors({
+    origin: (origin) => resolveFrontendOrigin(origin, environment),
+    allowMethods: ['GET', 'POST', 'DELETE'],
+    allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+    exposeHeaders: ['X-Request-Id']
+  })
+}
+
+function applyCorsPreflight(
+  request: Request,
+  cloudflareEnvironment: CloudflareEnvironment
+) {
+  return createCors(cloudflareEnvironment.ENVIRONMENT).preflight(request)
 }
 
 function isWebSocketEndpointCalled(request: Request) {

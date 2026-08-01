@@ -1,4 +1,5 @@
 import { type ApiErrorBody } from '@knucklebones/common'
+import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 
 interface ApiErrorOptions {
   status: number
@@ -70,4 +71,38 @@ export function sanitizeRequestForSentry(
     method: request.method,
     headers
   })
+}
+
+export function resolveFrontendOrigin(
+  origin: string | null,
+  environment: CloudflareEnvironment['ENVIRONMENT']
+): string | undefined {
+  if (origin === null) {
+    return undefined
+  }
+
+  if (environment === 'production') {
+    return ['https://knucklebones.io', 'https://www.knucklebones.io'].includes(
+      origin
+    )
+      ? origin
+      : undefined
+  }
+
+  let url: URL
+  try {
+    url = new URL(origin)
+  } catch {
+    return undefined
+  }
+
+  if (environment === 'staging') {
+    const isPagesPreview =
+      url.hostname === 'knucklebones-8ep.pages.dev' ||
+      url.hostname.endsWith('.knucklebones-8ep.pages.dev')
+    return url.protocol === 'https:' && isPagesPreview ? origin : undefined
+  }
+
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(url.hostname)
+  return url.protocol === 'http:' && isLocalhost ? origin : undefined
 }
