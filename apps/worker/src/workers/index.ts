@@ -12,6 +12,7 @@ import {
 } from '../endpoints'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type RequestWithId } from '../types/itty'
+import { authenticatePlayerMutation } from '../utils/authentication'
 import {
   apiError,
   sanitizeRequestForSentry,
@@ -24,13 +25,15 @@ export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObjec
 const router = Router()
 
 const { preflight, corsify } = cors({
-  allowMethods: ['POST', 'DELETE']
+  allowMethods: ['POST', 'DELETE'],
+  allowHeaders: ['Authorization', 'Content-Type']
 })
 
 router
   .all('*', withDurables({ parse: true }), preflight, withParams)
 
   .post('/players', createPlayer)
+  .all('/:roomKey/:playerId/*', authenticatePlayerMutation)
   .post('/:roomKey/:playerId/init', init)
   .post('/:roomKey/:playerId/play/:column/:dice', play)
   .post('/:roomKey/:playerId/rematch', rematch)

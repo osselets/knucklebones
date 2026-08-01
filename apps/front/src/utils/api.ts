@@ -103,6 +103,9 @@ export async function deleteDisplayName({
 async function sendApiRequest(path: string, method: Method, body?: unknown) {
   const headers = {
     Accept: 'application/json',
+    ...(localStorage.getItem('playerCredential') !== null && {
+      Authorization: `Bearer ${localStorage.getItem('playerCredential')}`
+    }),
     ...(body !== undefined && { 'Content-Type': 'application/json' })
   }
 
