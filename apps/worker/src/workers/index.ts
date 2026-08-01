@@ -42,6 +42,7 @@ import {
   withAuthenticatedMutationId,
   withMutationId
 } from '../utils/idempotency'
+import { recordHttpRequest } from '../utils/observability'
 import { validateRequestPath } from '../utils/validation'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
@@ -121,6 +122,7 @@ export default {
     cloudflareEnvironment: CloudflareEnvironment,
     context: ExecutionContext
   ) {
+    const startedAt = Date.now()
     const requestId = crypto.randomUUID()
     const requestWithId = Object.assign(request, {
       requestId
@@ -132,19 +134,30 @@ export default {
     })
     sentry.setTag('request_id', requestId)
     const { corsify } = createCors(cloudflareEnvironment.ENVIRONMENT)
+    const finalize = (response: Response) => {
+      const finalizedResponse = withRequestId(
+        corsify(response, requestWithId),
+        requestId
+      )
+      recordHttpRequest({
+        request,
+        response: finalizedResponse,
+        requestId,
+        environment: cloudflareEnvironment.ENVIRONMENT,
+        startedAt
+      })
+      return finalizedResponse
+    }
 
     try {
       if (isWebSocketEndpointCalled(requestWithId)) {
         const response = await webSocket(requestWithId, cloudflareEnvironment)
-        return withRequestId(response, requestId)
+        return finalize(response)
       }
 
       const invalidPathResponse = validateRequestPath(requestWithId)
       if (invalidPathResponse !== undefined) {
-        return withRequestId(
-          corsify(invalidPathResponse, requestWithId),
-          requestId
-        )
+        return finalize(invalidPathResponse)
       }
 
       const response = await router.fetch(
@@ -152,7 +165,7 @@ export default {
         cloudflareEnvironment,
         context
       )
-      return withRequestId(corsify(response, requestWithId), requestId)
+      return finalize(response)
     } catch (error: unknown) {
       sentry.captureException(error)
       const response = apiError({
@@ -162,7 +175,7 @@ export default {
         requestId,
         retryable: true
       })
-      return withRequestId(corsify(response, requestWithId), requestId)
+      return finalize(response)
     }
   }
 }
