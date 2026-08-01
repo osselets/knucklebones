@@ -1,20 +1,20 @@
 import * as React from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { getPathLanguage } from '../translations'
-import { randomName } from '../utils/name'
 import { Language } from './Language'
+import { PlayerIdentityGate } from './PlayerIdentityGate'
+import { PlayerIdentityTransfer } from './PlayerIdentityTransfer'
 import { Router } from './Router'
-import { MainContent, SideBarContainer, SideBarLayout } from './SideBar'
+import {
+  MainContent,
+  SideBarActions,
+  SideBarContainer,
+  SideBarLayout
+} from './SideBar'
 import { Theme } from './Theme'
 
 export function App() {
   const mainContentRef = React.useRef<React.ElementRef<'div'>>(null)
-
-  React.useEffect(() => {
-    if (localStorage.getItem('playerId') === null) {
-      localStorage.setItem('playerId', randomName())
-    }
-  }, [])
 
   return (
     <BrowserRouter basename={getPathLanguage()}>
@@ -31,7 +31,14 @@ export function App() {
           />
 
           <MainContent ref={mainContentRef}>
-            <Router />
+            <PlayerIdentityGate>
+              <>
+                <SideBarActions>
+                  <PlayerIdentityTransfer />
+                </SideBarActions>
+                <Router />
+              </>
+            </PlayerIdentityGate>
           </MainContent>
         </SideBarLayout>
       </div>

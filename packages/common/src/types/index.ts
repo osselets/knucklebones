@@ -1,3 +1,6 @@
 export * from './gameSettings'
+export * from './matchmaking'
 export * from './outcome'
 export * from './play'
+export * from './playerIdentity'
+export * from './ranking'

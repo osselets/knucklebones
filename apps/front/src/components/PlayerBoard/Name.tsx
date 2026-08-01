@@ -9,7 +9,8 @@ import { isEmptyOrBlank } from '@knucklebones/common'
 import {
   MAX_NAME_LENGTH,
   type PlayerNameProps,
-  getName
+  getName,
+  randomName
 } from '../../utils/name'
 import { IconButton } from '../IconButton'
 
@@ -57,19 +58,10 @@ export function Name({
     setIsBeingEdited(false)
 
     if (isEmptyOrBlank(name)) {
-      // If the name is empty, we want to remove the display name from local storage
-      localStorage.removeItem('displayName')
-
-      if (computedName === id) {
-        // If the name displayed was equal to id, and the name is now empty
-        // default back to id as we don't want an empty name
-        setName(id)
-      } else {
-        // If the name displayed was not the id (so it was the displayName)
-        // and the name is now empty, send an empty displayName to the backend
-        // as the player is trying to remove their displayName
-        updateDisplayName!('')
-      }
+      const generatedName = randomName()
+      localStorage.setItem('displayName', generatedName)
+      setName(generatedName)
+      updateDisplayName!(generatedName)
     } else {
       if (computedName === id) {
         if (name !== id) {

@@ -25,6 +25,15 @@ jobs:
 
       - run: pnpm lint
 
+      - run: pnpm test:unit
+
+      - run: pnpm test:worker
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm test:e2e
+
       - name: Deploy Production
         uses: cloudflare/wrangler-action@v3
         with:

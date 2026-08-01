@@ -58,7 +58,13 @@ export function sanitizeRequestForSentry(
   url.search = ''
 
   const headers = new Headers({ 'X-Request-Id': requestId })
-  const safeHeaderNames = ['Accept', 'Content-Type', 'User-Agent', 'CF-Ray']
+  const safeHeaderNames = [
+    'Accept',
+    'Content-Type',
+    'User-Agent',
+    'CF-Ray',
+    'Idempotency-Key'
+  ]
 
   safeHeaderNames.forEach((headerName) => {
     const value = request.headers.get(headerName)
