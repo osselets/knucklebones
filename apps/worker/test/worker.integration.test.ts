@@ -860,29 +860,29 @@ describe('runtime request validation', () => {
       'Idempotency-Key': crypto.randomUUID()
     }
 
-    const invalidRoom = await request(`/not-a-room/${player.playerId}/init`, {
-      method: 'POST',
-      headers
-    })
-    const invalidSettings = await request(
-      `/${roomKey}/${player.playerId}/init?boType=2`,
-      { method: 'POST', headers }
-    )
-    const invalidMove = await request(
-      `/${roomKey}/${player.playerId}/play/3/4.5`,
-      { method: 'POST', headers }
-    )
-    const blankDisplayName = await request(
-      `/${roomKey}/${player.playerId}/displayName/%20`,
-      { method: 'POST', headers }
-    )
-
-    for (const [label, response, code] of [
-      ['invalid room', invalidRoom, 'INVALID_ROUTE_PARAMETERS'],
-      ['invalid settings', invalidSettings, 'INVALID_GAME_SETTINGS'],
-      ['invalid move', invalidMove, 'INVALID_ROUTE_PARAMETERS'],
-      ['blank display name', blankDisplayName, 'INVALID_ROUTE_PARAMETERS']
+    for (const [label, path, code] of [
+      [
+        'invalid room',
+        `/not-a-room/${player.playerId}/init`,
+        'INVALID_ROUTE_PARAMETERS'
+      ],
+      [
+        'invalid settings',
+        `/${roomKey}/${player.playerId}/init?boType=2`,
+        'INVALID_GAME_SETTINGS'
+      ],
+      [
+        'invalid move',
+        `/${roomKey}/${player.playerId}/play/3/4.5`,
+        'INVALID_ROUTE_PARAMETERS'
+      ],
+      [
+        'blank display name',
+        `/${roomKey}/${player.playerId}/displayName/%20`,
+        'INVALID_ROUTE_PARAMETERS'
+      ]
     ] as const) {
+      const response = await request(path, { method: 'POST', headers })
       const responseText = await response.text()
       expect(response.status, `${label}: ${responseText}`).toBe(400)
       const body = apiErrorBodySchema.parse(JSON.parse(responseText))
