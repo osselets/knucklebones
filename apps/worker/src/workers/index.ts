@@ -9,12 +9,14 @@ import {
   getRankedProfile,
   getMatchmakingStatus,
   init,
+  createIdentityTransfer,
   joinMatchmaking,
   leaveMatchmaking,
   listDeviceCredentials,
   play,
   playIntent,
   rematch,
+  redeemIdentityTransfer,
   revokeDeviceCredential,
   revokeOtherDeviceCredentials,
   rotateDeviceCredential,
@@ -50,7 +52,9 @@ router
   .all('*', preflight, withParams)
 
   .post('/players', createPlayer)
+  .post('/v1/identity/transfers/redeem', redeemIdentityTransfer)
   .all('/v1/identity/*', authenticatePlayerRequest)
+  .post('/v1/identity/transfers', createIdentityTransfer)
   .get('/v1/identity/credentials', listDeviceCredentials)
   .post('/v1/identity/credentials/rotate', rotateDeviceCredential)
   .post('/v1/identity/credentials/revoke-others', revokeOtherDeviceCredentials)

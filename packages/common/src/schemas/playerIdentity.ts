@@ -1,5 +1,10 @@
 import { z } from 'zod/mini'
-import { type PlayerCredentials, type WebSocketTicket } from '../types'
+import {
+  type IdentityTransfer,
+  type PlayerCredentials,
+  type RedeemIdentityTransferRequest,
+  type WebSocketTicket
+} from '../types'
 import {
   credentialIdSchema,
   credentialSchema,
@@ -11,6 +16,16 @@ export const playerCredentialsSchema = z.object({
   playerId: playerIdSchema,
   credential: playerCredentialSchema
 }) satisfies z.ZodMiniType<PlayerCredentials>
+
+export const identityTransferSchema = z.object({
+  transferToken: credentialSchema,
+  expiresAt: z.int().check(z.minimum(0))
+}) satisfies z.ZodMiniType<IdentityTransfer>
+
+export const redeemIdentityTransferRequestSchema = z.strictObject({
+  transferToken: credentialSchema,
+  revokeOtherDevices: z.optional(z.boolean())
+}) satisfies z.ZodMiniType<RedeemIdentityTransferRequest>
 
 export const webSocketTicketSchema = z.object({
   ticket: credentialSchema,

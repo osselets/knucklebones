@@ -3,6 +3,7 @@ import { createTestHarness, type TestHarness } from 'wrangler'
 import {
   apiErrorBodySchema,
   deviceCredentialListSchema,
+  identityTransferSchema,
   matchmakingStatusSchema,
   playerCredentialsSchema,
   rankedProfileSchema,
@@ -274,6 +275,102 @@ describe('device credential lifecycle', () => {
     expect(currentRevoke.status).toBe(409)
     expect(otherRevoke.status).toBe(204)
     expect(otherVerification.status).toBe(401)
+  })
+})
+
+describe('one-time identity transfers', () => {
+  async function issueTransfer(player: PlayerCredentials) {
+    const response = await request('/v1/identity/transfers', {
+      method: 'POST',
+      headers: authorization(player)
+    })
+    expect(response.status).toBe(201)
+    return identityTransferSchema.parse(await response.json())
+  }
+
+  async function redeemTransfer(
+    transferToken: string,
+    revokeOtherDevices = false
+  ) {
+    return await request('/v1/identity/transfers/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transferToken, revokeOtherDevices })
+    })
+  }
+
+  it('issues a separate device credential for the same player', async () => {
+    const source = await createPlayer()
+    const transfer = await issueTransfer(source)
+    const response = await redeemTransfer(transfer.transferToken)
+
+    expect(response.status).toBe(201)
+    const imported = playerCredentialsSchema.parse(await response.json())
+    expect(imported.playerId).toBe(source.playerId)
+    expect(imported.credential).not.toBe(source.credential)
+
+    const [sourceVerification, importedVerification] = await Promise.all([
+      request(`/players/${source.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(source)
+      }),
+      request(`/players/${imported.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(imported)
+      })
+    ])
+    expect(sourceVerification.status).toBe(204)
+    expect(importedVerification.status).toBe(204)
+  })
+
+  it('allows only one of two concurrent redemptions', async () => {
+    const source = await createPlayer()
+    const transfer = await issueTransfer(source)
+
+    const responses = await Promise.all([
+      redeemTransfer(transfer.transferToken),
+      redeemTransfer(transfer.transferToken)
+    ])
+
+    expect(responses.map(({ status }) => status).sort()).toEqual([201, 410])
+  })
+
+  it('rejects an expired transfer token', async () => {
+    const source = await createPlayer()
+    const transfer = await issueTransfer(source)
+    const environment = await server.getWorker().getEnv()
+    await environment.PLAYERS_DB.prepare(
+      'UPDATE identity_transfers SET expires_at = ? WHERE player_id = ?'
+    )
+      .bind(Date.now() - 1, source.playerId)
+      .run()
+
+    const response = await redeemTransfer(transfer.transferToken)
+
+    expect(response.status).toBe(410)
+    expect(apiErrorBodySchema.parse(await response.json()).error.code).toBe(
+      'IDENTITY_TRANSFER_UNAVAILABLE'
+    )
+  })
+
+  it('can revoke source devices as part of redemption', async () => {
+    const source = await createPlayer()
+    const transfer = await issueTransfer(source)
+    const response = await redeemTransfer(transfer.transferToken, true)
+    const imported = playerCredentialsSchema.parse(await response.json())
+
+    const [sourceVerification, importedVerification] = await Promise.all([
+      request(`/players/${source.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(source)
+      }),
+      request(`/players/${imported.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(imported)
+      })
+    ])
+    expect(sourceVerification.status).toBe(401)
+    expect(importedVerification.status).toBe(204)
   })
 })
 
