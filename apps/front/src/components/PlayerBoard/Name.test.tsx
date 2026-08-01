@@ -32,7 +32,9 @@ describe('Name', () => {
     const generatedName = updateDisplayName.mock.calls[0][0] as string
     expect(generatedName).not.toBe(playerId)
     expect(generatedName).toMatch(/^[A-Z][A-Za-z]+$/)
-    expect(localStorage.getItem('displayName')).toBe(generatedName)
+    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
+      generatedName
+    )
     expect(screen.getByText(new RegExp(generatedName))).toBeInTheDocument()
   })
 })

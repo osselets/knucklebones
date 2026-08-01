@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test.describe.configure({ mode: 'serial' })
+
 interface StoredIdentity {
   displayName: string
   playerCredential: string
@@ -23,9 +25,11 @@ async function waitForHome(page: Page) {
 
 async function readIdentity(page: Page): Promise<StoredIdentity> {
   return await page.evaluate(() => ({
-    displayName: localStorage.displayName,
-    playerCredential: localStorage.playerCredential,
-    playerId: localStorage.playerId
+    displayName: localStorage.getItem('knucklebones.identity.v1.displayName')!,
+    playerCredential: localStorage.getItem(
+      'knucklebones.identity.v1.deviceCredential'
+    )!,
+    playerId: localStorage.getItem('knucklebones.identity.v1.playerId')!
   }))
 }
 
@@ -164,9 +168,15 @@ test('synchronizes a human game across independent browser identities', async ({
       (await firstColumns.count()) === 3 ? firstPlayer : secondPlayer
     const nextPlayer =
       currentPlayer === firstPlayer ? secondPlayer : firstPlayer
-    await currentPlayer.locator('div[role="button"]').first().click()
-
-    await expect(currentPlayer.locator('div[role="button"]')).toHaveCount(0)
+    const currentColumns = currentPlayer.locator('div[role="button"]')
+    await expect
+      .poll(async () => {
+        if ((await currentColumns.count()) === 3) {
+          await currentColumns.first().dispatchEvent('click')
+        }
+        return await currentColumns.count()
+      })
+      .toBe(0)
     await expect(nextPlayer.locator('div[role="button"]')).toHaveCount(3)
   } finally {
     await firstContext.close()

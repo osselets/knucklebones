@@ -19,6 +19,7 @@ import {
   play,
   voteRematch
 } from '../../utils/api'
+import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
 import { getWebSocketUrl, preparePlayers } from './utils'
 
@@ -38,7 +39,7 @@ export function useGameSetup() {
   const roomKey = useRoomKey()
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
-  const playerId = localStorage.getItem('playerId')!
+  const playerId = getStoredPlayerId()!
   const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
     const { ticket } = await createWebSocketTicket({ roomKey, playerId })
     return getWebSocketUrl(roomKey, ticket)

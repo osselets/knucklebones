@@ -6,6 +6,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { isEmptyOrBlank } from '@knucklebones/common'
+import { storeDisplayName } from '../../utils/identityStorage'
 import {
   MAX_NAME_LENGTH,
   type PlayerNameProps,
@@ -59,7 +60,7 @@ export function Name({
 
     if (isEmptyOrBlank(name)) {
       const generatedName = randomName()
-      localStorage.setItem('displayName', generatedName)
+      storeDisplayName(generatedName)
       setName(generatedName)
       updateDisplayName!(generatedName)
     } else {
@@ -68,13 +69,13 @@ export function Name({
           // If the name displayed was the id, and the new name
           // is different from the id the player is trying to set a
           // displayName, so set it in local storage and send it to the backend
-          localStorage.setItem('displayName', name)
+          storeDisplayName(name)
           updateDisplayName!(name)
         }
       } else {
         if (name !== displayName) {
           // Same case as above, but the player is trying to update their displayName
-          localStorage.setItem('displayName', name)
+          storeDisplayName(name)
           updateDisplayName!(name)
         }
       }

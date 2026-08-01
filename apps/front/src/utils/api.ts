@@ -14,6 +14,10 @@ import {
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
+import {
+  getStoredDeviceCredential,
+  getStoredDisplayName
+} from './identityStorage'
 
 type Method = 'GET' | 'POST' | 'DELETE'
 
@@ -134,8 +138,11 @@ export async function initGame(
 
   if (playerType === 'ai' && difficulty !== undefined) {
     urlSearchParams.append('difficulty', difficulty)
-  } else if ('displayName' in localStorage) {
-    urlSearchParams.append('displayName', localStorage.displayName)
+  } else {
+    const displayName = getStoredDisplayName()
+    if (displayName !== null) {
+      urlSearchParams.append('displayName', displayName)
+    }
   }
 
   if (boType !== undefined) {
@@ -212,7 +219,7 @@ async function sendApiRequest(
   path: string,
   method: Method,
   body?: unknown,
-  credential = localStorage.getItem('playerCredential'),
+  credential = getStoredDeviceCredential(),
   mutationId?: string
 ) {
   const headers = {
