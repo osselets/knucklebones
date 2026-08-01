@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { play } from './api'
+import {
+  createWebSocketTicket,
+  initGame,
+  play,
+  updateDisplayName,
+  voteRematch
+} from './api'
 
 const room = {
   roomKey: 'room-one',
@@ -50,6 +56,44 @@ describe('mutation requests', () => {
 
     await expect(play(room, { column: 1 })).rejects.toThrow('[409:Conflict]')
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('uses authenticated versioned room endpoints without player IDs', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          ticket: 'a'.repeat(64),
+          expiresAt: Date.now() + 30_000
+        })
+      )
+    localStorage.setItem('displayName', 'Dice Friend')
+
+    await initGame(room, { playerType: 'human', boType: 1 })
+    await voteRematch(room, { boType: 3 })
+    await updateDisplayName(room, { displayName: 'A/B ? Player' })
+    await createWebSocketTicket(room)
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      expect.stringContaining(`/v1/rooms/${room.roomKey}/init`),
+      expect.stringContaining(`/v1/rooms/${room.roomKey}/rematch`),
+      expect.stringContaining(`/v1/rooms/${room.roomKey}/display-name`),
+      expect.stringContaining(`/v1/rooms/${room.roomKey}/websocket-ticket`)
+    ])
+    expect(
+      fetchMock.mock.calls.every(
+        ([url]) => !url.toString().includes(room.playerId)
+      )
+    ).toBe(true)
+    expect(fetchMock.mock.calls[0][1]?.body).toBe(
+      '{"playerType":"human","boType":1,"displayName":"Dice Friend"}'
+    )
+    expect(fetchMock.mock.calls[1][1]?.body).toBe('{"boType":3}')
+    expect(fetchMock.mock.calls[2][1]?.body).toBe(
+      '{"displayName":"A/B ? Player"}'
+    )
   })
 
   it('reports a validated API error code and message', async () => {

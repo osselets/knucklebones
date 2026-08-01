@@ -44,7 +44,7 @@ export type InitializeGameResult =
   | { status: 'created' | 'existing'; gameState: IGameState }
 
 export type RematchGameResult =
-  | { status: 'game-ongoing' | 'unchanged' }
+  | { status: 'game-ongoing' | 'unchanged' | 'unknown-player' }
   | { status: 'updated'; gameState: IGameState }
 
 export type UpdateDisplayNameResult =

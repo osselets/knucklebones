@@ -110,11 +110,10 @@ export async function redeemIdentityTransfer(
 }
 
 export async function createWebSocketTicket({
-  playerId,
   roomKey
 }: IdentificationParams): Promise<WebSocketTicket> {
   const response = await sendApiRequest(
-    `/${roomKey}/${playerId}/websocket-ticket`,
+    `/v1/rooms/${roomKey}/websocket-ticket`,
     'POST'
   )
   const result = webSocketTicketSchema.safeParse(await response.json())
@@ -131,50 +130,32 @@ interface InitGameRequestParams extends Omit<GameSettings, 'boType'> {
   boType?: GameSettings['boType']
 }
 export async function initGame(
-  { playerId, roomKey }: IdentificationParams,
+  { roomKey }: IdentificationParams,
   { boType, difficulty, playerType }: InitGameRequestParams
 ) {
-  const urlSearchParams = new URLSearchParams()
+  const displayName = getStoredDisplayName()
+  const body =
+    playerType === 'ai'
+      ? { playerType, difficulty, boType }
+      : {
+          playerType,
+          boType,
+          ...(displayName !== null && { displayName })
+        }
 
-  if (playerType === 'ai' && difficulty !== undefined) {
-    urlSearchParams.append('difficulty', difficulty)
-  } else {
-    const displayName = getStoredDisplayName()
-    if (displayName !== null) {
-      urlSearchParams.append('displayName', displayName)
-    }
-  }
-
-  if (boType !== undefined) {
-    urlSearchParams.append('boType', String(boType))
-  }
-
-  const urlSearchParamsString = urlSearchParams.toString()
-
-  const queryParamsString =
-    urlSearchParamsString.length > 0 ? '?' + urlSearchParamsString : ''
-
-  const path = `/${roomKey}/${playerId}/init${queryParamsString}`
-
-  await sendMutationRequest(path, 'POST')
+  await sendMutationRequest(`/v1/rooms/${roomKey}/init`, 'POST', body)
 }
 
 // Pas besoin de repréciser `boType` si il change pas de la partie en cours
 type VoteRematchRequestParams = Partial<Omit<GameSettings, 'playerType'>>
 export async function voteRematch(
-  { playerId, roomKey }: IdentificationParams,
+  { roomKey }: IdentificationParams,
   { boType, difficulty }: VoteRematchRequestParams = {}
 ) {
-  const urlSearchParams = new URLSearchParams()
-  if (boType !== undefined) {
-    urlSearchParams.append('boType', String(boType))
-  }
-  if (difficulty !== undefined) {
-    urlSearchParams.append('difficulty', difficulty)
-  }
-
-  const path = `/${roomKey}/${playerId}/rematch?${urlSearchParams.toString()}`
-  await sendMutationRequest(path, 'POST')
+  await sendMutationRequest(`/v1/rooms/${roomKey}/rematch`, 'POST', {
+    boType,
+    difficulty
+  })
 }
 
 interface PlayRequestParams {
@@ -191,19 +172,16 @@ interface UpdateDisplayNameRequestParams {
   displayName: string
 }
 export async function updateDisplayName(
-  { playerId, roomKey }: IdentificationParams,
+  { roomKey }: IdentificationParams,
   { displayName }: UpdateDisplayNameRequestParams
 ) {
-  const path = `/${roomKey}/${playerId}/displayName/${displayName}`
-  await sendMutationRequest(path, 'POST')
+  await sendMutationRequest(`/v1/rooms/${roomKey}/display-name`, 'POST', {
+    displayName
+  })
 }
 
-export async function deleteDisplayName({
-  playerId,
-  roomKey
-}: IdentificationParams) {
-  const path = `/${roomKey}/${playerId}/displayName`
-  await sendMutationRequest(path, 'DELETE')
+export async function deleteDisplayName({ roomKey }: IdentificationParams) {
+  await sendMutationRequest(`/v1/rooms/${roomKey}/display-name`, 'DELETE')
 }
 
 async function sendMutationRequest(

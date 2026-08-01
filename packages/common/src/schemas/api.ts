@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 import { type ApiErrorBody } from '../types'
+import { boTypeSchema, difficultySchema } from './gameState'
 import {
   displayNameSchema,
   playerIdSchema,
@@ -42,6 +43,28 @@ export const playRouteParamsSchema = z.object({
 
 export const playIntentSchema = z.strictObject({
   column: z.union([z.literal(0), z.literal(1), z.literal(2)])
+})
+
+export const initializeRoomSchema = z.union([
+  z.strictObject({
+    playerType: z.literal('human'),
+    displayName: z.optional(displayNameSchema),
+    boType: z.optional(boTypeSchema)
+  }),
+  z.strictObject({
+    playerType: z.literal('ai'),
+    difficulty: difficultySchema,
+    boType: z.optional(boTypeSchema)
+  })
+])
+
+export const rematchRoomSchema = z.strictObject({
+  boType: z.optional(boTypeSchema),
+  difficulty: z.optional(difficultySchema)
+})
+
+export const updateDisplayNameSchema = z.strictObject({
+  displayName: displayNameSchema
 })
 
 export const gameSettingsQuerySchema = z.object({

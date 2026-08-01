@@ -2,10 +2,15 @@ import { status } from 'itty-router'
 import {
   GameState,
   gameSettingsQuerySchema,
-  idempotentRematchGameResultSchema
+  idempotentRematchGameResultSchema,
+  rematchRoomSchema,
+  type GameSettings
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type MutationRequestWithProps } from '../types/itty'
+import {
+  type AuthenticatedMutationRoomRequestWithProps,
+  type MutationRequestWithProps
+} from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
@@ -47,11 +52,53 @@ export async function rematch(
     })
   }
 
+  return await executeRematch(
+    request,
+    request.playerId,
+    gameSettings.value,
+    cloudflareEnvironment,
+    context
+  )
+}
+
+export async function rematchRoom(
+  request: Request & AuthenticatedMutationRoomRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  const body = rematchRoomSchema.safeParse(
+    await request.json().catch(() => undefined)
+  )
+  if (!body.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_REMATCH_REQUEST',
+      message: 'The rematch request is invalid.',
+      requestId: request.requestId
+    })
+  }
+
+  return await executeRematch(
+    request,
+    request.principal.playerId,
+    body.data,
+    cloudflareEnvironment,
+    context
+  )
+}
+
+async function executeRematch(
+  request: AuthenticatedMutationRoomRequestWithProps,
+  playerId: string,
+  gameSettings: Partial<Omit<GameSettings, 'playerType'>>,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
   const result = idempotentRematchGameResultSchema.parse(
     await getGameStateDurableObject(request).rematch(
       request.mutationId,
-      request.playerId,
-      gameSettings.value
+      playerId,
+      gameSettings
     )
   )
 
@@ -66,6 +113,15 @@ export async function rematch(
       status: 409,
       code: 'GAME_STILL_ONGOING',
       message: "The game is still ongoing. Can't rematch.",
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'unknown-player') {
+    return apiError({
+      status: 403,
+      code: 'NOT_A_PLAYER',
+      message: 'Only a player in this game can request a rematch.',
       requestId: request.requestId
     })
   }

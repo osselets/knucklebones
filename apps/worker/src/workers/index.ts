@@ -4,11 +4,13 @@ import { Toucan } from 'toucan-js'
 import {
   createPlayer,
   createWebSocketTicket,
+  deleteRoomDisplayName,
   deleteDisplayName,
   displayName,
   getRankedProfile,
   getMatchmakingStatus,
   init,
+  initializeRoom,
   createIdentityTransfer,
   joinMatchmaking,
   leaveMatchmaking,
@@ -16,12 +18,14 @@ import {
   play,
   playIntent,
   rematch,
+  rematchRoom,
   redeemIdentityTransfer,
   redeemIdentityRecovery,
   revokeDeviceCredential,
   revokeOtherDeviceCredentials,
   rotateDeviceCredential,
   rotateIdentityRecovery,
+  updateRoomDisplayName,
   verifyPlayer,
   webSocket
 } from '../endpoints'
@@ -75,7 +79,20 @@ router
     withDurables({ parse: true }),
     authenticatePlayerRequest
   )
+  .post('/v1/rooms/:roomKey/websocket-ticket', createWebSocketTicket)
+  .post('/v1/rooms/:roomKey/init', withAuthenticatedMutationId, initializeRoom)
   .post('/v1/rooms/:roomKey/play', withAuthenticatedMutationId, playIntent)
+  .post('/v1/rooms/:roomKey/rematch', withAuthenticatedMutationId, rematchRoom)
+  .post(
+    '/v1/rooms/:roomKey/display-name',
+    withAuthenticatedMutationId,
+    updateRoomDisplayName
+  )
+  .delete(
+    '/v1/rooms/:roomKey/display-name',
+    withAuthenticatedMutationId,
+    deleteRoomDisplayName
+  )
   .all(
     '/:roomKey/:playerId/*',
     withDurables({ parse: true }),

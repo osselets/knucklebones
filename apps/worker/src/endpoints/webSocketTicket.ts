@@ -1,9 +1,9 @@
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type AuthenticatedRoomRequestWithProps } from '../types/itty'
 import { enforceRateLimit } from '../utils/rateLimit'
 
 export async function createWebSocketTicket(
-  request: Request & BaseRequestWithProps,
+  request: Request & AuthenticatedRoomRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
   const rateLimit = await enforceRateLimit(

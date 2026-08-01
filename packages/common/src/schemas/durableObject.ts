@@ -63,7 +63,7 @@ export const initializeGameResultSchema = z.union([
 ]) satisfies z.ZodMiniType<InitializeGameResult>
 
 export const rematchGameResultSchema = z.union([
-  z.object({ status: z.enum(['game-ongoing', 'unchanged']) }),
+  z.object({ status: z.enum(['game-ongoing', 'unchanged', 'unknown-player']) }),
   updatedGameStateResultSchema
 ]) satisfies z.ZodMiniType<RematchGameResult>
 
