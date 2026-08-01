@@ -14,6 +14,7 @@ import {
   hashCredential
 } from '../utils/credentials'
 import { apiError } from '../utils/http'
+import { enforceRateLimit } from '../utils/rateLimit'
 
 const IDENTITY_TRANSFER_TTL_MS = 10 * 60 * 1000
 
@@ -22,9 +23,23 @@ interface IdentityTransferRedemptionRow {
 }
 
 export async function createIdentityTransfer(
-  request: AuthenticatedRequestWithProps,
+  request: Request & AuthenticatedRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const rateLimit = await enforceRateLimit(
+    request,
+    cloudflareEnvironment.PLAYERS_DB,
+    {
+      scope: 'identity-transfer-create',
+      identifier: request.principal.playerId,
+      limit: 20,
+      windowMs: 60 * 60 * 1000
+    }
+  )
+  if (rateLimit !== undefined) {
+    return rateLimit
+  }
+
   const transferToken = createCredential()
   const createdAt = Date.now()
   const expiresAt = createdAt + IDENTITY_TRANSFER_TTL_MS
@@ -53,6 +68,19 @@ export async function redeemIdentityTransfer(
   request: Request & RequestWithId,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const rateLimit = await enforceRateLimit(
+    request,
+    cloudflareEnvironment.PLAYERS_DB,
+    {
+      scope: 'identity-transfer-redeem',
+      limit: 20,
+      windowMs: 15 * 60 * 1000
+    }
+  )
+  if (rateLimit !== undefined) {
+    return rateLimit
+  }
+
   const body = redeemIdentityTransferRequestSchema.safeParse(
     await request.json().catch(() => undefined)
   )

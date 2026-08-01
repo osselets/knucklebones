@@ -466,6 +466,34 @@ describe('identity recovery', () => {
     expect(sourceVerification.status).toBe(401)
     expect(recoveredVerification.status).toBe(204)
   })
+
+  it('rate-limits repeated recovery attempts by client address', async () => {
+    const recoveryPhrase =
+      'knucklebones-recovery-v1.bbbb.bbbb.bbbb.bbbb.bbbb.bbbb.bbbb.bbbb'
+    const makeAttempt = (clientAddress: string) =>
+      request('/v1/identity/recovery/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': clientAddress
+        },
+        body: JSON.stringify({ recoveryPhrase })
+      })
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await makeAttempt('192.0.2.1')).status).toBe(410)
+    }
+
+    const limited = await makeAttempt('192.0.2.1')
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('Retry-After')).toMatch(/^\d+$/)
+    expect(apiErrorBodySchema.parse(await limited.json()).error).toMatchObject({
+      code: 'RATE_LIMITED',
+      retryable: true
+    })
+
+    expect((await makeAttempt('192.0.2.2')).status).toBe(410)
+  })
 })
 
 describe('atomic idempotent room mutations', () => {

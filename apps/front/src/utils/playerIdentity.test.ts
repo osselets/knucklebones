@@ -31,7 +31,9 @@ describe('ensurePlayerIdentity', () => {
     expect(
       localStorage.getItem('knucklebones.identity.v1.pendingRecoveryPhrase')
     ).toBe(bootstrap.recoveryPhrase)
-    expect(localStorage.getItem('displayName')).toBe('BraveBlueFox')
+    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
+      'BraveBlueFox'
+    )
   })
 
   it('adds a friendly name to an existing UUID identity', async () => {
@@ -41,7 +43,11 @@ describe('ensurePlayerIdentity', () => {
     await ensurePlayerIdentity()
 
     expect(createPlayer).not.toHaveBeenCalled()
-    expect(localStorage.getItem('displayName')).toBe('BraveBlueFox')
+    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
+      'BraveBlueFox'
+    )
+    expect(localStorage.getItem('playerId')).toBeNull()
+    expect(localStorage.getItem('playerCredential')).toBeNull()
   })
 
   it('preserves a user-selected display name', async () => {
@@ -51,6 +57,8 @@ describe('ensurePlayerIdentity', () => {
 
     await ensurePlayerIdentity()
 
-    expect(localStorage.getItem('displayName')).toBe('Custom Name')
+    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
+      'Custom Name'
+    )
   })
 })
