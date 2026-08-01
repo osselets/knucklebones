@@ -5,6 +5,16 @@ export interface PlayerCredentials {
   credential: string
 }
 
+export interface IdentityTransfer {
+  transferToken: string
+  expiresAt: number
+}
+
+export interface RedeemIdentityTransferRequest {
+  transferToken: string
+  revokeOtherDevices?: boolean
+}
+
 export interface WebSocketTicket {
   ticket: string
   expiresAt: number

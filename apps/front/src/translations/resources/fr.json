@@ -86,20 +86,22 @@
     "transfer": {
       "label": "Transférer l'identité",
       "title": "Transférer votre identité de joueur",
-      "warning": "Knucklebones ne propose pas de comptes. Votre identité de joueur existe uniquement dans ce navigateur. Effacer les données du site la supprimera si vous n'avez pas sauvegardé ce code de transfert.",
-      "secret-warning": "Toute personne possédant ce code peut utiliser votre identité. Gardez-le secret.",
+      "warning": "Knucklebones ne propose pas de comptes. Votre identité de joueur existe uniquement dans ce navigateur. Effacer les données du site la supprimera si vous ne l'avez pas transférée auparavant.",
+      "secret-warning": "Toute personne possédant ce code peut ajouter un appareil à votre identité. Gardez-le secret.",
       "export-title": "Copier depuis cet appareil",
       "code-label": "Code de transfert de l'identité du joueur",
       "copy": "Copier le code de transfert",
       "copied": "Copié !",
       "show": "Afficher le code",
       "hide": "Masquer le code",
+      "expiry": "Les codes de transfert expirent après 10 minutes et ne peuvent être utilisés qu'une seule fois.",
       "import-title": "Utiliser un code sur cet appareil",
       "import-warning": "Cette opération remplace l'identité de joueur actuellement enregistrée dans ce navigateur.",
       "import-placeholder": "Collez un code de transfert",
       "import": "Utiliser cette identité",
       "invalid": "Ce code de transfert est invalide.",
-      "error": "L'identité n'a pas pu être vérifiée. Vérifiez le code et réessayez."
+      "error": "Ce code de transfert a expiré, a déjà été utilisé ou est invalide.",
+      "create-error": "Impossible de créer un code de transfert. Réessayez."
     }
   }
 }

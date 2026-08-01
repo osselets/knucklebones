@@ -193,14 +193,19 @@ test('transfers an identity between independent browsers', async ({
 }) => {
   const sourceContext = await browser.newContext()
   const targetContext = await browser.newContext()
+  const replayContext = await browser.newContext()
   const source = await sourceContext.newPage()
   const target = await targetContext.newPage()
+  const replay = await replayContext.newPage()
 
   try {
     await waitForHome(source)
     const sourceIdentity = await readIdentity(source)
     await source.getByRole('button', { name: 'Transfer identity' }).click()
     await source.getByRole('button', { name: 'Show code' }).click()
+    await expect(
+      source.getByLabel('Player identity transfer code')
+    ).toHaveValue(/^knucklebones-transfer-v1\./)
     const transferCode = await source
       .getByLabel('Player identity transfer code')
       .inputValue()
@@ -216,9 +221,22 @@ test('transfers an identity between independent browsers', async ({
       target.getByRole('button', { name: 'Play against an AI' })
     ).toBeVisible()
 
-    expect((await readIdentity(target)).playerId).toBe(sourceIdentity.playerId)
+    const targetIdentity = await readIdentity(target)
+    expect(targetIdentity.playerId).toBe(sourceIdentity.playerId)
+    expect(targetIdentity.playerCredential).not.toBe(
+      sourceIdentity.playerCredential
+    )
+
+    await waitForHome(replay)
+    await replay.getByRole('button', { name: 'Transfer identity' }).click()
+    await replay.getByPlaceholder('Paste a transfer code').fill(transferCode)
+    await replay.getByRole('button', { name: 'Use this identity' }).click()
+    await expect(replay.getByRole('alert')).toContainText(
+      'expired, was already used, or is invalid'
+    )
   } finally {
     await sourceContext.close()
     await targetContext.close()
+    await replayContext.close()
   }
 })
