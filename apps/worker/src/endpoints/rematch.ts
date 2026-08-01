@@ -1,5 +1,5 @@
 import { status } from 'itty-router'
-import { type GameSettings, GameState } from '@knucklebones/common'
+import { GameState } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
@@ -7,11 +7,15 @@ import {
   broadcastGameState,
   getGameStateDurableObject
 } from '../utils/endpoints'
+import {
+  type GameSettingsQuery,
+  parseGameSettingsQuery
+} from '../utils/gameSettings'
 import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
 
 export interface RematchRequest extends MutationRequestWithProps {
-  query?: Omit<GameSettings, 'playerType'>
+  query?: GameSettingsQuery
 }
 
 export async function rematch(
@@ -19,10 +23,21 @@ export async function rematch(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
+  const gameSettings = parseGameSettingsQuery(request.query)
+
+  if (!gameSettings.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_GAME_SETTINGS',
+      message: 'The game settings are invalid.',
+      requestId: request.requestId
+    })
+  }
+
   const result = await getGameStateDurableObject(request).rematch(
     request.mutationId,
     request.playerId,
-    request.query
+    gameSettings.value
   )
 
   if (result.idempotencyStatus === 'conflict') {
