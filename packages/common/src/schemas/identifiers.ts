@@ -28,6 +28,10 @@ export const playerCredentialSchema = z.union([
   deviceCredentialSchema
 ])
 
+export const recoveryPhraseSchema = z
+  .string()
+  .check(z.regex(/^knucklebones-recovery-v1(?:\.[0-9a-f]{4}){8}$/i))
+
 export const displayNameSchema = z
   .string()
   .check(z.minLength(1), z.maxLength(64), z.regex(/\S/u))

@@ -17,9 +17,11 @@ import {
   playIntent,
   rematch,
   redeemIdentityTransfer,
+  redeemIdentityRecovery,
   revokeDeviceCredential,
   revokeOtherDeviceCredentials,
   rotateDeviceCredential,
+  rotateIdentityRecovery,
   verifyPlayer,
   webSocket
 } from '../endpoints'
@@ -53,8 +55,10 @@ router
 
   .post('/players', createPlayer)
   .post('/v1/identity/transfers/redeem', redeemIdentityTransfer)
+  .post('/v1/identity/recovery/redeem', redeemIdentityRecovery)
   .all('/v1/identity/*', authenticatePlayerRequest)
   .post('/v1/identity/transfers', createIdentityTransfer)
+  .post('/v1/identity/recovery/rotate', rotateIdentityRecovery)
   .get('/v1/identity/credentials', listDeviceCredentials)
   .post('/v1/identity/credentials/rotate', rotateDeviceCredential)
   .post('/v1/identity/credentials/revoke-others', revokeOtherDeviceCredentials)

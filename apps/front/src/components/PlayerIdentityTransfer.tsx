@@ -8,10 +8,21 @@ import {
 } from '@heroicons/react/24/outline'
 import {
   createIdentityTransferCode,
-  parseIdentityTransferCode
+  parseIdentityTransferCode,
+  recoveryPhraseSchema
 } from '@knucklebones/common'
-import { createIdentityTransfer, redeemIdentityTransfer } from '../utils/api'
-import { storePlayerCredentials } from '../utils/playerIdentity'
+import {
+  createIdentityTransfer,
+  redeemIdentityRecovery,
+  redeemIdentityTransfer,
+  rotateIdentityRecovery
+} from '../utils/api'
+import {
+  confirmRecoveryPhrase,
+  getPendingRecoveryPhrase,
+  storePendingRecoveryPhrase,
+  storePlayerCredentials
+} from '../utils/playerIdentity'
 import { Button } from './Button'
 import { Modal } from './Modal'
 import { ShortcutModal } from './ShortcutModal'
@@ -22,9 +33,24 @@ export function PlayerIdentityTransfer() {
   const [copied, setCopied] = React.useState(false)
   const [isCodeVisible, setIsCodeVisible] = React.useState(false)
   const [isExporting, setIsExporting] = React.useState(false)
+  const [exportError, setExportError] = React.useState<string>()
   const [importCode, setImportCode] = React.useState('')
   const [importError, setImportError] = React.useState<string>()
   const [isImporting, setIsImporting] = React.useState(false)
+  const [revokeOtherDevicesOnTransfer, setRevokeOtherDevicesOnTransfer] =
+    React.useState(false)
+  const [recoveryPhrase, setRecoveryPhrase] = React.useState(
+    getPendingRecoveryPhrase
+  )
+  const [isRecoveryVisible, setIsRecoveryVisible] = React.useState(
+    recoveryPhrase !== undefined
+  )
+  const [recoveryInput, setRecoveryInput] = React.useState('')
+  const [recoveryError, setRecoveryError] = React.useState<string>()
+  const [isRotatingRecovery, setIsRotatingRecovery] = React.useState(false)
+  const [isRecovering, setIsRecovering] = React.useState(false)
+  const [revokeOtherDevicesOnRecovery, setRevokeOtherDevicesOnRecovery] =
+    React.useState(false)
   const copiedTimeout = React.useRef<ReturnType<typeof setTimeout>>(undefined)
 
   React.useEffect(() => {
@@ -37,12 +63,13 @@ export function PlayerIdentityTransfer() {
     setIsExporting(true)
 
     try {
+      setExportError(undefined)
       const transfer = await createIdentityTransfer()
       const code = createIdentityTransferCode(transfer.transferToken)
       setTransferCode(code)
       return code
     } catch {
-      setImportError(t('identity.transfer.create-error'))
+      setExportError(t('identity.transfer.create-error'))
       return undefined
     } finally {
       setIsExporting(false)
@@ -89,7 +116,10 @@ export function PlayerIdentityTransfer() {
     setIsImporting(true)
 
     try {
-      const importedCredentials = await redeemIdentityTransfer(transferToken)
+      const importedCredentials = await redeemIdentityTransfer(
+        transferToken,
+        revokeOtherDevicesOnTransfer
+      )
       storePlayerCredentials(importedCredentials)
       window.location.reload()
     } catch {
@@ -98,10 +128,63 @@ export function PlayerIdentityTransfer() {
     }
   }
 
+  async function rotateRecoveryPhrase() {
+    setRecoveryError(undefined)
+    setIsRotatingRecovery(true)
+
+    try {
+      const recovery = await rotateIdentityRecovery()
+      storePendingRecoveryPhrase(recovery.recoveryPhrase)
+      setRecoveryPhrase(recovery.recoveryPhrase)
+      setIsRecoveryVisible(true)
+    } catch {
+      setRecoveryError(t('identity.recovery.rotate-error'))
+    } finally {
+      setIsRotatingRecovery(false)
+    }
+  }
+
+  async function copyRecoveryPhrase() {
+    if (recoveryPhrase !== undefined) {
+      await navigator.clipboard.writeText(recoveryPhrase)
+    }
+  }
+
+  function acknowledgeRecoveryPhrase() {
+    confirmRecoveryPhrase()
+    setRecoveryPhrase(undefined)
+    setIsRecoveryVisible(false)
+  }
+
+  async function recoverPlayerIdentity() {
+    const normalizedPhrase = recoveryInput.trim().toLowerCase()
+    if (!recoveryPhraseSchema.safeParse(normalizedPhrase).success) {
+      setRecoveryError(t('identity.recovery.invalid'))
+      return
+    }
+
+    setRecoveryError(undefined)
+    setIsRecovering(true)
+
+    try {
+      const recovered = await redeemIdentityRecovery(
+        normalizedPhrase,
+        revokeOtherDevicesOnRecovery
+      )
+      storePlayerCredentials(recovered)
+      storePendingRecoveryPhrase(recovered.recoveryPhrase)
+      window.location.reload()
+    } catch {
+      setRecoveryError(t('identity.recovery.error'))
+      setIsRecovering(false)
+    }
+  }
+
   return (
     <ShortcutModal
       icon={<IdentificationIcon />}
       label={t('identity.transfer.label')}
+      isInitiallyOpen={recoveryPhrase !== undefined}
     >
       <div className='flex max-w-lg flex-col gap-6'>
         <Modal.Title>{t('identity.transfer.title')}</Modal.Title>
@@ -150,6 +233,11 @@ export function PlayerIdentityTransfer() {
           <p className='text-sm text-slate-600 dark:text-slate-300'>
             {t('identity.transfer.expiry')}
           </p>
+          {exportError !== undefined && (
+            <p role='alert' className='text-red-700 dark:text-red-400'>
+              {exportError}
+            </p>
+          )}
         </section>
 
         <section className='flex flex-col gap-3 border-t-2 border-slate-200 pt-6 dark:border-slate-700'>
@@ -170,11 +258,99 @@ export function PlayerIdentityTransfer() {
               {importError}
             </p>
           )}
+          <label className='flex items-start gap-2'>
+            <input
+              type='checkbox'
+              checked={revokeOtherDevicesOnTransfer}
+              onChange={(event) =>
+                setRevokeOtherDevicesOnTransfer(event.target.checked)
+              }
+            />
+            <span>{t('identity.transfer.revoke-others')}</span>
+          </label>
           <Button
             disabled={isImporting || importCode.trim() === ''}
             onClick={() => void importPlayerIdentity()}
           >
             {t('identity.transfer.import')}
+          </Button>
+        </section>
+
+        <section className='flex flex-col gap-3 border-t-2 border-slate-200 pt-6 dark:border-slate-700'>
+          <h3 className='text-lg font-semibold'>
+            {t('identity.recovery.title')}
+          </h3>
+          <p>{t('identity.recovery.warning')}</p>
+          {recoveryPhrase !== undefined && (
+            <>
+              <input
+                type={isRecoveryVisible ? 'text' : 'password'}
+                value={recoveryPhrase}
+                readOnly
+                spellCheck={false}
+                aria-label={t('identity.recovery.phrase-label')}
+                className='rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
+              />
+              <div className='flex flex-wrap gap-2'>
+                <Button onClick={() => void copyRecoveryPhrase()}>
+                  {t('identity.recovery.copy')}
+                </Button>
+                <Button
+                  variant='secondary'
+                  onClick={() => setIsRecoveryVisible((visible) => !visible)}
+                >
+                  {t(
+                    isRecoveryVisible
+                      ? 'identity.recovery.hide'
+                      : 'identity.recovery.show'
+                  )}
+                </Button>
+                <Button variant='secondary' onClick={acknowledgeRecoveryPhrase}>
+                  {t('identity.recovery.saved')}
+                </Button>
+              </div>
+            </>
+          )}
+          <Button
+            disabled={isRotatingRecovery}
+            onClick={() => void rotateRecoveryPhrase()}
+          >
+            {t(
+              recoveryPhrase === undefined
+                ? 'identity.recovery.generate'
+                : 'identity.recovery.regenerate'
+            )}
+          </Button>
+
+          <h4 className='font-semibold'>{t('identity.recovery.use-title')}</h4>
+          <textarea
+            value={recoveryInput}
+            onChange={(event) => setRecoveryInput(event.target.value)}
+            placeholder={t('identity.recovery.placeholder')}
+            spellCheck={false}
+            rows={3}
+            className='resize-none rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
+          />
+          <label className='flex items-start gap-2'>
+            <input
+              type='checkbox'
+              checked={revokeOtherDevicesOnRecovery}
+              onChange={(event) =>
+                setRevokeOtherDevicesOnRecovery(event.target.checked)
+              }
+            />
+            <span>{t('identity.recovery.revoke-others')}</span>
+          </label>
+          {recoveryError !== undefined && (
+            <p role='alert' className='text-red-700 dark:text-red-400'>
+              {recoveryError}
+            </p>
+          )}
+          <Button
+            disabled={isRecovering || recoveryInput.trim() === ''}
+            onClick={() => void recoverPlayerIdentity()}
+          >
+            {t('identity.recovery.use')}
           </Button>
         </section>
       </div>

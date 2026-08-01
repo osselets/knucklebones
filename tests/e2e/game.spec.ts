@@ -11,6 +11,14 @@ async function waitForHome(page: Page) {
   await expect(
     page.getByRole('button', { name: 'Play against an AI' })
   ).toBeVisible()
+
+  const acknowledgeRecovery = page.getByRole('button', {
+    name: "I've saved it"
+  })
+  if (await acknowledgeRecovery.isVisible()) {
+    await acknowledgeRecovery.click()
+    await page.keyboard.press('Escape')
+  }
 }
 
 async function readIdentity(page: Page): Promise<StoredIdentity> {
@@ -233,6 +241,64 @@ test('transfers an identity between independent browsers', async ({
     await replay.getByRole('button', { name: 'Use this identity' }).click()
     await expect(replay.getByRole('alert')).toContainText(
       'expired, was already used, or is invalid'
+    )
+  } finally {
+    await sourceContext.close()
+    await targetContext.close()
+    await replayContext.close()
+  }
+})
+
+test('recovers an identity once and rotates its recovery phrase', async ({
+  browser
+}) => {
+  const sourceContext = await browser.newContext()
+  const targetContext = await browser.newContext()
+  const replayContext = await browser.newContext()
+  const source = await sourceContext.newPage()
+  const target = await targetContext.newPage()
+  const replay = await replayContext.newPage()
+
+  try {
+    await waitForHome(source)
+    const sourceIdentity = await readIdentity(source)
+    await source.getByRole('button', { name: 'Transfer identity' }).click()
+    await source
+      .getByRole('button', { name: 'Create a recovery phrase' })
+      .click()
+    await expect(
+      source.getByLabel('Player identity recovery phrase')
+    ).toHaveValue(/^knucklebones-recovery-v1\./)
+    const recoveryPhrase = await source
+      .getByLabel('Player identity recovery phrase')
+      .inputValue()
+
+    await waitForHome(target)
+    await target.getByRole('button', { name: 'Transfer identity' }).click()
+    await target
+      .getByPlaceholder('Paste a recovery phrase')
+      .fill(recoveryPhrase)
+    await Promise.all([
+      target.waitForEvent('load'),
+      target.getByRole('button', { name: 'Recover this identity' }).click()
+    ])
+    await expect(
+      target.getByLabel('Player identity recovery phrase')
+    ).toHaveValue(/^knucklebones-recovery-v1\./)
+    const targetIdentity = await readIdentity(target)
+    expect(targetIdentity.playerId).toBe(sourceIdentity.playerId)
+    expect(targetIdentity.playerCredential).not.toBe(
+      sourceIdentity.playerCredential
+    )
+
+    await waitForHome(replay)
+    await replay.getByRole('button', { name: 'Transfer identity' }).click()
+    await replay
+      .getByPlaceholder('Paste a recovery phrase')
+      .fill(recoveryPhrase)
+    await replay.getByRole('button', { name: 'Recover this identity' }).click()
+    await expect(replay.getByRole('alert')).toContainText(
+      'invalid or has already been replaced'
     )
   } finally {
     await sourceContext.close()

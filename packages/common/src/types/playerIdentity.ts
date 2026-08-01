@@ -5,6 +5,23 @@ export interface PlayerCredentials {
   credential: string
 }
 
+export interface PlayerIdentityBootstrap extends PlayerCredentials {
+  recoveryPhrase: string
+}
+
+export interface IdentityRecovery extends PlayerCredentials {
+  recoveryPhrase: string
+}
+
+export interface IdentityRecoveryPhrase {
+  recoveryPhrase: string
+}
+
+export interface RedeemIdentityRecoveryRequest {
+  recoveryPhrase: string
+  revokeOtherDevices?: boolean
+}
+
 export interface IdentityTransfer {
   transferToken: string
   expiresAt: number

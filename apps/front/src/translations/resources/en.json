@@ -98,9 +98,28 @@
       "import-warning": "This replaces the player identity currently stored in this browser.",
       "import-placeholder": "Paste a transfer code",
       "import": "Use this identity",
+      "revoke-others": "Revoke this identity on every other device after transfer",
       "invalid": "This transfer code is invalid.",
       "error": "This transfer code has expired, was already used, or is invalid.",
       "create-error": "A transfer code could not be created. Try again."
+    },
+    "recovery": {
+      "title": "Recovery phrase",
+      "warning": "Save this phrase somewhere private. It is the only way to recover your identity if every authorized device is lost. Anyone with it can take control of your identity.",
+      "phrase-label": "Player identity recovery phrase",
+      "copy": "Copy recovery phrase",
+      "show": "Show phrase",
+      "hide": "Hide phrase",
+      "saved": "I've saved it",
+      "generate": "Create a recovery phrase",
+      "regenerate": "Replace recovery phrase",
+      "use-title": "Recover an identity",
+      "placeholder": "Paste a recovery phrase",
+      "revoke-others": "Revoke every other device after recovery",
+      "use": "Recover this identity",
+      "invalid": "This recovery phrase is invalid.",
+      "error": "This recovery phrase is invalid or has already been replaced.",
+      "rotate-error": "A recovery phrase could not be created. Try again."
     }
   }
 }

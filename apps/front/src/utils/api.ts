@@ -1,10 +1,16 @@
 import {
   apiErrorBodySchema,
   type GameSettings,
+  type IdentityRecovery,
+  type IdentityRecoveryPhrase,
+  identityRecoveryPhraseSchema,
+  identityRecoverySchema,
   type IdentityTransfer,
   identityTransferSchema,
   type PlayerCredentials,
   playerCredentialsSchema,
+  type PlayerIdentityBootstrap,
+  playerIdentityBootstrapSchema,
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
@@ -16,12 +22,42 @@ interface IdentificationParams {
   playerId: string
 }
 
-export async function createPlayer(): Promise<PlayerCredentials> {
+export async function createPlayer(): Promise<PlayerIdentityBootstrap> {
   const response = await sendApiRequest('/players', 'POST')
-  const result = playerCredentialsSchema.safeParse(await response.json())
+  const result = playerIdentityBootstrapSchema.safeParse(await response.json())
 
   if (!result.success) {
     throw new Error('The server returned invalid player credentials.')
+  }
+
+  return result.data
+}
+
+export async function rotateIdentityRecovery(): Promise<IdentityRecoveryPhrase> {
+  const response = await sendApiRequest('/v1/identity/recovery/rotate', 'POST')
+  const result = identityRecoveryPhraseSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid recovery phrase.')
+  }
+
+  return result.data
+}
+
+export async function redeemIdentityRecovery(
+  recoveryPhrase: string,
+  revokeOtherDevices = false
+): Promise<IdentityRecovery> {
+  const response = await sendApiRequest(
+    '/v1/identity/recovery/redeem',
+    'POST',
+    { recoveryPhrase, revokeOtherDevices },
+    null
+  )
+  const result = identityRecoverySchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid identity recovery.')
   }
 
   return result.data
