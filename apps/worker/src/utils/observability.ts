@@ -64,6 +64,10 @@ export function classifyRoute(pathname: string): string {
     return `/${segments.join('/')}`
   }
 
+  if (segments[0] === 'v1' && segments[1] === 'diagnostics') {
+    return '/v1/diagnostics/:type'
+  }
+
   if (
     segments[0] === 'v1' &&
     (segments[1] === 'matchmaking' || segments[1] === 'ranked')

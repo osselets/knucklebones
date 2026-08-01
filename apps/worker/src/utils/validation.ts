@@ -49,6 +49,10 @@ export function validateRequestPath(
     return
   }
 
+  if (segments[0] === 'v1' && segments[1] === 'diagnostics') {
+    return
+  }
+
   if (
     segments[0] === 'v1' &&
     (segments[1] === 'matchmaking' || segments[1] === 'ranked')

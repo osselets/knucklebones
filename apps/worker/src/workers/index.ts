@@ -17,6 +17,7 @@ import {
   listDeviceCredentials,
   play,
   playIntent,
+  reportClientProtocolDiagnostic,
   rematch,
   rematchRoom,
   redeemIdentityTransfer,
@@ -57,6 +58,8 @@ router
   .post('/players', createPlayer)
   .post('/v1/identity/transfers/redeem', redeemIdentityTransfer)
   .post('/v1/identity/recovery/redeem', redeemIdentityRecovery)
+  .all('/v1/diagnostics/*', authenticatePlayerRequest)
+  .post('/v1/diagnostics/protocol', reportClientProtocolDiagnostic)
   .all('/v1/identity/*', authenticatePlayerRequest)
   .post('/v1/identity/verify', verifyPlayer)
   .post('/v1/identity/transfers', createIdentityTransfer)

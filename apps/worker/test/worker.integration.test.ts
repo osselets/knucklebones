@@ -95,6 +95,38 @@ describe('environment request policy', () => {
   })
 })
 
+describe('client protocol diagnostics', () => {
+  it('accepts only authenticated fixed diagnostic codes', async () => {
+    const player = await createPlayer()
+    const diagnostic = { code: 'INVALID_GAME_STATE_MESSAGE' }
+    const missingCredential = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(diagnostic)
+    })
+    const invalid = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code: 'RAW_PAYLOAD', payload: 'secret' })
+    })
+    const valid = await request('/v1/diagnostics/protocol', {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(diagnostic)
+    })
+
+    expect(missingCredential.status).toBe(401)
+    expect(invalid.status).toBe(400)
+    expect(valid.status).toBe(204)
+  })
+})
+
 describe('player identities and ranked profiles', () => {
   it('creates an authenticated UUID identity with a default rating', async () => {
     const player = await createPlayer()
@@ -828,29 +860,29 @@ describe('runtime request validation', () => {
       'Idempotency-Key': crypto.randomUUID()
     }
 
-    const invalidRoom = await request(`/not-a-room/${player.playerId}/init`, {
-      method: 'POST',
-      headers
-    })
-    const invalidSettings = await request(
-      `/${roomKey}/${player.playerId}/init?boType=2`,
-      { method: 'POST', headers }
-    )
-    const invalidMove = await request(
-      `/${roomKey}/${player.playerId}/play/3/4.5`,
-      { method: 'POST', headers }
-    )
-    const blankDisplayName = await request(
-      `/${roomKey}/${player.playerId}/displayName/%20`,
-      { method: 'POST', headers }
-    )
-
-    for (const [label, response, code] of [
-      ['invalid room', invalidRoom, 'INVALID_ROUTE_PARAMETERS'],
-      ['invalid settings', invalidSettings, 'INVALID_GAME_SETTINGS'],
-      ['invalid move', invalidMove, 'INVALID_ROUTE_PARAMETERS'],
-      ['blank display name', blankDisplayName, 'INVALID_ROUTE_PARAMETERS']
+    for (const [label, path, code] of [
+      [
+        'invalid room',
+        `/not-a-room/${player.playerId}/init`,
+        'INVALID_ROUTE_PARAMETERS'
+      ],
+      [
+        'invalid settings',
+        `/${roomKey}/${player.playerId}/init?boType=2`,
+        'INVALID_GAME_SETTINGS'
+      ],
+      [
+        'invalid move',
+        `/${roomKey}/${player.playerId}/play/3/4.5`,
+        'INVALID_ROUTE_PARAMETERS'
+      ],
+      [
+        'blank display name',
+        `/${roomKey}/${player.playerId}/displayName/%20`,
+        'INVALID_ROUTE_PARAMETERS'
+      ]
     ] as const) {
+      const response = await request(path, { method: 'POST', headers })
       const responseText = await response.text()
       expect(response.status, `${label}: ${responseText}`).toBe(400)
       const body = apiErrorBodySchema.parse(JSON.parse(responseText))

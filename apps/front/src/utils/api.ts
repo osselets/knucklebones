@@ -1,5 +1,6 @@
 import {
   apiErrorBodySchema,
+  type ClientProtocolDiagnosticCode,
   type GameSettings,
   type IdentityRecovery,
   type IdentityRecoveryPhrase,
@@ -71,6 +72,12 @@ export async function verifyPlayer({
   credential
 }: PlayerCredentials): Promise<void> {
   await sendApiRequest('/v1/identity/verify', 'POST', undefined, credential)
+}
+
+export async function reportClientProtocolDiagnostic(
+  code: ClientProtocolDiagnosticCode
+): Promise<void> {
+  await sendApiRequest('/v1/diagnostics/protocol', 'POST', { code })
 }
 
 export async function createIdentityTransfer(): Promise<IdentityTransfer> {
