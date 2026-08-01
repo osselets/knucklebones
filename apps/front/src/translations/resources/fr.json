@@ -78,5 +78,28 @@
       "opponent-win": "{{player}} a gagné la partie avec {{points}} points !"
     }
   },
-  "loading": "En attente du début de la partie"
+  "loading": "En attente du début de la partie",
+  "identity": {
+    "loading": "Création de votre identité de joueur…",
+    "error": "Impossible de créer votre identité de joueur.",
+    "retry": "Réessayer",
+    "transfer": {
+      "label": "Transférer l'identité",
+      "title": "Transférer votre identité de joueur",
+      "warning": "Knucklebones ne propose pas de comptes. Votre identité de joueur existe uniquement dans ce navigateur. Effacer les données du site la supprimera si vous n'avez pas sauvegardé ce code de transfert.",
+      "secret-warning": "Toute personne possédant ce code peut utiliser votre identité. Gardez-le secret.",
+      "export-title": "Copier depuis cet appareil",
+      "code-label": "Code de transfert de l'identité du joueur",
+      "copy": "Copier le code de transfert",
+      "copied": "Copié !",
+      "show": "Afficher le code",
+      "hide": "Masquer le code",
+      "import-title": "Utiliser un code sur cet appareil",
+      "import-warning": "Cette opération remplace l'identité de joueur actuellement enregistrée dans ce navigateur.",
+      "import-placeholder": "Collez un code de transfert",
+      "import": "Utiliser cette identité",
+      "invalid": "Ce code de transfert est invalide.",
+      "error": "L'identité n'a pas pu être vérifiée. Vérifiez le code et réessayez."
+    }
+  }
 }

@@ -86,7 +86,7 @@ export class Player {
       player.displayName,
       player.difficulty,
       player.dice,
-      player.columns
+      player.columns.map((column) => [...column])
     )
   }
 

@@ -1,4 +1,4 @@
-import { type IGameState } from '@knucklebones/common'
+import { type IGameState, toGameStateMessage } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 
@@ -17,6 +17,7 @@ export async function broadcastGameState(
 
   return await webSocketStore.fetch('https://dummy-url/broadcast', {
     method: 'POST',
-    body: JSON.stringify(gameState)
+    headers: { 'X-Request-Id': request.requestId },
+    body: JSON.stringify(toGameStateMessage(gameState, roomKey))
   })
 }

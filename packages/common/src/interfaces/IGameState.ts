@@ -3,6 +3,7 @@ import { type ILog } from './ILog'
 import { type IPlayer } from './IPlayer'
 
 export interface IGameState {
+  revision: number
   playerOne: IPlayer
   playerTwo: IPlayer
   spectators: string[]

@@ -77,5 +77,28 @@
       "opponent-win": "{{player}} won the game with {{points}} points!"
     }
   },
-  "loading": "Waiting for game to start"
+  "loading": "Waiting for game to start",
+  "identity": {
+    "loading": "Creating your player identity…",
+    "error": "We couldn't create your player identity.",
+    "retry": "Try again",
+    "transfer": {
+      "label": "Transfer identity",
+      "title": "Transfer your player identity",
+      "warning": "Knucklebones has no accounts. Your player identity exists only in this browser. Clearing its site data will lose it unless you save this transfer code.",
+      "secret-warning": "Anyone with this code can use your identity. Keep it private.",
+      "export-title": "Copy from this device",
+      "code-label": "Player identity transfer code",
+      "copy": "Copy transfer code",
+      "copied": "Copied!",
+      "show": "Show code",
+      "hide": "Hide code",
+      "import-title": "Use a code on this device",
+      "import-warning": "This replaces the player identity currently stored in this browser.",
+      "import-placeholder": "Paste a transfer code",
+      "import": "Use this identity",
+      "invalid": "This transfer code is invalid.",
+      "error": "The identity could not be verified. Check the code and try again."
+    }
+  }
 }
