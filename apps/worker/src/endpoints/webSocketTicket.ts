@@ -28,7 +28,9 @@ export async function createWebSocketTicket(
   return await webSocketStore.fetch('https://dummy-url/ticket', {
     method: 'POST',
     headers: {
-      'X-Player-Id': request.playerId,
+      'X-Player-Id': request.principal.playerId,
+      'X-Credential-Id': request.principal.credentialId,
+      'X-Room-Key': request.roomKey,
       'X-Request-Id': request.requestId
     }
   })

@@ -1,8 +1,12 @@
 import { Toucan } from 'toucan-js'
 import {
+  credentialIdSchema,
   credentialSchema,
   gameServerEventSchema,
   playerIdSchema,
+  PROTOCOL_VERSION,
+  roomKeySchema,
+  toGamePresenceMessage,
   type WebSocketTicket
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
@@ -14,6 +18,9 @@ const WEB_SOCKET_TICKETS_STORAGE_KEY = 'websocket-tickets'
 
 interface PendingWebSocketTicket {
   playerId: string
+  credentialId: string
+  roomKey: string
+  protocolVersion: typeof PROTOCOL_VERSION
   expiresAt: number
 }
 
@@ -28,6 +35,9 @@ export function removeExpiredWebSocketTickets(
       ([ticketHash, ticket]) =>
         credentialSchema.safeParse(ticketHash).success &&
         playerIdSchema.safeParse(ticket.playerId).success &&
+        credentialIdSchema.safeParse(ticket.credentialId).success &&
+        roomKeySchema.safeParse(ticket.roomKey).success &&
+        ticket.protocolVersion === PROTOCOL_VERSION &&
         Number.isInteger(ticket.expiresAt) &&
         ticket.expiresAt > now
     )
@@ -36,6 +46,11 @@ export function removeExpiredWebSocketTickets(
 
 interface WebSocketSession {
   playerId: string
+  credentialId: string
+  roomKey: string
+  connectionId: string
+  protocolVersion: typeof PROTOCOL_VERSION
+  role: 'pending' | 'player' | 'spectator'
   connectedAt: number
 }
 
@@ -65,8 +80,15 @@ export class WebSocketDurableObject {
       switch (url.pathname) {
         case '/ticket': {
           const playerId = request.headers.get('X-Player-Id')
+          const credentialId = request.headers.get('X-Credential-Id')
+          const roomKey = request.headers.get('X-Room-Key')
 
-          if (request.method !== 'POST' || playerId === null) {
+          if (
+            request.method !== 'POST' ||
+            playerId === null ||
+            credentialId === null ||
+            roomKey === null
+          ) {
             return apiError({
               status: 400,
               code: 'INVALID_WEBSOCKET_TICKET_REQUEST',
@@ -75,7 +97,7 @@ export class WebSocketDurableObject {
             })
           }
 
-          return await this.createTicket(playerId)
+          return await this.createTicket(playerId, credentialId, roomKey)
         }
         case '/websocket': {
           if (request.headers.get('Upgrade') !== 'websocket') {
@@ -117,6 +139,12 @@ export class WebSocketDurableObject {
             })
           }
 
+          if (event.data.type === 'game.state') {
+            this.updateSessionRoles(
+              event.data.payload.gameState.playerOne.id,
+              event.data.payload.gameState.playerTwo.id
+            )
+          }
           this.broadcast(JSON.stringify(event.data))
           return new Response(null, { status: 200 })
         }
@@ -142,8 +170,18 @@ export class WebSocketDurableObject {
   }
 
   async handleSession(webSocket: WebSocket, session: WebSocketSession) {
+    const wasConnected = this.hasOpenSession(session.playerId)
     this.state.acceptWebSocket(webSocket, [`player:${session.playerId}`])
     webSocket.serializeAttachment(session)
+    this.sendPresenceSnapshot(webSocket, session.roomKey, webSocket)
+
+    if (!wasConnected) {
+      this.broadcast(
+        JSON.stringify(
+          toGamePresenceMessage(session.roomKey, session.playerId, true)
+        )
+      )
+    }
   }
 
   async webSocketMessage(webSocket: WebSocket) {
@@ -156,6 +194,18 @@ export class WebSocketDurableObject {
     reason: string,
     wasClean: boolean
   ) {
+    const session = this.readSession(webSocket)
+    if (
+      session !== undefined &&
+      !this.hasOpenSession(session.playerId, webSocket)
+    ) {
+      this.broadcast(
+        JSON.stringify(
+          toGamePresenceMessage(session.roomKey, session.playerId, false)
+        )
+      )
+    }
+
     if (!wasClean) {
       this.sentry.captureMessage(`${code} - ${reason}`, 'error')
     }
@@ -175,8 +225,16 @@ export class WebSocketDurableObject {
     })
   }
 
-  private async createTicket(playerId: string): Promise<Response> {
-    if (!playerIdSchema.safeParse(playerId).success) {
+  private async createTicket(
+    playerId: string,
+    credentialId: string,
+    roomKey: string
+  ): Promise<Response> {
+    if (
+      !playerIdSchema.safeParse(playerId).success ||
+      !credentialIdSchema.safeParse(credentialId).success ||
+      !roomKeySchema.safeParse(roomKey).success
+    ) {
       throw new Error('Cannot issue a WebSocket ticket for an invalid player.')
     }
 
@@ -190,7 +248,13 @@ export class WebSocketDurableObject {
         WEB_SOCKET_TICKETS_STORAGE_KEY
       )
       const activeTickets = removeExpiredWebSocketTickets(tickets ?? {}, now)
-      activeTickets[ticketHash] = { playerId, expiresAt }
+      activeTickets[ticketHash] = {
+        playerId,
+        credentialId,
+        roomKey,
+        protocolVersion: PROTOCOL_VERSION,
+        expiresAt
+      }
       await transaction.put(WEB_SOCKET_TICKETS_STORAGE_KEY, activeTickets)
     })
 
@@ -230,7 +294,85 @@ export class WebSocketDurableObject {
         return undefined
       }
 
-      return { playerId: pendingTicket.playerId, connectedAt: now }
+      return {
+        playerId: pendingTicket.playerId,
+        credentialId: pendingTicket.credentialId,
+        roomKey: pendingTicket.roomKey,
+        connectionId: crypto.randomUUID(),
+        protocolVersion: pendingTicket.protocolVersion,
+        role: 'pending',
+        connectedAt: now
+      }
+    })
+  }
+
+  private hasOpenSession(playerId: string, excluded?: WebSocket): boolean {
+    return this.state
+      .getWebSockets(`player:${playerId}`)
+      .some(
+        (webSocket) =>
+          webSocket !== excluded && webSocket.readyState === WebSocket.OPEN
+      )
+  }
+
+  private readSession(webSocket: WebSocket): WebSocketSession | undefined {
+    const session = webSocket.deserializeAttachment() as
+      Partial<WebSocketSession> | undefined
+
+    if (
+      session === undefined ||
+      !playerIdSchema.safeParse(session.playerId).success ||
+      !credentialIdSchema.safeParse(session.credentialId).success ||
+      !roomKeySchema.safeParse(session.roomKey).success ||
+      !credentialIdSchema.safeParse(session.connectionId).success ||
+      session.protocolVersion !== PROTOCOL_VERSION ||
+      !['pending', 'player', 'spectator'].includes(session.role ?? '') ||
+      !Number.isInteger(session.connectedAt)
+    ) {
+      return undefined
+    }
+
+    return session as WebSocketSession
+  }
+
+  private sendPresenceSnapshot(
+    webSocket: WebSocket,
+    roomKey: string,
+    excluded: WebSocket
+  ): void {
+    const connectedPlayerIds = new Set<string>()
+    this.state.getWebSockets().forEach((connectedWebSocket) => {
+      if (
+        connectedWebSocket === excluded ||
+        connectedWebSocket.readyState !== WebSocket.OPEN
+      ) {
+        return
+      }
+      const session = this.readSession(connectedWebSocket)
+      if (session !== undefined) {
+        connectedPlayerIds.add(session.playerId)
+      }
+    })
+
+    connectedPlayerIds.forEach((playerId) => {
+      webSocket.send(
+        JSON.stringify(toGamePresenceMessage(roomKey, playerId, true))
+      )
+    })
+  }
+
+  private updateSessionRoles(playerOneId: string, playerTwoId: string): void {
+    this.state.getWebSockets().forEach((webSocket) => {
+      const session = this.readSession(webSocket)
+      if (session === undefined) {
+        return
+      }
+
+      session.role =
+        session.playerId === playerOneId || session.playerId === playerTwoId
+          ? 'player'
+          : 'spectator'
+      webSocket.serializeAttachment(session)
     })
   }
 }
