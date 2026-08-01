@@ -6,6 +6,7 @@ import {
   Player,
   toGameStateMessage,
   toGamePresenceMessage,
+  toGameReconnectDeadlineMessage,
   type IGameState
 } from '@knucklebones/common'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -137,6 +138,58 @@ describe('useGameSetup', () => {
     emitMessage(toGamePresenceMessage(roomKey, playerId, false), rerender)
     await waitFor(() =>
       expect(result.current?.presenceByPlayerId[playerId]).toBe(false)
+    )
+  })
+
+  it('tracks and clears reconnect deadlines', async () => {
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+    emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
+    await waitFor(() => expect(result.current?.revision).toBe(1))
+
+    emitMessage(
+      toGameReconnectDeadlineMessage(roomKey, playerId, 123_456),
+      rerender
+    )
+    await waitFor(() =>
+      expect(result.current?.reconnectDeadlineByPlayerId[playerId]).toBe(
+        123_456
+      )
+    )
+
+    emitMessage(toGameReconnectDeadlineMessage(roomKey, playerId, 0), rerender)
+    await waitFor(() =>
+      expect(
+        result.current?.reconnectDeadlineByPlayerId[playerId]
+      ).toBeUndefined()
+    )
+  })
+
+  it('clears reconnect deadlines when the game ends', async () => {
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+    emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
+    emitMessage(
+      toGameReconnectDeadlineMessage(roomKey, playerId, 123_456),
+      rerender
+    )
+    await waitFor(() =>
+      expect(result.current?.reconnectDeadlineByPlayerId[playerId]).toBe(
+        123_456
+      )
+    )
+
+    emitMessage(
+      toGameStateMessage(
+        {
+          ...createGameState(2),
+          outcome: 'game-ended',
+          finishReason: 'no-contest'
+        },
+        roomKey
+      ),
+      rerender
+    )
+    await waitFor(() =>
+      expect(result.current?.reconnectDeadlineByPlayerId).toEqual({})
     )
   })
 

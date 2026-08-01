@@ -40,6 +40,8 @@ export function useGameSetup() {
   const [presenceByPlayerId, setPresenceByPlayerId] = React.useState<
     Record<string, boolean>
   >({})
+  const [reconnectDeadlineByPlayerId, setReconnectDeadlineByPlayerId] =
+    React.useState<Record<string, number>>({})
   const roomKey = useRoomKey()
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
@@ -79,6 +81,21 @@ export function useGameSetup() {
             ...presence,
             [presenceEvent.payload.playerId]: presenceEvent.payload.connected
           }))
+        } else if (
+          serverEvent.data.type === 'game.reconnect-deadline' &&
+          serverEvent.data.payload.roomKey === roomKey
+        ) {
+          const deadlineEvent = serverEvent.data
+          setReconnectDeadlineByPlayerId((deadlines) => {
+            const nextDeadlines = { ...deadlines }
+            if (deadlineEvent.payload.expiresAt === 0) {
+              delete nextDeadlines[deadlineEvent.payload.playerId]
+            } else {
+              nextDeadlines[deadlineEvent.payload.playerId] =
+                deadlineEvent.payload.expiresAt
+            }
+            return nextDeadlines
+          })
         } else if (serverEvent.data.type === 'game.error') {
           setErrorMessage(serverEvent.data.payload.message)
         }
@@ -122,6 +139,9 @@ export function useGameSetup() {
       }
 
       setGameState(nextGameState)
+      if (nextGameState.outcome !== 'ongoing') {
+        setReconnectDeadlineByPlayerId({})
+      }
       setIsLoading(false)
       setErrorMessage(null)
     }
@@ -129,6 +149,7 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     setPresenceByPlayerId({})
+    setReconnectDeadlineByPlayerId({})
   }, [roomKey])
 
   React.useEffect(() => {
@@ -239,6 +260,7 @@ export function useGameSetup() {
     winner,
     errorMessage,
     presenceByPlayerId,
+    reconnectDeadlineByPlayerId,
     sendPlay,
     clearErrorMessage,
     voteContinueBo,

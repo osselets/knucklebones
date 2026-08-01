@@ -79,6 +79,9 @@
     }
   },
   "loading": "En attente du début de la partie",
+  "reconnect": {
+    "deadline": "{{player}} s'est déconnecté. Il lui reste {{seconds}} secondes pour se reconnecter."
+  },
   "identity": {
     "loading": "Création de votre identité de joueur…",
     "error": "Impossible de créer votre identité de joueur.",
