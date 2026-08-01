@@ -15,9 +15,15 @@ export async function broadcastGameState(
   const id = cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.idFromName(roomKey)
   const webSocketStore = cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.get(id)
 
-  return await webSocketStore.fetch('https://dummy-url/broadcast', {
+  const response = await webSocketStore.fetch('https://dummy-url/broadcast', {
     method: 'POST',
     headers: { 'X-Request-Id': request.requestId },
-    body: JSON.stringify(toGameStateMessage(gameState, roomKey))
+    body: JSON.stringify(
+      toGameStateMessage(gameState, roomKey, request.requestId)
+    )
   })
+
+  if (!response.ok) {
+    throw new Error('The WebSocket room rejected a server event.')
+  }
 }

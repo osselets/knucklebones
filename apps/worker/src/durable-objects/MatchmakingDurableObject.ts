@@ -2,6 +2,8 @@ import { Toucan } from 'toucan-js'
 import {
   DEFAULT_RATING_POOL,
   type MatchmakingStatus,
+  matchmakingStatusSchema,
+  playerIdSchema,
   RANKED_MATCH_FORMAT,
   type RankedMatchAssignment
 } from '@knucklebones/common'
@@ -49,7 +51,8 @@ export class MatchmakingDurableObject {
       const url = new URL(request.url)
       const playerId = request.headers.get('X-Player-Id')
 
-      if (playerId === null) {
+      const parsedPlayerId = playerIdSchema.safeParse(playerId)
+      if (!parsedPlayerId.success) {
         return apiError({
           status: 400,
           code: 'INVALID_MATCHMAKING_REQUEST',
@@ -60,8 +63,13 @@ export class MatchmakingDurableObject {
 
       switch (`${request.method} ${url.pathname}`) {
         case 'POST /join': {
-          const rating = Number(request.headers.get('X-Player-Rating'))
-          if (!Number.isInteger(rating)) {
+          const ratingHeader = request.headers.get('X-Player-Rating')
+          const rating = ratingHeader === null ? NaN : Number(ratingHeader)
+          if (
+            ratingHeader === null ||
+            !/^-?\d+$/.test(ratingHeader) ||
+            !Number.isSafeInteger(rating)
+          ) {
             return apiError({
               status: 400,
               code: 'INVALID_PLAYER_RATING',
@@ -69,12 +77,12 @@ export class MatchmakingDurableObject {
               requestId
             })
           }
-          return await this.join(playerId, rating)
+          return await this.join(parsedPlayerId.data, rating)
         }
         case 'GET /status':
-          return await this.getStatus(playerId)
+          return await this.getStatus(parsedPlayerId.data)
         case 'DELETE /queue':
-          return await this.leave(playerId)
+          return await this.leave(parsedPlayerId.data)
         default:
           return apiError({
             status: 404,
@@ -234,7 +242,7 @@ export class MatchmakingDurableObject {
   }
 
   private statusResponse(status: MatchmakingStatus): Response {
-    return Response.json(status, {
+    return Response.json(matchmakingStatusSchema.parse(status), {
       headers: { 'Cache-Control': 'no-store' }
     })
   }

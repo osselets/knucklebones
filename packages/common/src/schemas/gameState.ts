@@ -38,6 +38,8 @@ export const logSchema = z.object({
 
 export const playerSchema = z.object({
   id: playerIdSchema,
+  // Legacy rooms allowed arbitrary display names. New writes are constrained
+  // at the HTTP boundary while persisted snapshots remain readable.
   displayName: z.optional(z.string()),
   difficulty: z.optional(difficultySchema),
   dice: z.optional(diceSchema),
@@ -59,6 +61,11 @@ const outcomeHistoryEntrySchema = z.object({
   playerOne: playerOutcomeSchema,
   playerTwo: playerOutcomeSchema
 }) satisfies z.ZodMiniType<OutcomeHistoryEntry>
+
+export const lobbySchema = z.object({
+  players: z.array(playerSchema).check(z.maxLength(2)),
+  boType: z.optional(boTypeSchema)
+})
 
 export const gameStateSchema = z.object({
   revision: z._default(z.int().check(z.minimum(0)), 0),

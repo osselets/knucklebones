@@ -1,11 +1,4 @@
-export interface ApiErrorBody {
-  error: {
-    code: string
-    message: string
-    requestId: string
-    retryable: boolean
-  }
-}
+import { type ApiErrorBody } from '@knucklebones/common'
 
 interface ApiErrorOptions {
   status: number

@@ -1,5 +1,10 @@
 import { status } from 'itty-router'
-import { GameState, type PlayRejectionReason } from '@knucklebones/common'
+import {
+  GameState,
+  idempotentPlayGameResultSchema,
+  playRouteParamsSchema,
+  type PlayRejectionReason
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
@@ -9,6 +14,7 @@ import {
 } from '../utils/endpoints'
 import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
+import { invalidRouteParameters } from '../utils/validation'
 
 interface PlayRequest extends MutationRequestWithProps {
   dice?: number
@@ -20,15 +26,24 @@ export async function play(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
+  const params = playRouteParamsSchema.safeParse({
+    roomKey: request.roomKey,
+    playerId: request.playerId,
+    column: request.column,
+    dice: request.dice
+  })
+  if (!params.success) {
+    return invalidRouteParameters(request.requestId)
+  }
+
   const play = {
-    dice: Number(request.dice),
-    column: Number(request.column),
+    dice: Number(params.data.dice),
+    column: Number(params.data.column),
     author: request.playerId
   }
 
-  const result = await getGameStateDurableObject(request).play(
-    request.mutationId,
-    play
+  const result = idempotentPlayGameResultSchema.parse(
+    await getGameStateDurableObject(request).play(request.mutationId, play)
   )
 
   if (result.idempotencyStatus === 'conflict') {

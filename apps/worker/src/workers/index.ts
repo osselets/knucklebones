@@ -25,6 +25,7 @@ import {
   withRequestId
 } from '../utils/http'
 import { withMutationId } from '../utils/idempotency'
+import { validateRequestPath } from '../utils/validation'
 
 export { GameStateDurableObject } from '../durable-objects/GameStateDurableObject'
 export { MatchmakingDurableObject } from '../durable-objects/MatchmakingDurableObject'
@@ -38,7 +39,7 @@ const { preflight, corsify } = cors({
 })
 
 router
-  .all('*', withDurables({ parse: true }), preflight, withParams)
+  .all('*', preflight, withParams)
 
   .post('/players', createPlayer)
   .all('/players/:playerId/*', authenticatePlayerRequest)
@@ -48,7 +49,11 @@ router
   .post('/matchmaking/:playerId/join', joinMatchmaking)
   .get('/matchmaking/:playerId/status', getMatchmakingStatus)
   .delete('/matchmaking/:playerId/queue', leaveMatchmaking)
-  .all('/:roomKey/:playerId/*', authenticatePlayerRequest)
+  .all(
+    '/:roomKey/:playerId/*',
+    withDurables({ parse: true }),
+    authenticatePlayerRequest
+  )
   .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
   .post('/:roomKey/:playerId/init', withMutationId, init)
   .post('/:roomKey/:playerId/play/:column/:dice', withMutationId, play)
@@ -91,6 +96,14 @@ export default {
       if (isWebSocketEndpointCalled(requestWithId)) {
         const response = await webSocket(requestWithId, cloudflareEnvironment)
         return withRequestId(response, requestId)
+      }
+
+      const invalidPathResponse = validateRequestPath(requestWithId)
+      if (invalidPathResponse !== undefined) {
+        return withRequestId(
+          corsify(invalidPathResponse, requestWithId),
+          requestId
+        )
       }
 
       const response = await router.fetch(

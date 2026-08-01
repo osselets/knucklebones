@@ -1,12 +1,13 @@
 import { z } from 'zod/mini'
 import { type PlayerCredentials, type WebSocketTicket } from '../types'
+import { credentialSchema, playerIdSchema } from './identifiers'
 
 export const playerCredentialsSchema = z.object({
-  playerId: z.uuidv4(),
-  credential: z.string().check(z.length(64), z.regex(/^[0-9a-f]+$/))
+  playerId: playerIdSchema,
+  credential: credentialSchema
 }) satisfies z.ZodMiniType<PlayerCredentials>
 
 export const webSocketTicketSchema = z.object({
-  ticket: z.string().check(z.length(64), z.regex(/^[0-9a-f]+$/)),
-  expiresAt: z.number()
+  ticket: credentialSchema,
+  expiresAt: z.int().check(z.minimum(0))
 }) satisfies z.ZodMiniType<WebSocketTicket>

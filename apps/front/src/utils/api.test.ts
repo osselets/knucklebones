@@ -50,6 +50,26 @@ describe('mutation requests', () => {
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
+  it('reports a validated API error code and message', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json(
+        {
+          error: {
+            code: 'NOT_PLAYER_TURN',
+            message: 'It is not your turn.',
+            requestId: '33333333-3333-4333-8333-333333333333',
+            retryable: false
+          }
+        },
+        { status: 409, statusText: 'Conflict' }
+      )
+    )
+
+    await expect(play(room, { column: 1, dice: 4 })).rejects.toThrow(
+      '[NOT_PLAYER_TURN: It is not your turn.]'
+    )
+  })
+
   it('retries a server error with the same idempotency key', async () => {
     fetchMock
       .mockResolvedValueOnce(

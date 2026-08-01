@@ -30,6 +30,10 @@ export async function joinMatchmaking(
     })
   }
 
+  if (!Number.isInteger(profile.rating)) {
+    throw new Error('The stored ranked player rating is invalid.')
+  }
+
   return await fetchMatchmakingObject(request, cloudflareEnvironment, '/join', {
     method: 'POST',
     headers: { 'X-Player-Rating': String(profile.rating) }

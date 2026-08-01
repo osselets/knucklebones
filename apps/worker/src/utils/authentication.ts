@@ -1,4 +1,8 @@
-import { AI_PLAYER_ID } from '@knucklebones/common'
+import {
+  AI_PLAYER_ID,
+  credentialSchema,
+  playerIdSchema
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type RequestWithId } from '../types/itty'
 import { hashCredential } from './credentials'
@@ -34,7 +38,9 @@ export async function authenticatePlayerRequest(
     .bind(credentialHash)
     .first<PlayerIdentityRow>()
 
-  if (identity === null) {
+  const authenticatedPlayerId = playerIdSchema.safeParse(identity?.player_id)
+
+  if (!authenticatedPlayerId.success) {
     return apiError({
       status: 401,
       code: 'INVALID_PLAYER_CREDENTIAL',
@@ -47,7 +53,7 @@ export async function authenticatePlayerRequest(
     request.playerId === AI_PLAYER_ID &&
     new URL(request.url).pathname.endsWith(`/${AI_PLAYER_ID}/init`)
 
-  if (request.playerId !== identity.player_id && !isAiSetup) {
+  if (request.playerId !== authenticatedPlayerId.data && !isAiSetup) {
     return apiError({
       status: 403,
       code: 'PLAYER_ID_MISMATCH',
@@ -58,6 +64,13 @@ export async function authenticatePlayerRequest(
 }
 
 function getBearerCredential(authorization: string | null): string | undefined {
-  const match = authorization?.match(/^Bearer ([0-9a-f]{64})$/)
-  return match?.[1]
+  const prefix = 'Bearer '
+  if (!authorization?.startsWith(prefix)) {
+    return undefined
+  }
+
+  const credential = credentialSchema.safeParse(
+    authorization.slice(prefix.length)
+  )
+  return credential.success ? credential.data : undefined
 }

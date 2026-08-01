@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createTestHarness, type TestHarness } from 'wrangler'
 import {
+  apiErrorBodySchema,
   matchmakingStatusSchema,
   playerCredentialsSchema,
   rankedProfileSchema,
@@ -171,6 +172,49 @@ describe('atomic idempotent room mutations', () => {
     await expect(conflict.json()).resolves.toMatchObject({
       error: { code: 'IDEMPOTENCY_KEY_REUSED' }
     })
+  })
+})
+
+describe('runtime request validation', () => {
+  it('rejects malformed route and query values before room mutation', async () => {
+    const player = await createPlayer()
+    const roomKey = crypto.randomUUID()
+    const headers = {
+      ...authorization(player),
+      'Idempotency-Key': crypto.randomUUID()
+    }
+
+    const invalidRoom = await request(`/not-a-room/${player.playerId}/init`, {
+      method: 'POST',
+      headers
+    })
+    const invalidSettings = await request(
+      `/${roomKey}/${player.playerId}/init?boType=2`,
+      { method: 'POST', headers }
+    )
+    const invalidMove = await request(
+      `/${roomKey}/${player.playerId}/play/3/4.5`,
+      { method: 'POST', headers }
+    )
+    const blankDisplayName = await request(
+      `/${roomKey}/${player.playerId}/displayName/%20`,
+      { method: 'POST', headers }
+    )
+
+    for (const [label, response, code] of [
+      ['invalid room', invalidRoom, 'INVALID_ROUTE_PARAMETERS'],
+      ['invalid settings', invalidSettings, 'INVALID_GAME_SETTINGS'],
+      ['invalid move', invalidMove, 'INVALID_ROUTE_PARAMETERS'],
+      ['blank display name', blankDisplayName, 'INVALID_ROUTE_PARAMETERS']
+    ] as const) {
+      expect(
+        response.status,
+        `${label}: ${await response.clone().text()}`
+      ).toBe(400)
+      const body = apiErrorBodySchema.parse(await response.json())
+      expect(body.error.code).toBe(code)
+      expect(response.headers.get('X-Request-Id')).toBe(body.error.requestId)
+    }
   })
 })
 
