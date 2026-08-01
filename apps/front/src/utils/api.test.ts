@@ -20,7 +20,7 @@ describe('mutation requests', () => {
       .mockRejectedValueOnce(new TypeError('offline'))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
 
-    await play(room, { column: 1, dice: 4 })
+    await play(room, { column: 1 })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const firstHeaders = fetchMock.mock.calls[0][1]?.headers as Record<
@@ -37,6 +37,10 @@ describe('mutation requests', () => {
     expect(secondHeaders['Idempotency-Key']).toBe(
       firstHeaders['Idempotency-Key']
     )
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      `/v1/rooms/${room.roomKey}/play`
+    )
+    expect(fetchMock.mock.calls[0][1]?.body).toBe('{"column":1}')
   })
 
   it('does not retry a client error', async () => {
@@ -44,9 +48,7 @@ describe('mutation requests', () => {
       new Response(null, { status: 409, statusText: 'Conflict' })
     )
 
-    await expect(play(room, { column: 1, dice: 4 })).rejects.toThrow(
-      '[409:Conflict]'
-    )
+    await expect(play(room, { column: 1 })).rejects.toThrow('[409:Conflict]')
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
@@ -65,7 +67,7 @@ describe('mutation requests', () => {
       )
     )
 
-    await expect(play(room, { column: 1, dice: 4 })).rejects.toThrow(
+    await expect(play(room, { column: 1 })).rejects.toThrow(
       '[NOT_PLAYER_TURN: It is not your turn.]'
     )
   })
@@ -77,7 +79,7 @@ describe('mutation requests', () => {
       )
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
 
-    await play(room, { column: 1, dice: 4 })
+    await play(room, { column: 1 })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const firstHeaders = fetchMock.mock.calls[0][1]?.headers as Record<
@@ -96,7 +98,7 @@ describe('mutation requests', () => {
   it('reports an error after the retry is exhausted', async () => {
     fetchMock.mockRejectedValue(new TypeError('offline'))
 
-    await expect(play(room, { column: 1, dice: 4 })).rejects.toThrow(
+    await expect(play(room, { column: 1 })).rejects.toThrow(
       'There was an error while doing a network call.'
     )
     expect(fetchMock).toHaveBeenCalledTimes(2)

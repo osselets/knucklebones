@@ -103,15 +103,14 @@ export async function voteRematch(
 }
 
 interface PlayRequestParams {
-  dice: number
   column: number
 }
 export async function play(
-  { playerId, roomKey }: IdentificationParams,
-  { column, dice }: PlayRequestParams
+  { roomKey }: IdentificationParams,
+  { column }: PlayRequestParams
 ) {
-  const path = `/${roomKey}/${playerId}/play/${column}/${dice}`
-  await sendMutationRequest(path, 'POST')
+  const path = `/v1/rooms/${roomKey}/play`
+  await sendMutationRequest(path, 'POST', { column })
 }
 interface UpdateDisplayNameRequestParams {
   displayName: string
@@ -132,9 +131,13 @@ export async function deleteDisplayName({
   await sendMutationRequest(path, 'DELETE')
 }
 
-async function sendMutationRequest(path: string, method: 'POST' | 'DELETE') {
+async function sendMutationRequest(
+  path: string,
+  method: 'POST' | 'DELETE',
+  body?: unknown
+) {
   const mutationId = crypto.randomUUID()
-  return await sendApiRequest(path, method, undefined, undefined, mutationId)
+  return await sendApiRequest(path, method, body, undefined, mutationId)
 }
 
 async function sendApiRequest(

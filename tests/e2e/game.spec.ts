@@ -75,6 +75,16 @@ test('starts a hard BO1 AI game with valid versioned state updates', async ({
   await expect(page.getByText('Waiting for game to start...')).toHaveCount(0)
   await expect.poll(() => gameStateMessages.length).toBeGreaterThan(0)
 
+  const columns = page.locator('div[role="button"]')
+  await expect(columns).toHaveCount(3)
+  const messagesBeforeHumanMove = gameStateMessages.length
+  await columns.first().click()
+  await expect(columns).toHaveCount(0)
+  await expect(columns).toHaveCount(3)
+  await expect
+    .poll(() => gameStateMessages.length)
+    .toBeGreaterThan(messagesBeforeHumanMove + 1)
+
   for (const [index, message] of gameStateMessages.entries()) {
     expect(message).toMatchObject({
       type: 'game.state',
