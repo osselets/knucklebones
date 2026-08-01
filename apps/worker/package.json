@@ -5,8 +5,9 @@
   "type": "module",
   "module": "./dist/index.mjs",
   "scripts": {
+    "db:migrate:local": "wrangler d1 migrations apply PLAYERS_DB --local",
     "dev": "NODE_ENV=development wrangler dev",
-    "dev:test": "wrangler d1 migrations apply PLAYERS_DB --local && NODE_ENV=development wrangler dev"
+    "dev:test": "pnpm db:migrate:local && NODE_ENV=development wrangler dev"
   },
   "dependencies": {
     "@knucklebones/common": "workspace:*",
