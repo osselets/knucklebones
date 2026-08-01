@@ -3,6 +3,7 @@ import { type IGameState, type ILog, type IPlayer } from '../interfaces'
 import {
   type BoType,
   type Difficulty,
+  type GameFinishReason,
   type Outcome,
   type OutcomeHistoryEntry,
   type PlayerOutcome
@@ -30,6 +31,12 @@ export const outcomeSchema = z.enum([
   'round-ended',
   'game-ended'
 ]) satisfies z.ZodMiniType<Outcome>
+
+export const gameFinishReasonSchema = z.enum([
+  'completed',
+  'forfeit',
+  'no-contest'
+]) satisfies z.ZodMiniType<GameFinishReason>
 
 export const logSchema = z.object({
   content: z.string(),
@@ -77,6 +84,7 @@ export const gameStateSchema = z.object({
   boType: boTypeSchema,
   winnerId: z.optional(playerIdSchema),
   outcome: outcomeSchema,
+  finishReason: z.optional(gameFinishReasonSchema),
   outcomeHistory: z.array(outcomeHistoryEntrySchema),
   rematchVote: z.optional(playerIdSchema)
 }) satisfies z.ZodMiniType<IGameState>

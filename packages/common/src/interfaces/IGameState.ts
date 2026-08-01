@@ -1,4 +1,9 @@
-import { type BoType, type Outcome, type OutcomeHistory } from '../types'
+import {
+  type BoType,
+  type GameFinishReason,
+  type Outcome,
+  type OutcomeHistory
+} from '../types'
 import { type ILog } from './ILog'
 import { type IPlayer } from './IPlayer'
 
@@ -12,6 +17,7 @@ export interface IGameState {
   boType: BoType
   winnerId?: string
   outcome: Outcome
+  finishReason?: GameFinishReason
   outcomeHistory: OutcomeHistory
   rematchVote?: string
 }
