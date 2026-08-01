@@ -845,11 +845,9 @@ describe('runtime request validation', () => {
       ['invalid move', invalidMove, 'INVALID_ROUTE_PARAMETERS'],
       ['blank display name', blankDisplayName, 'INVALID_ROUTE_PARAMETERS']
     ] as const) {
-      expect(
-        response.status,
-        `${label}: ${await response.clone().text()}`
-      ).toBe(400)
-      const body = apiErrorBodySchema.parse(await response.json())
+      const responseText = await response.text()
+      expect(response.status, `${label}: ${responseText}`).toBe(400)
+      const body = apiErrorBodySchema.parse(JSON.parse(responseText))
       expect(body.error.code).toBe(code)
       expect(response.headers.get('X-Request-Id')).toBe(body.error.requestId)
     }
