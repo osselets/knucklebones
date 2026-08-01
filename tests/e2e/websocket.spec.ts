@@ -11,7 +11,9 @@ test('WebSocket tickets are authenticated, one-time, and reject client messages'
   expect(player.playerId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
   )
-  expect(player.credential).toMatch(/^[0-9a-f]{64}$/)
+  expect(player.credential).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_[0-9a-f]{64}$/
+  )
   const roomKey = crypto.randomUUID()
   const ticketResponse = await request.post(
     `${workerUrl}/${roomKey}/${player.playerId}/websocket-ticket`,

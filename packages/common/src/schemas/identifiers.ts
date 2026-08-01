@@ -8,11 +8,25 @@ export const gamePlayerIdSchema = z.union([
   z.literal(AI_PLAYER_ID)
 ])
 export const matchIdSchema = z.uuidv4()
+export const credentialIdSchema = z.uuidv4()
 export const mutationIdSchema = z.uuidv4()
 export const requestIdSchema = z.uuidv4()
 export const credentialSchema = z
   .string()
   .check(z.length(64), z.regex(/^[0-9a-f]+$/))
+
+export const deviceCredentialSchema = z
+  .string()
+  .check(
+    z.regex(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_[0-9a-f]{64}$/
+    )
+  )
+
+export const playerCredentialSchema = z.union([
+  credentialSchema,
+  deviceCredentialSchema
+])
 
 export const displayNameSchema = z
   .string()
