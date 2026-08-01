@@ -68,15 +68,9 @@ export async function redeemIdentityRecovery(
 }
 
 export async function verifyPlayer({
-  playerId,
   credential
 }: PlayerCredentials): Promise<void> {
-  await sendApiRequest(
-    `/players/${playerId}/verify`,
-    'POST',
-    undefined,
-    credential
-  )
+  await sendApiRequest('/v1/identity/verify', 'POST', undefined, credential)
 }
 
 export async function createIdentityTransfer(): Promise<IdentityTransfer> {

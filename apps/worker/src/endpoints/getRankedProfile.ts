@@ -1,6 +1,6 @@
 import { DEFAULT_RATING_POOL, rankedProfileSchema } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import { type AuthenticatedRequestWithProps } from '../types/itty'
 import { apiError } from '../utils/http'
 
 interface RankedProfileRow {
@@ -14,15 +14,16 @@ interface RankedProfileRow {
 }
 
 export async function getRankedProfile(
-  request: BaseRequestWithProps,
+  request: AuthenticatedRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const playerId = request.principal.playerId
   const profile = await cloudflareEnvironment.PLAYERS_DB.prepare(
     `SELECT player_id, rating_pool, rating, games_played, wins, draws, losses
      FROM player_ratings
      WHERE player_id = ? AND rating_pool = ?`
   )
-    .bind(request.playerId, DEFAULT_RATING_POOL)
+    .bind(playerId, DEFAULT_RATING_POOL)
     .first<RankedProfileRow>()
 
   if (profile === null) {

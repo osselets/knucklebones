@@ -1,11 +1,9 @@
 import { DEFAULT_RATING_POOL } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type RequestWithId } from '../types/itty'
+import { type AuthenticatedRequestWithProps } from '../types/itty'
 import { apiError } from '../utils/http'
 
-interface MatchmakingRequest extends RequestWithId {
-  playerId: string
-}
+type MatchmakingRequest = AuthenticatedRequestWithProps
 
 interface RatingRow {
   rating: number
@@ -15,10 +13,11 @@ export async function joinMatchmaking(
   request: Request & MatchmakingRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const playerId = request.principal.playerId
   const profile = await cloudflareEnvironment.PLAYERS_DB.prepare(
     'SELECT rating FROM player_ratings WHERE player_id = ? AND rating_pool = ?'
   )
-    .bind(request.playerId, DEFAULT_RATING_POOL)
+    .bind(playerId, DEFAULT_RATING_POOL)
     .first<RatingRow>()
 
   if (profile === null) {
@@ -34,17 +33,28 @@ export async function joinMatchmaking(
     throw new Error('The stored ranked player rating is invalid.')
   }
 
-  return await fetchMatchmakingObject(request, cloudflareEnvironment, '/join', {
-    method: 'POST',
-    headers: { 'X-Player-Rating': String(profile.rating) }
-  })
+  return await fetchMatchmakingObject(
+    request,
+    playerId,
+    cloudflareEnvironment,
+    '/join',
+    {
+      method: 'POST',
+      headers: { 'X-Player-Rating': String(profile.rating) }
+    }
+  )
 }
 
 export async function getMatchmakingStatus(
   request: Request & MatchmakingRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
-  return await fetchMatchmakingObject(request, cloudflareEnvironment, '/status')
+  return await fetchMatchmakingObject(
+    request,
+    request.principal.playerId,
+    cloudflareEnvironment,
+    '/status'
+  )
 }
 
 export async function leaveMatchmaking(
@@ -53,6 +63,7 @@ export async function leaveMatchmaking(
 ): Promise<Response> {
   return await fetchMatchmakingObject(
     request,
+    request.principal.playerId,
     cloudflareEnvironment,
     '/queue',
     { method: 'DELETE' }
@@ -61,6 +72,7 @@ export async function leaveMatchmaking(
 
 async function fetchMatchmakingObject(
   request: Request & MatchmakingRequest,
+  playerId: string,
   cloudflareEnvironment: CloudflareEnvironment,
   path: string,
   init?: RequestInit
@@ -70,7 +82,7 @@ async function fetchMatchmakingObject(
   )
   const matchmaking = cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.get(id)
   const headers = new Headers(init?.headers)
-  headers.set('X-Player-Id', request.playerId)
+  headers.set('X-Player-Id', playerId)
   headers.set('X-Request-Id', request.requestId)
 
   return await matchmaking.fetch(`https://dummy-url${path}`, {

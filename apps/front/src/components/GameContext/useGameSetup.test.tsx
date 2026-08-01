@@ -103,6 +103,27 @@ describe('useGameSetup', () => {
     )
   })
 
+  it('keeps valid state and reports an unsupported protocol version', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+    emitMessage(toGameStateMessage(createGameState(3), roomKey), rerender)
+    await waitFor(() => expect(result.current?.revision).toBe(3))
+
+    emitMessage(
+      {
+        ...toGameStateMessage(createGameState(4), roomKey),
+        version: 999
+      },
+      rerender
+    )
+
+    expect(result.current?.revision).toBe(3)
+    expect(result.current?.errorMessage).toBe('errors.unsupported-protocol')
+    expect(consoleError).toHaveBeenCalledWith(
+      'Ignored a message using an unsupported protocol version.'
+    )
+  })
+
   it('reinitializes the room whenever the socket reconnects', async () => {
     const { rerender } = renderHook(() => useGameSetup(), { wrapper })
     expect(initGame).not.toHaveBeenCalled()

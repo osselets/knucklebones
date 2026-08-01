@@ -81,6 +81,9 @@
   "reconnect": {
     "deadline": "{{player}} disconnected. They have {{seconds}} seconds to reconnect."
   },
+  "errors": {
+    "unsupported-protocol": "This game version is no longer compatible. Refresh the page to continue."
+  },
   "identity": {
     "loading": "Creating your player identity…",
     "error": "We couldn't create your player identity.",

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
@@ -9,6 +10,7 @@ import {
   getGameStateMessagePayload,
   type IGameState,
   isEmptyOrBlank,
+  PROTOCOL_VERSION,
   type GameSettings
 } from '@knucklebones/common'
 import { useRoomKey } from '../../hooks/useRoomKey'
@@ -34,6 +36,7 @@ const useWebSocket =
   ).default ?? useWebSocketImport
 
 export function useGameSetup() {
+  const { t } = useTranslation()
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
@@ -70,6 +73,19 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     if (lastJsonMessage !== null) {
+      if (
+        typeof lastJsonMessage === 'object' &&
+        lastJsonMessage !== null &&
+        'version' in lastJsonMessage &&
+        lastJsonMessage.version !== PROTOCOL_VERSION
+      ) {
+        console.error(
+          'Ignored a message using an unsupported protocol version.'
+        )
+        setErrorMessage(t('errors.unsupported-protocol'))
+        return
+      }
+
       const serverEvent = gameServerEventSchema.safeParse(lastJsonMessage)
       if (serverEvent.success && serverEvent.data.type !== 'game.state') {
         if (
@@ -145,7 +161,7 @@ export function useGameSetup() {
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage, roomKey])
+  }, [lastJsonMessage, roomKey, t])
 
   React.useEffect(() => {
     setPresenceByPlayerId({})

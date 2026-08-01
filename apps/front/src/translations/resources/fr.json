@@ -82,6 +82,9 @@
   "reconnect": {
     "deadline": "{{player}} s'est déconnecté. Il lui reste {{seconds}} secondes pour se reconnecter."
   },
+  "errors": {
+    "unsupported-protocol": "Cette version du jeu n'est plus compatible. Actualisez la page pour continuer."
+  },
   "identity": {
     "loading": "Création de votre identité de joueur…",
     "error": "Impossible de créer votre identité de joueur.",

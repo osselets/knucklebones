@@ -55,7 +55,9 @@ const updatedGameStateResultSchema = z.object({
 })
 
 export const initializeGameResultSchema = z.union([
-  z.object({ status: z.literal('waiting') }),
+  z.object({
+    status: z.enum(['waiting', 'not-assigned', 'invalid-ranked-settings'])
+  }),
   z.object({
     status: z.enum(['created', 'existing']),
     gameState: gameStateSchema
@@ -63,7 +65,14 @@ export const initializeGameResultSchema = z.union([
 ]) satisfies z.ZodMiniType<InitializeGameResult>
 
 export const rematchGameResultSchema = z.union([
-  z.object({ status: z.enum(['game-ongoing', 'unchanged', 'unknown-player']) }),
+  z.object({
+    status: z.enum([
+      'game-ongoing',
+      'unchanged',
+      'unknown-player',
+      'ranked-rematch-disabled'
+    ])
+  }),
   updatedGameStateResultSchema
 ]) satisfies z.ZodMiniType<RematchGameResult>
 
