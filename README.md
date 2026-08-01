@@ -32,6 +32,24 @@ The `apps` directory contains the React application (`front`) and the Cloudflare
 
 The `packages` directory contains code that's shared between the React application and Cloudflare worker.
 
+## Local development
+
+Install dependencies, initialize the local D1 database, and start both apps:
+
+```sh
+pnpm install
+pnpm db:migrate:local
+pnpm dev
+```
+
+Wrangler keeps local D1 data separate from Cloudflare. Branch previews use the
+shared staging Worker and staging identity database; production has separate
+Worker, Durable Object, and D1 resources. Database migrations are append-only
+and must be applied before deploying compatible staging or production code.
+
+`SENTRY_DSN` is an environment-scoped Worker secret. Deployment credentials
+remain in the repository's GitHub Actions secrets and must never be committed.
+
 ## Legal disclaimer
 
 The original Knucklebones game in Cult of the Lamb was created by Massive Monster. This is a fan-site and not an official implementation by Massive Monster. You can find the original game on the [Cult of the Lamb](https://www.cultofthelamb.com/) website.
