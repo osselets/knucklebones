@@ -11,9 +11,13 @@ import {
   init,
   joinMatchmaking,
   leaveMatchmaking,
+  listDeviceCredentials,
   play,
   playIntent,
   rematch,
+  revokeDeviceCredential,
+  revokeOtherDeviceCredentials,
+  rotateDeviceCredential,
   verifyPlayer,
   webSocket
 } from '../endpoints'
@@ -46,6 +50,11 @@ router
   .all('*', preflight, withParams)
 
   .post('/players', createPlayer)
+  .all('/v1/identity/*', authenticatePlayerRequest)
+  .get('/v1/identity/credentials', listDeviceCredentials)
+  .post('/v1/identity/credentials/rotate', rotateDeviceCredential)
+  .post('/v1/identity/credentials/revoke-others', revokeOtherDeviceCredentials)
+  .delete('/v1/identity/credentials/:credentialId', revokeDeviceCredential)
   .all('/players/:playerId/*', authenticatePlayerRequest)
   .post('/players/:playerId/verify', verifyPlayer)
   .get('/players/:playerId/rating', getRankedProfile)
