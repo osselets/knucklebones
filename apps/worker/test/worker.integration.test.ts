@@ -674,7 +674,7 @@ describe('versioned authenticated room API', () => {
     }
   })
 
-  it('rejects rematch votes from authenticated spectators', async () => {
+  it('accepts both player rematch votes but rejects authenticated spectators', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
     const spectator = await createPlayer()
@@ -732,6 +732,42 @@ describe('versioned authenticated room API', () => {
     await expect(displayName.json()).resolves.toMatchObject({
       error: { code: 'NOT_A_PLAYER' }
     })
+
+    const firstVote = await request(
+      `/v1/rooms/${roomKey}/rematch`,
+      mutationRequest(playerOne, {})
+    )
+    const secondVote = await request(
+      `/v1/rooms/${roomKey}/rematch`,
+      mutationRequest(playerTwo, {})
+    )
+    expect(firstVote.status).toBe(200)
+    expect(secondVote.status).toBe(200)
+
+    const currentStateResponse = await callGame('initializeGame', [
+      {
+        mutationId: crypto.randomUUID(),
+        playerId: playerOne.playerId,
+        boType: 1
+      }
+    ])
+    const currentState = idempotentInitializeGameResultSchema.parse(
+      await currentStateResponse.json()
+    )
+    expect(currentState.idempotencyStatus).toBe('applied')
+    if (
+      currentState.idempotencyStatus !== 'conflict' &&
+      currentState.value.status === 'existing'
+    ) {
+      expect(currentState.value.gameState).toMatchObject({
+        outcome: 'ongoing',
+        playerOne: { id: playerOne.playerId },
+        playerTwo: { id: playerTwo.playerId }
+      })
+      expect(currentState.value.gameState.rematchVote).toBeUndefined()
+    } else {
+      throw new Error('Expected the rematch to create an ongoing game.')
+    }
   })
 })
 

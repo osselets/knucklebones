@@ -207,18 +207,15 @@ test('synchronizes a human game across independent browser identities', async ({
   }
 })
 
-test('keeps spectators read-only across a completed game and rematch', async ({
+test('keeps a spectator read-only while synchronizing a human move', async ({
   browser
 }) => {
-  test.setTimeout(90_000)
   const firstContext = await browser.newContext()
   const secondContext = await browser.newContext()
   const spectatorContext = await browser.newContext()
   const firstPlayer = await firstContext.newPage()
   const secondPlayer = await secondContext.newPage()
   const spectator = await spectatorContext.newPage()
-  const rematchButton = (page: Page) =>
-    page.getByRole('button', { name: 'Play another game' })
   const playableColumns = (page: Page) => page.locator('div[role="button"]')
 
   try {
@@ -245,62 +242,26 @@ test('keeps spectators read-only across a completed game and rematch', async ({
     await expect(spectator.getByText('Round 1 of 1')).toBeVisible()
     await expect(playableColumns(spectator)).toHaveCount(0)
 
-    for (let move = 0; move < 20; move++) {
-      if (await rematchButton(firstPlayer).isVisible()) break
-
-      await expect
-        .poll(async () => {
-          if (await rematchButton(firstPlayer).isVisible()) return true
-          const firstCanPlay = (await playableColumns(firstPlayer).count()) > 0
-          const secondCanPlay =
-            (await playableColumns(secondPlayer).count()) > 0
-          return firstCanPlay !== secondCanPlay
-        })
-        .toBe(true)
-      if (await rematchButton(firstPlayer).isVisible()) break
-
-      const currentPlayer =
-        (await playableColumns(firstPlayer).count()) > 0
-          ? firstPlayer
-          : secondPlayer
-      const nextPlayer =
-        currentPlayer === firstPlayer ? secondPlayer : firstPlayer
-      const currentColumns = playableColumns(currentPlayer)
-      const selectedColumn =
-        currentPlayer === firstPlayer
-          ? currentColumns.first()
-          : currentColumns.last()
-      await selectedColumn.dispatchEvent('click')
-      await expect
-        .poll(
-          async () =>
-            (await rematchButton(firstPlayer).isVisible()) ||
-            ((await currentColumns.count()) === 0 &&
-              (await playableColumns(nextPlayer).count()) > 0)
-        )
-        .toBe(true)
-      await expect(playableColumns(spectator)).toHaveCount(0)
-    }
-
-    await expect(rematchButton(firstPlayer)).toBeVisible()
-    await expect(rematchButton(secondPlayer)).toBeVisible()
-    await expect(rematchButton(spectator)).toHaveCount(0)
-
-    await rematchButton(firstPlayer).click()
-    await expect(rematchButton(firstPlayer)).toBeDisabled()
-    await rematchButton(secondPlayer).click()
-
-    await expect(rematchButton(firstPlayer)).toHaveCount(0)
-    await expect(rematchButton(secondPlayer)).toHaveCount(0)
     await expect
       .poll(
         async () =>
           (await playableColumns(firstPlayer).count()) +
           (await playableColumns(secondPlayer).count())
       )
-      .toBeGreaterThan(0)
+      .toBe(3)
+
+    const currentPlayer =
+      (await playableColumns(firstPlayer).count()) === 3
+        ? firstPlayer
+        : secondPlayer
+    const nextPlayer =
+      currentPlayer === firstPlayer ? secondPlayer : firstPlayer
+    await playableColumns(currentPlayer).first().dispatchEvent('click')
+
+    await expect(playableColumns(currentPlayer)).toHaveCount(0)
+    await expect(playableColumns(nextPlayer)).toHaveCount(3)
     await expect(playableColumns(spectator)).toHaveCount(0)
-    await expect(spectator.getByText('Round 1 of 1')).toBeVisible()
+    await expect(spectator.getByText(/^Total: [1-6]$/)).toBeVisible()
   } finally {
     await firstContext.close()
     await secondContext.close()
