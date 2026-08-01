@@ -14,15 +14,30 @@ import {
   hashCredential
 } from '../utils/credentials'
 import { apiError } from '../utils/http'
+import { enforceRateLimit } from '../utils/rateLimit'
 
 interface IdentityRecoveryRow {
   player_id: string
 }
 
 export async function rotateIdentityRecovery(
-  request: AuthenticatedRequestWithProps,
+  request: Request & AuthenticatedRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const rateLimit = await enforceRateLimit(
+    request,
+    cloudflareEnvironment.PLAYERS_DB,
+    {
+      scope: 'identity-recovery-rotate',
+      identifier: request.principal.playerId,
+      limit: 10,
+      windowMs: 60 * 60 * 1000
+    }
+  )
+  if (rateLimit !== undefined) {
+    return rateLimit
+  }
+
   const recoveryPhrase = createRecoveryPhrase()
   const rotatedAt = Date.now()
 
@@ -53,6 +68,19 @@ export async function redeemIdentityRecovery(
   request: Request & RequestWithId,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const rateLimit = await enforceRateLimit(
+    request,
+    cloudflareEnvironment.PLAYERS_DB,
+    {
+      scope: 'identity-recovery-redeem',
+      limit: 10,
+      windowMs: 15 * 60 * 1000
+    }
+  )
+  if (rateLimit !== undefined) {
+    return rateLimit
+  }
+
   const rawBody = (await request.json().catch(() => undefined)) as
     Record<string, unknown> | undefined
   const body = redeemIdentityRecoveryRequestSchema.safeParse({

@@ -1,15 +1,26 @@
 import { type PlayerIdentityBootstrap } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
+import { type RequestWithId } from '../types/itty'
 import {
   createDeviceCredential,
   createRecoveryPhrase,
   hashCredential
 } from '../utils/credentials'
+import { enforceRateLimit } from '../utils/rateLimit'
 
 export async function createPlayer(
-  _request: Request,
+  request: Request & RequestWithId,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
+  const rateLimit = await enforceRateLimit(
+    request,
+    cloudflareEnvironment.PLAYERS_DB,
+    { scope: 'identity-create', limit: 30, windowMs: 60 * 60 * 1000 }
+  )
+  if (rateLimit !== undefined) {
+    return rateLimit
+  }
+
   const playerId = crypto.randomUUID()
   const { credentialId, credential, secretHash } =
     await createDeviceCredential()
