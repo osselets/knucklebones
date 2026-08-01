@@ -6,6 +6,7 @@ import {
   createWebSocketTicket,
   deleteDisplayName,
   displayName,
+  getRankedProfile,
   init,
   play,
   rematch,
@@ -28,7 +29,7 @@ export { WebSocketDurableObject } from '../durable-objects/WebSocketDurableObjec
 const router = Router()
 
 const { preflight, corsify } = cors({
-  allowMethods: ['POST', 'DELETE'],
+  allowMethods: ['GET', 'POST', 'DELETE'],
   allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key']
 })
 
@@ -38,6 +39,7 @@ router
   .post('/players', createPlayer)
   .all('/players/:playerId/*', authenticatePlayerRequest)
   .post('/players/:playerId/verify', verifyPlayer)
+  .get('/players/:playerId/rating', getRankedProfile)
   .all('/:roomKey/:playerId/*', authenticatePlayerRequest)
   .post('/:roomKey/:playerId/websocket-ticket', createWebSocketTicket)
   .post('/:roomKey/:playerId/init', withMutationId, init)

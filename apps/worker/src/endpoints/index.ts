@@ -1,5 +1,6 @@
 export * from './createPlayer'
 export * from './displayName'
+export * from './getRankedProfile'
 export * from './init'
 export * from './play'
 export * from './rematch'
