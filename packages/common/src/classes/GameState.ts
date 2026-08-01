@@ -3,6 +3,7 @@ import {
   type Outcome,
   type Play,
   type OutcomeHistory,
+  type PlayRejectionReason,
   type PlayerOutcome,
   type BoType
 } from '../types'
@@ -94,6 +95,12 @@ export class GameState implements IGameState {
   }
 
   applyPlay(play: Play, giveNextDice = true) {
+    const rejectionReason = this.getPlayRejectionReason(play)
+
+    if (rejectionReason !== undefined) {
+      throw new Error(`Invalid play: ${rejectionReason}.`)
+    }
+
     const [playerOne, playerTwo] = this.getPlayers(play.author)
 
     playerOne.addDice(play.dice, play.column)
@@ -109,6 +116,36 @@ export class GameState implements IGameState {
       this.whoWins()
     } else {
       this.nextTurn(play.author, giveNextDice)
+    }
+  }
+
+  getPlayRejectionReason(play: Play): PlayRejectionReason | undefined {
+    if (this.outcome !== 'ongoing') {
+      return 'game-ended'
+    }
+
+    if (
+      play.author !== this.playerOne.id &&
+      play.author !== this.playerTwo.id
+    ) {
+      return 'unknown-player'
+    }
+
+    if (play.author !== this.nextPlayer.id) {
+      return 'not-player-turn'
+    }
+
+    if (play.dice !== this.nextPlayer.dice) {
+      return 'unexpected-die'
+    }
+
+    if (!Number.isInteger(play.column) || play.column < 0 || play.column > 2) {
+      return 'invalid-column'
+    }
+
+    const [player] = this.getPlayers(play.author)
+    if (player.columns[play.column].length >= 3) {
+      return 'column-full'
     }
   }
 
