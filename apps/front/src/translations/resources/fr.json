@@ -78,5 +78,10 @@
       "opponent-win": "{{player}} a gagné la partie avec {{points}} points !"
     }
   },
-  "loading": "En attente du début de la partie"
+  "loading": "En attente du début de la partie",
+  "identity": {
+    "loading": "Création de votre identité de joueur…",
+    "error": "Impossible de créer votre identité de joueur.",
+    "retry": "Réessayer"
+  }
 }

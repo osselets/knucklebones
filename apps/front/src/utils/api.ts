@@ -1,6 +1,21 @@
-import { type GameSettings } from '@knucklebones/common'
+import {
+  type GameSettings,
+  type PlayerCredentials,
+  playerCredentialsSchema
+} from '@knucklebones/common'
 
 type Method = 'GET' | 'POST' | 'DELETE'
+
+export async function createPlayer(): Promise<PlayerCredentials> {
+  const response = await sendApiRequest('/players', 'POST')
+  const result = playerCredentialsSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned invalid player credentials.')
+  }
+
+  return result.data
+}
 
 // À synchroniser avec les types de requêtes côté back
 interface IdentificationParams {
@@ -91,7 +106,7 @@ async function sendApiRequest(path: string, method: Method, body?: unknown) {
     ...(body !== undefined && { 'Content-Type': 'application/json' })
   }
 
-  await fetch(`${import.meta.env.VITE_WORKER_URL}${path}`, {
+  return await fetch(`${import.meta.env.VITE_WORKER_URL}${path}`, {
     method,
     headers,
     ...(body !== undefined && { body: JSON.stringify(body) })
@@ -102,6 +117,7 @@ async function sendApiRequest(path: string, method: Method, body?: unknown) {
           `[${resp.status}:${resp.statusText}] There was an error while doing a network call. Please try again.`
         )
       }
+      return resp
     })
     .catch(() => {
       throw new Error(
