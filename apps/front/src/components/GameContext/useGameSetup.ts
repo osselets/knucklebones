@@ -4,6 +4,7 @@ import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
   AI_PLAYER_ID,
   compatibleGameStateMessageSchema,
+  gameServerEventSchema,
   GameState,
   getGameStateMessagePayload,
   type IGameState,
@@ -36,6 +37,9 @@ export function useGameSetup() {
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [presenceByPlayerId, setPresenceByPlayerId] = React.useState<
+    Record<string, boolean>
+  >({})
   const roomKey = useRoomKey()
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
@@ -64,6 +68,23 @@ export function useGameSetup() {
 
   React.useEffect(() => {
     if (lastJsonMessage !== null) {
+      const serverEvent = gameServerEventSchema.safeParse(lastJsonMessage)
+      if (serverEvent.success && serverEvent.data.type !== 'game.state') {
+        if (
+          serverEvent.data.type === 'game.presence' &&
+          serverEvent.data.payload.roomKey === roomKey
+        ) {
+          const presenceEvent = serverEvent.data
+          setPresenceByPlayerId((presence) => ({
+            ...presence,
+            [presenceEvent.payload.playerId]: presenceEvent.payload.connected
+          }))
+        } else if (serverEvent.data.type === 'game.error') {
+          setErrorMessage(serverEvent.data.payload.message)
+        }
+        return
+      }
+
       const parsedGameState =
         compatibleGameStateMessageSchema.safeParse(lastJsonMessage)
 
@@ -105,6 +126,10 @@ export function useGameSetup() {
       setErrorMessage(null)
     }
   }, [lastJsonMessage, roomKey])
+
+  React.useEffect(() => {
+    setPresenceByPlayerId({})
+  }, [roomKey])
 
   React.useEffect(() => {
     if (readyState === ReadyState.OPEN) {
@@ -213,6 +238,7 @@ export function useGameSetup() {
     playerSide,
     winner,
     errorMessage,
+    presenceByPlayerId,
     sendPlay,
     clearErrorMessage,
     voteContinueBo,
