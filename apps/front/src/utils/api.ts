@@ -1,10 +1,17 @@
 import {
   type GameSettings,
   type PlayerCredentials,
-  playerCredentialsSchema
+  playerCredentialsSchema,
+  type WebSocketTicket,
+  webSocketTicketSchema
 } from '@knucklebones/common'
 
 type Method = 'GET' | 'POST' | 'DELETE'
+
+interface IdentificationParams {
+  roomKey: string
+  playerId: string
+}
 
 export async function createPlayer(): Promise<PlayerCredentials> {
   const response = await sendApiRequest('/players', 'POST')
@@ -17,12 +24,24 @@ export async function createPlayer(): Promise<PlayerCredentials> {
   return result.data
 }
 
-// À synchroniser avec les types de requêtes côté back
-interface IdentificationParams {
-  roomKey: string
-  playerId: string
+export async function createWebSocketTicket({
+  playerId,
+  roomKey
+}: IdentificationParams): Promise<WebSocketTicket> {
+  const response = await sendApiRequest(
+    `/${roomKey}/${playerId}/websocket-ticket`,
+    'POST'
+  )
+  const result = webSocketTicketSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid WebSocket ticket.')
+  }
+
+  return result.data
 }
 
+// À synchroniser avec les types de requêtes côté back
 interface InitGameRequestParams extends Omit<GameSettings, 'boType'> {
   boType?: GameSettings['boType']
 }

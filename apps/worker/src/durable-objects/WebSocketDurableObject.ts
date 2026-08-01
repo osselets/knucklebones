@@ -1,6 +1,23 @@
 import { Toucan } from 'toucan-js'
+import { type WebSocketTicket } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
+import { createCredential, hashCredential } from '../utils/credentials'
 import { apiError } from '../utils/http'
+
+const WEB_SOCKET_TICKET_TTL_MS = 30_000
+const WEB_SOCKET_TICKETS_STORAGE_KEY = 'websocket-tickets'
+
+interface PendingWebSocketTicket {
+  playerId: string
+  expiresAt: number
+}
+
+type PendingWebSocketTickets = Record<string, PendingWebSocketTicket>
+
+interface WebSocketSession {
+  playerId: string
+  connectedAt: number
+}
 
 export class WebSocketDurableObject {
   state: DurableObjectState
@@ -26,6 +43,20 @@ export class WebSocketDurableObject {
       const url = new URL(request.url)
 
       switch (url.pathname) {
+        case '/ticket': {
+          const playerId = request.headers.get('X-Player-Id')
+
+          if (request.method !== 'POST' || playerId === null) {
+            return apiError({
+              status: 400,
+              code: 'INVALID_WEBSOCKET_TICKET_REQUEST',
+              message: 'The WebSocket ticket request is invalid.',
+              requestId
+            })
+          }
+
+          return await this.createTicket(playerId)
+        }
         case '/websocket': {
           if (request.headers.get('Upgrade') !== 'websocket') {
             return apiError({
@@ -36,9 +67,21 @@ export class WebSocketDurableObject {
             })
           }
 
+          const ticket = url.searchParams.get('ticket')
+          const session = await this.consumeTicket(ticket)
+
+          if (session === undefined) {
+            return apiError({
+              status: 401,
+              code: 'INVALID_WEBSOCKET_TICKET',
+              message: 'The WebSocket ticket is invalid or expired.',
+              requestId
+            })
+          }
+
           const [client, server] = Object.values(new WebSocketPair())
 
-          await this.handleSession(server)
+          await this.handleSession(server, session)
 
           return new Response(null, { status: 101, webSocket: client })
         }
@@ -67,8 +110,9 @@ export class WebSocketDurableObject {
     }
   }
 
-  async handleSession(webSocket: WebSocket) {
-    this.state.acceptWebSocket(webSocket)
+  async handleSession(webSocket: WebSocket, session: WebSocketSession) {
+    this.state.acceptWebSocket(webSocket, [`player:${session.playerId}`])
+    webSocket.serializeAttachment(session)
   }
 
   async webSocketMessage(webSocket: WebSocket) {
@@ -98,5 +142,68 @@ export class WebSocketDurableObject {
         this.sentry.captureException(error)
       }
     })
+  }
+
+  private async createTicket(playerId: string): Promise<Response> {
+    const ticket = createCredential()
+    const ticketHash = await hashCredential(ticket)
+    const now = Date.now()
+    const expiresAt = now + WEB_SOCKET_TICKET_TTL_MS
+
+    await this.state.storage.transaction(async (transaction) => {
+      const tickets = await transaction.get<PendingWebSocketTickets>(
+        WEB_SOCKET_TICKETS_STORAGE_KEY
+      )
+      const activeTickets = this.removeExpiredTickets(tickets ?? {}, now)
+      activeTickets[ticketHash] = { playerId, expiresAt }
+      await transaction.put(WEB_SOCKET_TICKETS_STORAGE_KEY, activeTickets)
+    })
+
+    return Response.json({ ticket, expiresAt } satisfies WebSocketTicket, {
+      status: 201,
+      headers: { 'Cache-Control': 'no-store' }
+    })
+  }
+
+  private async consumeTicket(
+    ticket: string | null
+  ): Promise<WebSocketSession | undefined> {
+    if (ticket === null || !/^[0-9a-f]{64}$/.test(ticket)) {
+      return undefined
+    }
+
+    const ticketHash = await hashCredential(ticket)
+    const now = Date.now()
+
+    return await this.state.storage.transaction(async (transaction) => {
+      const tickets = await transaction.get<PendingWebSocketTickets>(
+        WEB_SOCKET_TICKETS_STORAGE_KEY
+      )
+      const activeTickets = this.removeExpiredTickets(tickets ?? {}, now)
+      const pendingTicket = activeTickets[ticketHash]
+
+      delete activeTickets[ticketHash]
+
+      if (Object.keys(activeTickets).length === 0) {
+        await transaction.delete(WEB_SOCKET_TICKETS_STORAGE_KEY)
+      } else {
+        await transaction.put(WEB_SOCKET_TICKETS_STORAGE_KEY, activeTickets)
+      }
+
+      if (pendingTicket === undefined) {
+        return undefined
+      }
+
+      return { playerId: pendingTicket.playerId, connectedAt: now }
+    })
+  }
+
+  private removeExpiredTickets(
+    tickets: PendingWebSocketTickets,
+    now: number
+  ): PendingWebSocketTickets {
+    return Object.fromEntries(
+      Object.entries(tickets).filter(([, ticket]) => ticket.expiresAt > now)
+    )
   }
 }

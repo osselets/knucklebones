@@ -11,6 +11,7 @@ import {
 } from '@knucklebones/common'
 import { useRoomKey } from '../../hooks/useRoomKey'
 import {
+  createWebSocketTicket,
   deleteDisplayName,
   updateDisplayName,
   initGame,
@@ -36,11 +37,17 @@ export function useGameSetup() {
   const roomKey = useRoomKey()
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
-  const { lastJsonMessage, readyState } = useWebSocket(getWebSocketUrl(roomKey))
+  const playerId = localStorage.getItem('playerId')!
+  const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
+    const { ticket } = await createWebSocketTicket({ roomKey, playerId })
+    return getWebSocketUrl(roomKey, ticket)
+  }, [playerId, roomKey])
+  const { lastJsonMessage, readyState } = useWebSocket(
+    getAuthenticatedWebSocketUrl
+  )
 
   const isGameStateReady = gameState !== null
 
-  const playerId = localStorage.getItem('playerId')!
   const playerSide = isGameStateReady
     ? getPlayerSide(playerId, gameState)
     : 'spectator'
