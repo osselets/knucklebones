@@ -1,11 +1,18 @@
 import { status } from 'itty-router'
 import {
+  AI_PLAYER_ID,
   GameState,
   idempotentInitializeGameResultSchema,
-  initGameQuerySchema
+  initGameQuerySchema,
+  initializeRoomSchema,
+  type BoType,
+  type Difficulty
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type MutationRequestWithProps } from '../types/itty'
+import {
+  type AuthenticatedMutationRoomRequestWithProps,
+  type MutationRequestWithProps
+} from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
@@ -48,13 +55,69 @@ export async function init(
     })
   }
 
-  const result = idempotentInitializeGameResultSchema.parse(
-    await getGameStateDurableObject(request).initializeGame({
-      mutationId: request.mutationId,
+  return await executeInitializeGame(
+    request,
+    {
       playerId: request.playerId,
       displayName: query.data.displayName,
       difficulty: gameSettings.value.difficulty,
       boType: gameSettings.value.boType
+    },
+    cloudflareEnvironment,
+    context
+  )
+}
+
+export async function initializeRoom(
+  request: Request & AuthenticatedMutationRoomRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  const body = initializeRoomSchema.safeParse(
+    await request.json().catch(() => undefined)
+  )
+  if (!body.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_INITIALIZE_GAME_REQUEST',
+      message: 'The game initialization request is invalid.',
+      requestId: request.requestId
+    })
+  }
+
+  return await executeInitializeGame(
+    request,
+    {
+      playerId:
+        body.data.playerType === 'ai'
+          ? AI_PLAYER_ID
+          : request.principal.playerId,
+      displayName:
+        body.data.playerType === 'human' ? body.data.displayName : undefined,
+      difficulty:
+        body.data.playerType === 'ai' ? body.data.difficulty : undefined,
+      boType: body.data.boType
+    },
+    cloudflareEnvironment,
+    context
+  )
+}
+
+async function executeInitializeGame(
+  request: AuthenticatedMutationRoomRequestWithProps,
+  player: {
+    playerId: string
+    displayName?: string
+    difficulty?: Difficulty
+    boType?: BoType
+  },
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  const result = idempotentInitializeGameResultSchema.parse(
+    await getGameStateDurableObject(request).initializeGame({
+      mutationId: request.mutationId,
+      ...player
     })
   )
 

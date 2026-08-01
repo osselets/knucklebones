@@ -538,6 +538,138 @@ describe('atomic idempotent room mutations', () => {
   })
 })
 
+describe('versioned authenticated room API', () => {
+  function mutationRequest(
+    player: PlayerCredentials,
+    body?: unknown
+  ): RequestInit {
+    return {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Idempotency-Key': crypto.randomUUID(),
+        ...(body !== undefined && { 'Content-Type': 'application/json' })
+      },
+      ...(body !== undefined && { body: JSON.stringify(body) })
+    }
+  }
+
+  it('derives room actors from credentials and accepts settings in JSON', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const roomKey = crypto.randomUUID()
+
+    const first = await request(
+      `/v1/rooms/${roomKey}/init`,
+      mutationRequest(playerOne, {
+        playerType: 'human',
+        displayName: 'Player / One?',
+        boType: 1
+      })
+    )
+    const second = await request(
+      `/v1/rooms/${roomKey}/init`,
+      mutationRequest(playerTwo, { playerType: 'human', boType: 1 })
+    )
+    const renamed = await request(
+      `/v1/rooms/${roomKey}/display-name`,
+      mutationRequest(playerOne, { displayName: 'Updated / Name?' })
+    )
+    const ticket = await request(
+      `/v1/rooms/${roomKey}/websocket-ticket`,
+      mutationRequest(playerOne)
+    )
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(renamed.status).toBe(200)
+    expect(ticket.status).toBe(201)
+    expect(webSocketTicketSchema.safeParse(await ticket.json()).success).toBe(
+      true
+    )
+  })
+
+  it('rejects malformed or identity-bearing room bodies', async () => {
+    const player = await createPlayer()
+    const roomKey = crypto.randomUUID()
+
+    for (const body of [
+      { playerType: 'human', playerId: player.playerId },
+      { playerType: 'ai' },
+      { playerType: 'human', boType: 2 }
+    ]) {
+      const response = await request(
+        `/v1/rooms/${roomKey}/init`,
+        mutationRequest(player, body)
+      )
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'INVALID_INITIALIZE_GAME_REQUEST' }
+      })
+    }
+  })
+
+  it('rejects rematch votes from authenticated spectators', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const spectator = await createPlayer()
+    const roomKey = crypto.randomUUID()
+
+    for (const player of [playerOne, playerTwo]) {
+      expect(
+        (
+          await request(
+            `/v1/rooms/${roomKey}/init`,
+            mutationRequest(player, { playerType: 'human', boType: 1 })
+          )
+        ).status
+      ).toBe(200)
+    }
+
+    const environment = await server.getWorker().getEnv()
+    const durableObjectId =
+      environment.GAME_STATE_DURABLE_OBJECT.idFromName(roomKey)
+    const game = environment.GAME_STATE_DURABLE_OBJECT.get(durableObjectId)
+    const callGame = async (method: string, args: unknown[]) => {
+      const response = await game.fetch(
+        `https://itty-durable/do/call/${method}`,
+        {
+          headers: {
+            'do-name': roomKey,
+            'do-content': JSON.stringify(args)
+          }
+        }
+      )
+      expect(response.ok).toBe(true)
+      return response
+    }
+    const now = Date.now() + 60_000
+    await callGame('configureDisconnectPolicy', [roomKey, 100])
+    await callGame('updatePresence', [playerOne.playerId, true, now])
+    await callGame('updatePresence', [playerTwo.playerId, true, now])
+    await callGame('updatePresence', [playerOne.playerId, false, now])
+    await callGame('adjudicateDisconnects', [now + 100])
+
+    const rematch = await request(
+      `/v1/rooms/${roomKey}/rematch`,
+      mutationRequest(spectator, {})
+    )
+    const displayName = await request(
+      `/v1/rooms/${roomKey}/display-name`,
+      mutationRequest(spectator, { displayName: 'Intruder' })
+    )
+
+    expect(rematch.status).toBe(403)
+    await expect(rematch.json()).resolves.toMatchObject({
+      error: { code: 'NOT_A_PLAYER' }
+    })
+    expect(displayName.status).toBe(403)
+    await expect(displayName.json()).resolves.toMatchObject({
+      error: { code: 'NOT_A_PLAYER' }
+    })
+  })
+})
+
 describe('ranked disconnect adjudication', () => {
   async function createActiveRoom() {
     const playerOne = await createPlayer()

@@ -328,6 +328,13 @@ export class GameStateDurableObject extends createDurable({
   ): RematchGameResult {
     const gameState = this.getInitializedGameState()
 
+    if (
+      playerId !== gameState.playerOne.id &&
+      playerId !== gameState.playerTwo.id
+    ) {
+      return { status: 'unknown-player' }
+    }
+
     if (gameState.outcome === 'ongoing') {
       return { status: 'game-ongoing' }
     }
