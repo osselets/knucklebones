@@ -17,9 +17,13 @@ import {
   type PlayGameResult,
   playGameCommandSchema,
   playGameResultSchema,
+  playerIdSchema,
+  type PresenceUpdateResult,
   type RematchGameResult,
   rematchGameCommandSchema,
   rematchGameResultSchema,
+  roomKeySchema,
+  toGameStateMessage,
   type UpdateDisplayNameResult,
   updateDisplayNameCommandSchema,
   updateDisplayNameResultSchema
@@ -38,6 +42,12 @@ type ProcessedMutations = Record<string, ProcessedMutation>
 
 const PROCESSED_MUTATION_TTL_MS = 15 * 60 * 1000
 const MAX_PROCESSED_MUTATIONS = 200
+const DEFAULT_DISCONNECT_GRACE_MS = 60_000
+
+interface DisconnectPolicy {
+  roomKey: string
+  gracePeriodMs: number
+}
 
 export class GameStateDurableObject extends createDurable({
   autoPersist: true
@@ -45,6 +55,10 @@ export class GameStateDurableObject extends createDurable({
   lobby: ILobby
   gameState?: IGameState
   processedMutations: ProcessedMutations
+  disconnectPolicy?: DisconnectPolicy
+  connectedPlayers: Record<string, boolean>
+  reconnectDeadlines: Record<string, number>
+  pendingDisconnectBroadcast?: IGameState
 
   constructor(
     state: DurableObjectState,
@@ -53,6 +67,134 @@ export class GameStateDurableObject extends createDurable({
     super(state, cloudflareEnvironment)
     this.lobby = new Lobby().toJson()
     this.processedMutations = {}
+    this.connectedPlayers = {}
+    this.reconnectDeadlines = {}
+  }
+
+  configureDisconnectPolicy(
+    roomKey: string,
+    gracePeriodMs = DEFAULT_DISCONNECT_GRACE_MS
+  ): void {
+    this.disconnectPolicy = {
+      roomKey: roomKeySchema.parse(roomKey),
+      gracePeriodMs: Number.isInteger(gracePeriodMs)
+        ? Math.min(Math.max(gracePeriodMs, 1), 5 * 60_000)
+        : DEFAULT_DISCONNECT_GRACE_MS
+    }
+  }
+
+  async updatePresence(
+    playerId: string,
+    connected: boolean,
+    observedAt = Date.now()
+  ): Promise<PresenceUpdateResult> {
+    const parsedPlayerId = playerIdSchema.parse(playerId)
+    if (typeof connected !== 'boolean' || !Number.isInteger(observedAt)) {
+      throw new Error('Invalid presence update.')
+    }
+    if (this.disconnectPolicy === undefined) {
+      return { status: 'disabled' }
+    }
+
+    const gameState = this.readPlayerGameState(parsedPlayerId)
+    if (gameState === undefined || gameState.outcome !== 'ongoing') {
+      return { status: 'ignored' }
+    }
+
+    if (connected) {
+      const hadDeadline = this.reconnectDeadlines[parsedPlayerId] !== undefined
+      const changed = this.connectedPlayers[parsedPlayerId] !== true
+      this.connectedPlayers[parsedPlayerId] = true
+      delete this.reconnectDeadlines[parsedPlayerId]
+
+      const adjudication = this.adjudicateDisconnects(observedAt)
+      await this.scheduleDisconnectAlarm()
+      if (adjudication.status === 'adjudicated') {
+        return adjudication
+      }
+
+      return changed || hadDeadline
+        ? {
+            status: 'updated',
+            playerId: parsedPlayerId,
+            connected: true,
+            ...(hadDeadline && { reconnectDeadline: 0 })
+          }
+        : { status: 'unchanged' }
+    }
+
+    if (
+      this.connectedPlayers[parsedPlayerId] === false &&
+      this.reconnectDeadlines[parsedPlayerId] !== undefined
+    ) {
+      return { status: 'unchanged' }
+    }
+
+    this.connectedPlayers[parsedPlayerId] = false
+    const reconnectDeadline = observedAt + this.disconnectPolicy.gracePeriodMs
+    this.reconnectDeadlines[parsedPlayerId] = reconnectDeadline
+    await this.scheduleDisconnectAlarm()
+
+    return {
+      status: 'updated',
+      playerId: parsedPlayerId,
+      connected: false,
+      reconnectDeadline
+    }
+  }
+
+  adjudicateDisconnects(now = Date.now()): PresenceUpdateResult {
+    if (this.disconnectPolicy === undefined || this.gameState === undefined) {
+      return { status: 'disabled' }
+    }
+
+    const gameState = GameState.fromJson(gameStateSchema.parse(this.gameState))
+    if (gameState.outcome !== 'ongoing') {
+      this.reconnectDeadlines = {}
+      return { status: 'unchanged' }
+    }
+
+    const players = [gameState.playerOne.id, gameState.playerTwo.id]
+    const expiredPlayers = players.filter(
+      (playerId) => (this.reconnectDeadlines[playerId] ?? Infinity) <= now
+    )
+
+    if (expiredPlayers.length === 2) {
+      gameState.finishAsNoContest()
+    } else if (expiredPlayers.length === 1) {
+      const disconnectedPlayerId = expiredPlayers[0]
+      const opponentId = players.find(
+        (playerId) => playerId !== disconnectedPlayerId
+      )!
+      if (this.connectedPlayers[opponentId] !== true) {
+        return { status: 'unchanged' }
+      }
+      gameState.finishByForfeit(disconnectedPlayerId)
+    } else {
+      return { status: 'unchanged' }
+    }
+
+    this.reconnectDeadlines = {}
+    return {
+      status: 'adjudicated',
+      gameState: this.commitGameState(gameState)
+    }
+  }
+
+  async alarm(): Promise<void> {
+    await this.loadFromStorage()
+    const result = this.adjudicateDisconnects()
+    if (result.status === 'adjudicated') {
+      this.pendingDisconnectBroadcast = result.gameState
+    }
+    await this.scheduleDisconnectAlarm()
+    await this.persist()
+
+    if (this.pendingDisconnectBroadcast !== undefined) {
+      await this.broadcastAlarmResult(this.pendingDisconnectBroadcast)
+      this.pendingDisconnectBroadcast = undefined
+      await this.persist()
+    }
   }
 
   initializeGame({
@@ -261,6 +403,55 @@ export class GameStateDurableObject extends createDurable({
     return {
       status: 'updated',
       gameState: this.commitGameState(gameState)
+    }
+  }
+
+  private readPlayerGameState(playerId: string): GameState | undefined {
+    if (this.gameState === undefined) {
+      return
+    }
+
+    const gameState = GameState.fromJson(gameStateSchema.parse(this.gameState))
+    if (
+      gameState.playerOne.id !== playerId &&
+      gameState.playerTwo.id !== playerId
+    ) {
+      return
+    }
+
+    return gameState
+  }
+
+  private async scheduleDisconnectAlarm(): Promise<void> {
+    const deadlines = Object.values(this.reconnectDeadlines)
+    if (deadlines.length === 0) {
+      await this.deleteAlarm()
+      return
+    }
+
+    await this.setAlarm(Math.min(...deadlines))
+  }
+
+  private async broadcastAlarmResult(gameState: IGameState): Promise<void> {
+    const roomKey = this.disconnectPolicy?.roomKey
+    if (roomKey === undefined) {
+      return
+    }
+
+    const environment = (
+      this.state as DurableObjectState & { env: CloudflareEnvironment }
+    ).env
+    const id = environment.WEB_SOCKET_DURABLE_OBJECT.idFromName(roomKey)
+    const webSocketStore = environment.WEB_SOCKET_DURABLE_OBJECT.get(id)
+    const requestId = crypto.randomUUID()
+    const response = await webSocketStore.fetch('https://dummy-url/broadcast', {
+      method: 'POST',
+      headers: { 'X-Request-Id': requestId },
+      body: JSON.stringify(toGameStateMessage(gameState, roomKey, requestId))
+    })
+
+    if (!response.ok) {
+      throw new Error('The WebSocket room rejected a disconnect outcome.')
     }
   }
 

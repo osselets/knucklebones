@@ -29,6 +29,16 @@ export interface UpdateDisplayNameCommand {
   displayName?: string
 }
 
+export type PresenceUpdateResult =
+  | { status: 'disabled' | 'ignored' | 'unchanged' }
+  | {
+      status: 'updated'
+      playerId: string
+      connected: boolean
+      reconnectDeadline?: number
+    }
+  | { status: 'adjudicated'; gameState: IGameState }
+
 export type InitializeGameResult =
   | { status: 'waiting' }
   | { status: 'created' | 'existing'; gameState: IGameState }

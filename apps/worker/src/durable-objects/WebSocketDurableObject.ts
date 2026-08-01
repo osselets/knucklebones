@@ -4,9 +4,12 @@ import {
   credentialSchema,
   gameServerEventSchema,
   playerIdSchema,
+  presenceUpdateResultSchema,
   PROTOCOL_VERSION,
   roomKeySchema,
+  toGameReconnectDeadlineMessage,
   toGamePresenceMessage,
+  toGameStateMessage,
   type WebSocketTicket
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
@@ -181,6 +184,7 @@ export class WebSocketDurableObject {
           toGamePresenceMessage(session.roomKey, session.playerId, true)
         )
       )
+      await this.reportPresence(session, true)
     }
   }
 
@@ -204,6 +208,7 @@ export class WebSocketDurableObject {
           toGamePresenceMessage(session.roomKey, session.playerId, false)
         )
       )
+      await this.reportPresence(session, false)
     }
 
     if (!wasClean) {
@@ -374,5 +379,46 @@ export class WebSocketDurableObject {
           : 'spectator'
       webSocket.serializeAttachment(session)
     })
+  }
+
+  private async reportPresence(
+    session: WebSocketSession,
+    connected: boolean
+  ): Promise<void> {
+    const id = this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      session.roomKey
+    )
+    const gameStateStore =
+      this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.get(id)
+    const response = await gameStateStore.fetch(
+      'https://itty-durable/do/call/updatePresence',
+      {
+        headers: {
+          'do-name': session.roomKey,
+          'do-content': JSON.stringify([session.playerId, connected])
+        }
+      }
+    )
+    if (!response.ok) {
+      throw new Error('The game room rejected a presence update.')
+    }
+
+    const result = presenceUpdateResultSchema.parse(await response.json())
+
+    if (result.status === 'updated' && result.reconnectDeadline !== undefined) {
+      this.broadcast(
+        JSON.stringify(
+          toGameReconnectDeadlineMessage(
+            session.roomKey,
+            session.playerId,
+            result.reconnectDeadline
+          )
+        )
+      )
+    } else if (result.status === 'adjudicated') {
+      this.broadcast(
+        JSON.stringify(toGameStateMessage(result.gameState, session.roomKey))
+      )
+    }
   }
 }

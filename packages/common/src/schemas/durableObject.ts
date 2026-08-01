@@ -4,6 +4,7 @@ import {
   type IdempotentMutationResult,
   type InitializeGameResult,
   type PlayGameResult,
+  type PresenceUpdateResult,
   type RematchGameResult,
   type UpdateDisplayNameResult
 } from '../types'
@@ -87,6 +88,20 @@ export const playGameResultSchema = z.union([
   }),
   updatedGameStateResultSchema
 ]) satisfies z.ZodMiniType<PlayGameResult>
+
+export const presenceUpdateResultSchema = z.union([
+  z.object({ status: z.enum(['disabled', 'ignored', 'unchanged']) }),
+  z.object({
+    status: z.literal('updated'),
+    playerId: playerIdSchema,
+    connected: z.boolean(),
+    reconnectDeadline: z.optional(z.int().check(z.minimum(0)))
+  }),
+  z.object({
+    status: z.literal('adjudicated'),
+    gameState: gameStateSchema
+  })
+]) satisfies z.ZodMiniType<PresenceUpdateResult>
 
 export const gameStateMutationResultSchema = z.union([
   initializeGameResultSchema,
