@@ -122,3 +122,17 @@ export function toGamePresenceMessage(
     payload: { roomKey, playerId, connected }
   }
 }
+
+export function toGameReconnectDeadlineMessage(
+  roomKey: string,
+  playerId: string,
+  expiresAt: number,
+  requestId?: string
+): GameReconnectDeadlineEvent {
+  return {
+    version: PROTOCOL_VERSION,
+    type: 'game.reconnect-deadline',
+    ...(requestId !== undefined && { requestId }),
+    payload: { roomKey, playerId, expiresAt }
+  }
+}

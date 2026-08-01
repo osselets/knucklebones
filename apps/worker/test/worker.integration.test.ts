@@ -8,6 +8,7 @@ import {
   matchmakingStatusSchema,
   playerCredentialsSchema,
   playerIdentityBootstrapSchema,
+  type PresenceUpdateResult,
   rankedProfileSchema,
   webSocketTicketSchema,
   type PlayerCredentials
@@ -534,6 +535,122 @@ describe('atomic idempotent room mutations', () => {
     await expect(conflict.json()).resolves.toMatchObject({
       error: { code: 'IDEMPOTENCY_KEY_REUSED' }
     })
+  })
+})
+
+describe('ranked disconnect adjudication', () => {
+  async function createActiveRoom() {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const roomKey = crypto.randomUUID()
+
+    for (const player of [playerOne, playerTwo]) {
+      const response = await request(`/${roomKey}/${player.playerId}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Idempotency-Key': crypto.randomUUID()
+        }
+      })
+      expect(response.status).toBe(200)
+    }
+
+    const environment = await server.getWorker().getEnv()
+    const durableObjectId =
+      environment.GAME_STATE_DURABLE_OBJECT.idFromName(roomKey)
+    const game = environment.GAME_STATE_DURABLE_OBJECT.get(durableObjectId)
+    const callGame = async <T>(method: string, args: unknown[]): Promise<T> => {
+      const response = await game.fetch(
+        `https://itty-durable/do/call/${method}`,
+        {
+          headers: {
+            'do-name': roomKey,
+            'do-content': JSON.stringify(args)
+          }
+        }
+      )
+      expect(response.ok).toBe(true)
+      return (response.status === 204 ? undefined : await response.json()) as T
+    }
+    await callGame('configureDisconnectPolicy', [roomKey, 100])
+    await callGame('updatePresence', [playerOne.playerId, true, 900])
+    await callGame('updatePresence', [playerTwo.playerId, true, 900])
+
+    return { callGame, playerOne, playerTwo }
+  }
+
+  it('cancels a deadline on reconnect and forfeits only after a later expiry', async () => {
+    const { callGame, playerOne, playerTwo } = await createActiveRoom()
+    const now = Date.now() + 60_000
+
+    const disconnected = await callGame<PresenceUpdateResult>(
+      'updatePresence',
+      [playerOne.playerId, false, now]
+    )
+    expect(disconnected).toMatchObject({
+      status: 'updated',
+      reconnectDeadline: now + 100
+    })
+
+    const reconnected = await callGame<PresenceUpdateResult>('updatePresence', [
+      playerOne.playerId,
+      true,
+      now + 50
+    ])
+    expect(reconnected).toMatchObject({
+      status: 'updated',
+      reconnectDeadline: 0
+    })
+    expect(
+      await callGame<PresenceUpdateResult>('adjudicateDisconnects', [now + 200])
+    ).toEqual({
+      status: 'unchanged'
+    })
+
+    await callGame('updatePresence', [playerOne.playerId, false, now + 1_000])
+    const adjudicated = await callGame<PresenceUpdateResult>(
+      'adjudicateDisconnects',
+      [now + 1_100]
+    )
+    expect(adjudicated).toMatchObject({
+      status: 'adjudicated',
+      gameState: {
+        outcome: 'game-ended',
+        finishReason: 'forfeit',
+        winnerId: playerTwo.playerId
+      }
+    })
+    expect(
+      await callGame<PresenceUpdateResult>('adjudicateDisconnects', [
+        now + 1_100
+      ])
+    ).toEqual({
+      status: 'unchanged'
+    })
+  })
+
+  it('marks the game no-contest when both deadlines expire', async () => {
+    const { callGame, playerOne, playerTwo } = await createActiveRoom()
+    const now = Date.now() + 60_000
+
+    await callGame('updatePresence', [playerOne.playerId, false, now])
+    await callGame('updatePresence', [playerTwo.playerId, false, now + 10])
+    const adjudicated = await callGame<PresenceUpdateResult>(
+      'adjudicateDisconnects',
+      [now + 110]
+    )
+
+    expect(adjudicated).toMatchObject({
+      status: 'adjudicated',
+      gameState: {
+        outcome: 'game-ended',
+        finishReason: 'no-contest'
+      }
+    })
+    if (adjudicated.status === 'adjudicated') {
+      expect(adjudicated.gameState.winnerId).toBeUndefined()
+      expect(adjudicated.gameState.outcomeHistory).toEqual([])
+    }
   })
 })
 

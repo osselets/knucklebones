@@ -1,4 +1,5 @@
 export type Outcome = 'ongoing' | 'round-ended' | 'game-ended'
+export type GameFinishReason = 'completed' | 'forfeit' | 'no-contest'
 
 export interface PlayerOutcome {
   id: string

@@ -126,6 +126,7 @@ describe('GameState play validation', () => {
     gameState.applyPlay({ author: 'player-one', column: 2, dice: 6 })
 
     expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.finishReason).toBe('completed')
     expect(gameState.winnerId).toBe('player-one')
     expect(gameState.outcomeHistory).toEqual([
       {
@@ -140,5 +141,31 @@ describe('GameState play validation', () => {
         dice: 1
       })
     ).toBe('game-ended')
+  })
+
+  it('records an authoritative forfeit outcome', () => {
+    const gameState = createGameState()
+
+    expect(gameState.finishByForfeit('player-one')).toBe(true)
+    expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.finishReason).toBe('forfeit')
+    expect(gameState.winnerId).toBe('player-two')
+    expect(gameState.outcomeHistory).toEqual([
+      {
+        playerOne: { id: 'player-one', score: 0 },
+        playerTwo: { id: 'player-two', score: 1 }
+      }
+    ])
+    expect(gameState.finishByForfeit('player-one')).toBe(false)
+  })
+
+  it('records a no-contest without a winner or rated history', () => {
+    const gameState = createGameState()
+
+    expect(gameState.finishAsNoContest()).toBe(true)
+    expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.finishReason).toBe('no-contest')
+    expect(gameState.winnerId).toBeUndefined()
+    expect(gameState.outcomeHistory).toEqual([])
   })
 })

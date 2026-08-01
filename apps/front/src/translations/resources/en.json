@@ -78,6 +78,9 @@
     }
   },
   "loading": "Waiting for game to start",
+  "reconnect": {
+    "deadline": "{{player}} disconnected. They have {{seconds}} seconds to reconnect."
+  },
   "identity": {
     "loading": "Creating your player identity…",
     "error": "We couldn't create your player identity.",

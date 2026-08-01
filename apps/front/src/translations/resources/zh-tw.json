@@ -78,6 +78,9 @@
     }
   },
   "loading": "等待遊戲開始",
+  "reconnect": {
+    "deadline": "{{player}} 已斷線。還有 {{seconds}} 秒可以重新連線。"
+  },
   "identity": {
     "loading": "正在建立您的玩家身分…",
     "error": "無法建立您的玩家身分。",

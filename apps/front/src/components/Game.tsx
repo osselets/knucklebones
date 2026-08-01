@@ -8,6 +8,7 @@ import { Loading } from './Loading'
 import { OutcomeHistory } from './OutcomeHistory'
 import { PlayerOneBoard, PlayerTwoBoard } from './PlayerBoard'
 import { QRCodeModal } from './QRCode'
+import { ReconnectNotice } from './ReconnectNotice'
 import { SideBarActions } from './SideBar'
 import { WarningToast } from './WarningToast'
 
@@ -35,6 +36,7 @@ export function Game() {
         {isOnMobile && gameOutcome}
       </SideBarActions>
       <div ref={gameRef} className='flex flex-col items-center justify-around'>
+        <ReconnectNotice />
         <PlayerTwoBoard />
         {!isOnMobile && gameOutcome}
         <PlayerOneBoard />
