@@ -1,5 +1,10 @@
 import { Toucan } from 'toucan-js'
-import { type WebSocketTicket } from '@knucklebones/common'
+import {
+  credentialSchema,
+  gameServerEventSchema,
+  playerIdSchema,
+  type WebSocketTicket
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { createCredential, hashCredential } from '../utils/credentials'
 import { apiError } from '../utils/http'
@@ -19,7 +24,13 @@ export function removeExpiredWebSocketTickets(
   now: number
 ): PendingWebSocketTickets {
   return Object.fromEntries(
-    Object.entries(tickets).filter(([, ticket]) => ticket.expiresAt > now)
+    Object.entries(tickets).filter(
+      ([ticketHash, ticket]) =>
+        credentialSchema.safeParse(ticketHash).success &&
+        playerIdSchema.safeParse(ticket.playerId).success &&
+        Number.isInteger(ticket.expiresAt) &&
+        ticket.expiresAt > now
+    )
   )
 }
 
@@ -95,7 +106,18 @@ export class WebSocketDurableObject {
           return new Response(null, { status: 101, webSocket: client })
         }
         case '/broadcast': {
-          this.broadcast(await request.text())
+          const body = await request.json().catch(() => undefined)
+          const event = gameServerEventSchema.safeParse(body)
+          if (!event.success) {
+            return apiError({
+              status: 400,
+              code: 'INVALID_SERVER_EVENT',
+              message: 'The server event is invalid.',
+              requestId
+            })
+          }
+
+          this.broadcast(JSON.stringify(event.data))
           return new Response(null, { status: 200 })
         }
         default:
@@ -154,6 +176,10 @@ export class WebSocketDurableObject {
   }
 
   private async createTicket(playerId: string): Promise<Response> {
+    if (!playerIdSchema.safeParse(playerId).success) {
+      throw new Error('Cannot issue a WebSocket ticket for an invalid player.')
+    }
+
     const ticket = createCredential()
     const ticketHash = await hashCredential(ticket)
     const now = Date.now()
@@ -177,11 +203,12 @@ export class WebSocketDurableObject {
   private async consumeTicket(
     ticket: string | null
   ): Promise<WebSocketSession | undefined> {
-    if (ticket === null || !/^[0-9a-f]{64}$/.test(ticket)) {
+    const parsedTicket = credentialSchema.safeParse(ticket)
+    if (!parsedTicket.success) {
       return undefined
     }
 
-    const ticketHash = await hashCredential(ticket)
+    const ticketHash = await hashCredential(parsedTicket.data)
     const now = Date.now()
 
     return await this.state.storage.transaction(async (transaction) => {

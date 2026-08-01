@@ -1,4 +1,5 @@
 import {
+  apiErrorBodySchema,
   type GameSettings,
   type PlayerCredentials,
   playerCredentialsSchema,
@@ -178,8 +179,18 @@ async function sendApiRequest(
     }
 
     if (response.status < 500 || attempt === attempts - 1) {
+      const result = apiErrorBodySchema.safeParse(
+        await response
+          .clone()
+          .json()
+          .catch(() => undefined)
+      )
+      const details = result.success
+        ? `${result.data.error.code}: ${result.data.error.message}`
+        : `${response.status}:${response.statusText}`
+
       throw new Error(
-        `[${response.status}:${response.statusText}] There was an error while doing a network call. Please try again.`
+        `[${details}] There was an error while doing a network call. Please try again.`
       )
     }
   }

@@ -1,45 +1,31 @@
 import { createDurable } from 'itty-durable'
 import {
-  type BoType,
-  type Difficulty,
   type GameSettings,
   GameState,
+  gameStateSchema,
   type IGameState,
   type ILobby,
+  type IdempotentMutationResult,
+  type InitializeGameCommand,
+  type InitializeGameResult,
+  initializeGameCommandSchema,
+  initializeGameResultSchema,
   Lobby,
+  lobbySchema,
   Player,
   type Play,
-  type PlayRejectionReason
+  type PlayGameResult,
+  playGameCommandSchema,
+  playGameResultSchema,
+  type RematchGameResult,
+  rematchGameCommandSchema,
+  rematchGameResultSchema,
+  type UpdateDisplayNameResult,
+  updateDisplayNameCommandSchema,
+  updateDisplayNameResultSchema
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
-
-interface InitializeGameCommand {
-  mutationId: string
-  playerId: string
-  displayName?: string
-  difficulty?: Difficulty
-  boType?: BoType
-}
-
-export type InitializeGameResult =
-  | { status: 'waiting' }
-  | { status: 'created' | 'existing'; gameState: IGameState }
-
-export type RematchGameResult =
-  | { status: 'game-ongoing' | 'unchanged' }
-  | { status: 'updated'; gameState: IGameState }
-
-export type UpdateDisplayNameResult =
-  { status: 'unknown-player' } | { status: 'updated'; gameState: IGameState }
-
-export type PlayGameResult =
-  | { status: 'rejected'; reason: PlayRejectionReason }
-  | { status: 'updated'; gameState: IGameState }
-
-export type IdempotentMutationResult<T> =
-  | { idempotencyStatus: 'applied' | 'replayed'; value: T }
-  | { idempotencyStatus: 'conflict' }
 
 interface ProcessedMutation {
   fingerprint: string
@@ -75,12 +61,31 @@ export class GameStateDurableObject extends createDurable({
     difficulty,
     boType
   }: InitializeGameCommand): IdempotentMutationResult<InitializeGameResult> {
-    return this.runIdempotently(
+    const command = initializeGameCommandSchema.parse({
       mutationId,
+      playerId,
+      displayName,
+      difficulty,
+      boType
+    })
+
+    return this.runIdempotently(
+      command.mutationId,
       'initialize-game',
-      { playerId, displayName, difficulty, boType },
+      {
+        playerId: command.playerId,
+        displayName: command.displayName,
+        difficulty: command.difficulty,
+        boType: command.boType
+      },
+      initializeGameResultSchema,
       () =>
-        this.applyInitializeGame({ playerId, displayName, difficulty, boType })
+        this.applyInitializeGame({
+          playerId: command.playerId,
+          displayName: command.displayName,
+          difficulty: command.difficulty,
+          boType: command.boType
+        })
     )
   }
 
@@ -91,7 +96,9 @@ export class GameStateDurableObject extends createDurable({
     boType
   }: Omit<InitializeGameCommand, 'mutationId'>): InitializeGameResult {
     if (this.gameState !== undefined) {
-      const gameState = GameState.fromJson(this.gameState)
+      const gameState = GameState.fromJson(
+        gameStateSchema.parse(this.gameState)
+      )
       let serializedGameState = gameState.toJson()
 
       if (gameState.addSpectator(playerId)) {
@@ -101,7 +108,7 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'existing', gameState: serializedGameState }
     }
 
-    const lobby = Lobby.fromJson(this.lobby)
+    const lobby = Lobby.fromJson(lobbySchema.parse(this.lobby))
     const player = new Player(playerId, displayName, difficulty)
 
     if (boType !== undefined) {
@@ -125,8 +132,14 @@ export class GameStateDurableObject extends createDurable({
     mutationId: string,
     play: Play
   ): IdempotentMutationResult<PlayGameResult> {
-    return this.runIdempotently(mutationId, 'play', play, () =>
-      this.applyPlay(play)
+    const command = playGameCommandSchema.parse({ mutationId, play })
+
+    return this.runIdempotently(
+      command.mutationId,
+      'play',
+      command.play,
+      playGameResultSchema,
+      () => this.applyPlay(command.play)
     )
   }
 
@@ -147,11 +160,21 @@ export class GameStateDurableObject extends createDurable({
     playerId: string,
     gameSettings?: Partial<Omit<GameSettings, 'playerType'>>
   ): IdempotentMutationResult<RematchGameResult> {
-    return this.runIdempotently(
+    const command = rematchGameCommandSchema.parse({
       mutationId,
+      playerId,
+      gameSettings
+    })
+
+    return this.runIdempotently(
+      command.mutationId,
       'rematch',
-      { playerId, gameSettings },
-      () => this.applyRematch(playerId, gameSettings)
+      {
+        playerId: command.playerId,
+        gameSettings: command.gameSettings
+      },
+      rematchGameResultSchema,
+      () => this.applyRematch(command.playerId, command.gameSettings)
     )
   }
 
@@ -204,11 +227,18 @@ export class GameStateDurableObject extends createDurable({
     playerId: string,
     displayName?: string
   ): IdempotentMutationResult<UpdateDisplayNameResult> {
-    return this.runIdempotently(
+    const command = updateDisplayNameCommandSchema.parse({
       mutationId,
+      playerId,
+      displayName
+    })
+
+    return this.runIdempotently(
+      command.mutationId,
       'update-display-name',
-      { playerId, displayName },
-      () => this.applyDisplayNameUpdate(playerId, displayName)
+      { playerId: command.playerId, displayName: command.displayName },
+      updateDisplayNameResultSchema,
+      () => this.applyDisplayNameUpdate(command.playerId, command.displayName)
     )
   }
 
@@ -243,13 +273,14 @@ export class GameStateDurableObject extends createDurable({
       throw new Error('Game state is not initialized.')
     }
 
-    return GameState.fromJson(this.gameState)
+    return GameState.fromJson(gameStateSchema.parse(this.gameState))
   }
 
   private runIdempotently<T>(
     mutationId: string,
     operation: string,
     payload: unknown,
+    resultSchema: { parse(value: unknown): T },
     mutation: () => T
   ): IdempotentMutationResult<T> {
     const fingerprint = JSON.stringify({ operation, payload })
@@ -262,7 +293,7 @@ export class GameStateDurableObject extends createDurable({
 
       return {
         idempotencyStatus: 'replayed',
-        value: processedMutation.value as T
+        value: resultSchema.parse(processedMutation.value)
       }
     }
 

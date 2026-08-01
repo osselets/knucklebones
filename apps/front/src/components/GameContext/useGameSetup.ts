@@ -5,6 +5,7 @@ import {
   AI_PLAYER_ID,
   compatibleGameStateMessageSchema,
   GameState,
+  getGameStateMessagePayload,
   type IGameState,
   isEmptyOrBlank,
   type GameSettings
@@ -70,18 +71,13 @@ export function useGameSetup() {
         return
       }
 
+      const { gameState: nextGameState, roomKey: messageRoomKey } =
+        getGameStateMessagePayload(parsedGameState.data)
+
       const hasRevision =
         typeof lastJsonMessage === 'object' &&
         lastJsonMessage !== null &&
-        'revision' in lastJsonMessage
-
-      const messageRoomKey =
-        typeof lastJsonMessage === 'object' &&
-        lastJsonMessage !== null &&
-        'roomKey' in lastJsonMessage &&
-        typeof lastJsonMessage.roomKey === 'string'
-          ? lastJsonMessage.roomKey
-          : undefined
+        ('revision' in lastJsonMessage || 'payload' in lastJsonMessage)
 
       if (messageRoomKey !== undefined && messageRoomKey !== roomKey) {
         return
@@ -92,18 +88,18 @@ export function useGameSetup() {
           ? latestRevision.current.value
           : -1
 
-      if (hasRevision && parsedGameState.data.revision <= latestRoomRevision) {
+      if (hasRevision && nextGameState.revision <= latestRoomRevision) {
         return
       }
 
       if (hasRevision) {
         latestRevision.current = {
           roomKey,
-          value: parsedGameState.data.revision
+          value: nextGameState.revision
         }
       }
 
-      setGameState(parsedGameState.data)
+      setGameState(nextGameState)
       setIsLoading(false)
       setErrorMessage(null)
     }

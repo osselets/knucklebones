@@ -3,17 +3,36 @@ import { removeExpiredWebSocketTickets } from '../src/durable-objects/WebSocketD
 
 describe('removeExpiredWebSocketTickets', () => {
   it('removes tickets at and before their expiry time', () => {
+    const expiredHash = 'a'.repeat(64)
+    const boundaryHash = 'b'.repeat(64)
+    const activeHash = 'c'.repeat(64)
+    const playerId = '22222222-2222-4222-8222-222222222222'
+
     expect(
       removeExpiredWebSocketTickets(
         {
-          expired: { playerId: 'one', expiresAt: 99 },
-          boundary: { playerId: 'two', expiresAt: 100 },
-          active: { playerId: 'three', expiresAt: 101 }
+          [expiredHash]: { playerId, expiresAt: 99 },
+          [boundaryHash]: { playerId, expiresAt: 100 },
+          [activeHash]: { playerId, expiresAt: 101 }
         },
         100
       )
     ).toEqual({
-      active: { playerId: 'three', expiresAt: 101 }
+      [activeHash]: { playerId, expiresAt: 101 }
     })
+  })
+
+  it('removes malformed persisted tickets', () => {
+    expect(
+      removeExpiredWebSocketTickets(
+        {
+          malformed: {
+            playerId: 'not-a-player-id',
+            expiresAt: 101
+          }
+        },
+        100
+      )
+    ).toEqual({})
   })
 })

@@ -1,4 +1,5 @@
 import { status } from 'itty-router'
+import { idempotentUpdateDisplayNameResultSchema } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
 import {
@@ -12,10 +13,12 @@ export async function deleteDisplayName(
   request: MutationRequestWithProps,
   cloudflareEnvironment: CloudflareEnvironment
 ) {
-  const result = await getGameStateDurableObject(request).updateDisplayName(
-    request.mutationId,
-    request.playerId,
-    undefined
+  const result = idempotentUpdateDisplayNameResultSchema.parse(
+    await getGameStateDurableObject(request).updateDisplayName(
+      request.mutationId,
+      request.playerId,
+      undefined
+    )
   )
 
   if (result.idempotencyStatus === 'conflict') {

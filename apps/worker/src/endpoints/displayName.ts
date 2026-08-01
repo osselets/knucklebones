@@ -1,4 +1,8 @@
 import { status } from 'itty-router'
+import {
+  displayNameRouteParamsSchema,
+  idempotentUpdateDisplayNameResultSchema
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
 import {
@@ -7,6 +11,7 @@ import {
 } from '../utils/endpoints'
 import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
+import { invalidRouteParameters } from '../utils/validation'
 
 interface DisplayNameRequest extends MutationRequestWithProps {
   displayName?: string
@@ -16,10 +21,21 @@ export async function displayName(
   request: DisplayNameRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ) {
-  const result = await getGameStateDurableObject(request).updateDisplayName(
-    request.mutationId,
-    request.playerId,
-    request.displayName
+  const params = displayNameRouteParamsSchema.safeParse({
+    roomKey: request.roomKey,
+    playerId: request.playerId,
+    displayName: request.displayName
+  })
+  if (!params.success) {
+    return invalidRouteParameters(request.requestId)
+  }
+
+  const result = idempotentUpdateDisplayNameResultSchema.parse(
+    await getGameStateDurableObject(request).updateDisplayName(
+      request.mutationId,
+      request.playerId,
+      params.data.displayName
+    )
   )
 
   if (result.idempotencyStatus === 'conflict') {

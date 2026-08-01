@@ -1,4 +1,4 @@
-import { DEFAULT_RATING_POOL, type RankedProfile } from '@knucklebones/common'
+import { DEFAULT_RATING_POOL, rankedProfileSchema } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type BaseRequestWithProps } from '../types/itty'
 import { apiError } from '../utils/http'
@@ -34,16 +34,17 @@ export async function getRankedProfile(
     })
   }
 
-  return Response.json(
-    {
-      playerId: profile.player_id,
-      ratingPool: DEFAULT_RATING_POOL,
-      rating: profile.rating,
-      gamesPlayed: profile.games_played,
-      wins: profile.wins,
-      draws: profile.draws,
-      losses: profile.losses
-    } satisfies RankedProfile,
-    { headers: { 'Cache-Control': 'no-store' } }
-  )
+  const response = rankedProfileSchema.parse({
+    playerId: profile.player_id,
+    ratingPool: DEFAULT_RATING_POOL,
+    rating: profile.rating,
+    gamesPlayed: profile.games_played,
+    wins: profile.wins,
+    draws: profile.draws,
+    losses: profile.losses
+  })
+
+  return Response.json(response, {
+    headers: { 'Cache-Control': 'no-store' }
+  })
 }

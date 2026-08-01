@@ -21,7 +21,7 @@ vi.mock('react-use-websocket', () => ({
   ReadyState: { CLOSED: 3, OPEN: 1 }
 }))
 vi.mock('../../hooks/useRoomKey', () => ({
-  useRoomKey: () => 'room-one'
+  useRoomKey: () => '11111111-1111-4111-8111-111111111111'
 }))
 vi.mock('../../utils/api', () => ({
   createWebSocketTicket: vi.fn(),
@@ -33,6 +33,8 @@ vi.mock('../../utils/api', () => ({
 }))
 
 const playerId = '22222222-2222-4222-8222-222222222222'
+const roomKey = '11111111-1111-4111-8111-111111111111'
+const foreignRoomKey = '33333333-3333-4333-8333-333333333333'
 
 function wrapper({ children }: React.PropsWithChildren) {
   return <MemoryRouter>{children}</MemoryRouter>
@@ -76,18 +78,18 @@ describe('useGameSetup', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
 
-    emitMessage(toGameStateMessage(createGameState(3), 'room-one'), rerender)
+    emitMessage(toGameStateMessage(createGameState(3), roomKey), rerender)
     await waitFor(() => expect(result.current?.revision).toBe(3))
 
     emitMessage(
-      toGameStateMessage(createGameState(2, 'Stale Name'), 'room-one'),
+      toGameStateMessage(createGameState(2, 'Stale Name'), roomKey),
       rerender
     )
     expect(result.current?.revision).toBe(3)
     expect(result.current?.playerOne.displayName).toBe('Current Name')
 
     emitMessage(
-      toGameStateMessage(createGameState(4, 'Foreign Name'), 'room-two'),
+      toGameStateMessage(createGameState(4, 'Foreign Name'), foreignRoomKey),
       rerender
     )
     expect(result.current?.revision).toBe(3)
@@ -123,7 +125,7 @@ describe('useGameSetup', () => {
   it('rolls an optimistic move back after a network failure', async () => {
     vi.mocked(play).mockRejectedValueOnce(new Error('network unavailable'))
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
-    emitMessage(toGameStateMessage(createGameState(1), 'room-one'), rerender)
+    emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
     await waitFor(() => expect(result.current).not.toBeNull())
 
     await act(async () => {

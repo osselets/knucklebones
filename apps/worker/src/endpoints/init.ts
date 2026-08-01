@@ -1,5 +1,9 @@
 import { status } from 'itty-router'
-import { GameState } from '@knucklebones/common'
+import {
+  GameState,
+  idempotentInitializeGameResultSchema,
+  initGameQuerySchema
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type MutationRequestWithProps } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
@@ -23,6 +27,16 @@ export async function init(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
+  const query = initGameQuerySchema.safeParse(request.query ?? {})
+  if (!query.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_GAME_SETTINGS',
+      message: 'The game settings are invalid.',
+      requestId: request.requestId
+    })
+  }
+
   const gameSettings = parseGameSettingsQuery(request.query)
 
   if (!gameSettings.success) {
@@ -34,13 +48,15 @@ export async function init(
     })
   }
 
-  const result = await getGameStateDurableObject(request).initializeGame({
-    mutationId: request.mutationId,
-    playerId: request.playerId,
-    displayName: request.query?.displayName,
-    difficulty: gameSettings.value.difficulty,
-    boType: gameSettings.value.boType
-  })
+  const result = idempotentInitializeGameResultSchema.parse(
+    await getGameStateDurableObject(request).initializeGame({
+      mutationId: request.mutationId,
+      playerId: request.playerId,
+      displayName: query.data.displayName,
+      difficulty: gameSettings.value.difficulty,
+      boType: gameSettings.value.boType
+    })
+  )
 
   if (result.idempotencyStatus === 'conflict') {
     return idempotencyConflict(request.requestId)

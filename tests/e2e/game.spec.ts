@@ -79,11 +79,25 @@ test('starts a hard BO1 AI game with valid versioned state updates', async ({
     expect(message).toMatchObject({
       type: 'game.state',
       version: 1,
-      boType: 1
+      requestId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      ),
+      payload: {
+        roomKey: expect.stringMatching(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+        ),
+        gameState: { boType: 1 }
+      }
     })
     if (index > 0) {
-      expect(message.revision).toBeGreaterThan(
-        gameStateMessages[index - 1].revision as number
+      const gameState = (message.payload as Record<string, unknown>)
+        .gameState as Record<string, unknown>
+      const previousGameState = (
+        gameStateMessages[index - 1].payload as Record<string, unknown>
+      ).gameState as Record<string, unknown>
+
+      expect(gameState.revision).toBeGreaterThan(
+        previousGameState.revision as number
       )
     }
   }
