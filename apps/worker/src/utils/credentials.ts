@@ -8,6 +8,13 @@ export function createCredential(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
 }
 
+export function createRecoveryPhrase(): string {
+  const secret = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
+  const groups = secret.match(/.{4}/g)
+
+  return `knucklebones-recovery-v1.${groups!.join('.')}`
+}
+
 export interface CreatedDeviceCredential {
   credentialId: string
   credential: string

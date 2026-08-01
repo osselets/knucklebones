@@ -3,9 +3,11 @@ import { createTestHarness, type TestHarness } from 'wrangler'
 import {
   apiErrorBodySchema,
   deviceCredentialListSchema,
+  identityRecoverySchema,
   identityTransferSchema,
   matchmakingStatusSchema,
   playerCredentialsSchema,
+  playerIdentityBootstrapSchema,
   rankedProfileSchema,
   webSocketTicketSchema,
   type PlayerCredentials
@@ -371,6 +373,98 @@ describe('one-time identity transfers', () => {
     ])
     expect(sourceVerification.status).toBe(401)
     expect(importedVerification.status).toBe(204)
+  })
+})
+
+describe('identity recovery', () => {
+  async function createRecoveryIdentity() {
+    const response = await request('/players', { method: 'POST' })
+    expect(response.status).toBe(201)
+    return playerIdentityBootstrapSchema.parse(await response.json())
+  }
+
+  async function redeemRecovery(
+    recoveryPhrase: string,
+    revokeOtherDevices = false
+  ) {
+    return await request('/v1/identity/recovery/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recoveryPhrase, revokeOtherDevices })
+    })
+  }
+
+  it('stores only a verifier for the initial 128-bit recovery phrase', async () => {
+    const identity = await createRecoveryIdentity()
+    const environment = await server.getWorker().getEnv()
+    const recovery = await environment.PLAYERS_DB.prepare(
+      'SELECT verifier_hash FROM recovery_credentials WHERE player_id = ?'
+    )
+      .bind(identity.playerId)
+      .first<{ verifier_hash: string }>()
+
+    expect(identity.recoveryPhrase).toMatch(
+      /^knucklebones-recovery-v1(?:\.[0-9a-f]{4}){8}$/
+    )
+    expect(recovery?.verifier_hash).toMatch(/^[0-9a-f]{64}$/)
+    expect(recovery?.verifier_hash).not.toContain(identity.recoveryPhrase)
+  })
+
+  it('atomically recovers once and rotates the phrase', async () => {
+    const source = await createRecoveryIdentity()
+    const responses = await Promise.all([
+      redeemRecovery(source.recoveryPhrase.toUpperCase()),
+      redeemRecovery(source.recoveryPhrase)
+    ])
+
+    expect(responses.map(({ status }) => status).sort()).toEqual([201, 410])
+    const success = responses.find(({ status }) => status === 201)!
+    const recovered = identityRecoverySchema.parse(await success.json())
+    expect(recovered.playerId).toBe(source.playerId)
+    expect(recovered.credential).not.toBe(source.credential)
+    expect(recovered.recoveryPhrase).not.toBe(source.recoveryPhrase)
+
+    const replay = await redeemRecovery(source.recoveryPhrase)
+    expect(replay.status).toBe(410)
+
+    const replacement = await redeemRecovery(recovered.recoveryPhrase)
+    expect(replacement.status).toBe(201)
+  })
+
+  it('regenerates recovery for an authenticated existing device', async () => {
+    const source = await createRecoveryIdentity()
+    const rotation = await request('/v1/identity/recovery/rotate', {
+      method: 'POST',
+      headers: authorization(source)
+    })
+    expect(rotation.status).toBe(201)
+
+    const oldRecovery = await redeemRecovery(source.recoveryPhrase)
+    const sourceVerification = await request(
+      `/players/${source.playerId}/verify`,
+      { method: 'POST', headers: authorization(source) }
+    )
+    expect(oldRecovery.status).toBe(410)
+    expect(sourceVerification.status).toBe(204)
+  })
+
+  it('can revoke all source devices while recovering', async () => {
+    const source = await createRecoveryIdentity()
+    const response = await redeemRecovery(source.recoveryPhrase, true)
+    const recovered = identityRecoverySchema.parse(await response.json())
+
+    const [sourceVerification, recoveredVerification] = await Promise.all([
+      request(`/players/${source.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(source)
+      }),
+      request(`/players/${recovered.playerId}/verify`, {
+        method: 'POST',
+        headers: authorization(recovered)
+      })
+    ])
+    expect(sourceVerification.status).toBe(401)
+    expect(recoveredVerification.status).toBe(204)
   })
 })
 

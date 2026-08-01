@@ -1,7 +1,11 @@
 import { z } from 'zod/mini'
 import {
   type IdentityTransfer,
+  type IdentityRecovery,
+  type IdentityRecoveryPhrase,
   type PlayerCredentials,
+  type PlayerIdentityBootstrap,
+  type RedeemIdentityRecoveryRequest,
   type RedeemIdentityTransferRequest,
   type WebSocketTicket
 } from '../types'
@@ -9,13 +13,35 @@ import {
   credentialIdSchema,
   credentialSchema,
   playerCredentialSchema,
-  playerIdSchema
+  playerIdSchema,
+  recoveryPhraseSchema
 } from './identifiers'
 
 export const playerCredentialsSchema = z.object({
   playerId: playerIdSchema,
   credential: playerCredentialSchema
 }) satisfies z.ZodMiniType<PlayerCredentials>
+
+export const playerIdentityBootstrapSchema = z.object({
+  playerId: playerIdSchema,
+  credential: playerCredentialSchema,
+  recoveryPhrase: recoveryPhraseSchema
+}) satisfies z.ZodMiniType<PlayerIdentityBootstrap>
+
+export const identityRecoverySchema = z.object({
+  playerId: playerIdSchema,
+  credential: playerCredentialSchema,
+  recoveryPhrase: recoveryPhraseSchema
+}) satisfies z.ZodMiniType<IdentityRecovery>
+
+export const identityRecoveryPhraseSchema = z.object({
+  recoveryPhrase: recoveryPhraseSchema
+}) satisfies z.ZodMiniType<IdentityRecoveryPhrase>
+
+export const redeemIdentityRecoveryRequestSchema = z.strictObject({
+  recoveryPhrase: recoveryPhraseSchema,
+  revokeOtherDevices: z.optional(z.boolean())
+}) satisfies z.ZodMiniType<RedeemIdentityRecoveryRequest>
 
 export const identityTransferSchema = z.object({
   transferToken: credentialSchema,
