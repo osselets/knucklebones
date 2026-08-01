@@ -27,7 +27,10 @@ export function apiError({
     } satisfies ApiErrorBody,
     {
       status,
-      headers: { 'X-Request-Id': requestId }
+      headers: {
+        'X-Request-Id': requestId,
+        'X-Knucklebones-Error-Code': code
+      }
     }
   )
 }

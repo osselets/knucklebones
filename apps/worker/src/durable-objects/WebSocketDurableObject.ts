@@ -15,6 +15,7 @@ import {
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { createCredential, hashCredential } from '../utils/credentials'
 import { apiError } from '../utils/http'
+import { recordOperationalEvent } from '../utils/observability'
 
 const WEB_SOCKET_TICKET_TTL_MS = 30_000
 const WEB_SOCKET_TICKETS_STORAGE_KEY = 'websocket-tickets'
@@ -186,9 +187,23 @@ export class WebSocketDurableObject {
       )
       await this.reportPresence(session, true)
     }
+
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'websocket.connection',
+      outcome: 'accepted',
+      role: session.role,
+      player_connection_count: this.state.getWebSockets(
+        `player:${session.playerId}`
+      ).length
+    })
   }
 
   async webSocketMessage(webSocket: WebSocket) {
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'websocket.message',
+      outcome: 'rejected',
+      reason: 'client-messages-disabled'
+    })
     webSocket.close(1008, 'Client messages are not supported.')
   }
 
@@ -212,12 +227,28 @@ export class WebSocketDurableObject {
     }
 
     if (!wasClean) {
-      this.sentry.captureMessage(`${code} - ${reason}`, 'error')
+      this.sentry.captureMessage(
+        `WebSocket closed unexpectedly with code ${code}.`,
+        'error'
+      )
     }
+
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'websocket.connection',
+      outcome: 'closed',
+      clean: wasClean,
+      close_code: code,
+      final_player_connection:
+        session !== undefined && !this.hasOpenSession(session.playerId)
+    })
   }
 
   async webSocketError(webSocket: WebSocket, error: unknown) {
     this.sentry.captureException(error)
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'websocket.connection',
+      outcome: 'error'
+    })
   }
 
   broadcast(message: string) {
