@@ -1,4 +1,5 @@
 import {
+  credentialIdSchema,
   displayNameSchema,
   gamePlayerIdSchema,
   playerIdSchema,
@@ -34,6 +35,18 @@ export function validateRequestPath(
     return roomKeySchema.safeParse(segments[2]).success
       ? undefined
       : invalidRouteParameters(request.requestId)
+  }
+
+  if (segments[0] === 'v1' && segments[1] === 'identity') {
+    if (
+      request.method === 'DELETE' &&
+      segments[2] === 'credentials' &&
+      !credentialIdSchema.safeParse(segments[3]).success
+    ) {
+      return invalidRouteParameters(request.requestId)
+    }
+
+    return
   }
 
   if (segments.length >= 3) {

@@ -2,12 +2,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createTestHarness, type TestHarness } from 'wrangler'
 import {
   apiErrorBodySchema,
+  deviceCredentialListSchema,
   matchmakingStatusSchema,
   playerCredentialsSchema,
   rankedProfileSchema,
   webSocketTicketSchema,
   type PlayerCredentials
 } from '@knucklebones/common'
+import {
+  createDeviceCredential,
+  hashCredential
+} from '../src/utils/credentials'
 
 const workerConfigPath = new URL('../wrangler.toml', import.meta.url).pathname
 
@@ -131,6 +136,144 @@ describe('player identities and ranked profiles', () => {
     expect(malformed.status).toBe(401)
     expect(incorrect.status).toBe(401)
     expect(valid.status).toBe(204)
+  })
+})
+
+describe('device credential lifecycle', () => {
+  it('authenticates a migrated legacy credential', async () => {
+    const player = await createPlayer()
+    const legacyCredential = 'b'.repeat(64)
+    const environment = await server.getWorker().getEnv()
+    await environment.PLAYERS_DB.prepare(
+      `INSERT INTO device_credentials
+        (credential_id, player_id, secret_hash, created_at)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(
+        crypto.randomUUID(),
+        player.playerId,
+        await hashCredential(legacyCredential),
+        Date.now()
+      )
+      .run()
+
+    const verification = await request(`/players/${player.playerId}/verify`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${legacyCredential}` }
+    })
+
+    expect(verification.status).toBe(204)
+  })
+
+  it('rotates the current credential and rejects the revoked secret', async () => {
+    const player = await createPlayer()
+    expect(player.credential).toMatch(/^[0-9a-f-]{36}_[0-9a-f]{64}$/)
+
+    const initialList = await request('/v1/identity/credentials', {
+      headers: authorization(player)
+    })
+    expect(initialList.status).toBe(200)
+    expect(deviceCredentialListSchema.parse(await initialList.json())).toEqual([
+      expect.objectContaining({ current: true })
+    ])
+
+    const rotation = await request('/v1/identity/credentials/rotate', {
+      method: 'POST',
+      headers: authorization(player)
+    })
+    expect(rotation.status).toBe(201)
+    const rotated = playerCredentialsSchema.parse(await rotation.json())
+
+    const revokedVerification = await request(
+      `/players/${player.playerId}/verify`,
+      { method: 'POST', headers: authorization(player) }
+    )
+    const rotatedVerification = await request(
+      `/players/${player.playerId}/verify`,
+      { method: 'POST', headers: authorization(rotated) }
+    )
+
+    expect(revokedVerification.status).toBe(401)
+    expect(rotatedVerification.status).toBe(204)
+  })
+
+  it('revokes every other active device without revoking the caller', async () => {
+    const player = await createPlayer()
+    const otherDevice = await createDeviceCredential()
+    const environment = await server.getWorker().getEnv()
+    await environment.PLAYERS_DB.prepare(
+      `INSERT INTO device_credentials
+        (credential_id, player_id, secret_hash, created_at)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(
+        otherDevice.credentialId,
+        player.playerId,
+        otherDevice.secretHash,
+        Date.now()
+      )
+      .run()
+
+    const revoke = await request('/v1/identity/credentials/revoke-others', {
+      method: 'POST',
+      headers: authorization(player)
+    })
+    const currentVerification = await request(
+      `/players/${player.playerId}/verify`,
+      { method: 'POST', headers: authorization(player) }
+    )
+    const otherVerification = await request(
+      `/players/${player.playerId}/verify`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${otherDevice.credential}`
+        }
+      }
+    )
+
+    expect(revoke.status).toBe(204)
+    expect(currentVerification.status).toBe(204)
+    expect(otherVerification.status).toBe(401)
+  })
+
+  it('revokes a selected device but protects the current credential', async () => {
+    const player = await createPlayer()
+    const otherDevice = await createDeviceCredential()
+    const [currentCredentialId] = player.credential.split('_')
+    const environment = await server.getWorker().getEnv()
+    await environment.PLAYERS_DB.prepare(
+      `INSERT INTO device_credentials
+        (credential_id, player_id, secret_hash, created_at)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(
+        otherDevice.credentialId,
+        player.playerId,
+        otherDevice.secretHash,
+        Date.now()
+      )
+      .run()
+
+    const currentRevoke = await request(
+      `/v1/identity/credentials/${currentCredentialId}`,
+      { method: 'DELETE', headers: authorization(player) }
+    )
+    const otherRevoke = await request(
+      `/v1/identity/credentials/${otherDevice.credentialId}`,
+      { method: 'DELETE', headers: authorization(player) }
+    )
+    const otherVerification = await request(
+      `/players/${player.playerId}/verify`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherDevice.credential}` }
+      }
+    )
+
+    expect(currentRevoke.status).toBe(409)
+    expect(otherRevoke.status).toBe(204)
+    expect(otherVerification.status).toBe(401)
   })
 })
 

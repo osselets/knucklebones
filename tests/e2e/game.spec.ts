@@ -37,7 +37,9 @@ test('keeps a UUID identity private behind a persistent friendly name', async ({
   expect(originalIdentity.playerId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
   )
-  expect(originalIdentity.playerCredential).toMatch(/^[0-9a-f]{64}$/)
+  expect(originalIdentity.playerCredential).toMatch(
+    /^(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_)?[0-9a-f]{64}$/
+  )
   expect(originalIdentity.displayName).not.toBe(originalIdentity.playerId)
 
   await page.reload()

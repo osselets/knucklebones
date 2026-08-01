@@ -12,5 +12,11 @@ export interface WebSocketTicket {
 
 export interface AuthenticatedPrincipal {
   playerId: string
-  credentialId?: string
+  credentialId: string
+}
+
+export interface DeviceCredentialSummary {
+  credentialId: string
+  createdAt: number
+  current: boolean
 }

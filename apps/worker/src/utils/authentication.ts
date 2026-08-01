@@ -1,6 +1,8 @@
 import {
   AI_PLAYER_ID,
+  credentialIdSchema,
   credentialSchema,
+  playerCredentialSchema,
   playerIdSchema
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
@@ -8,11 +10,17 @@ import {
   type AuthenticatedRequestWithProps,
   type RequestWithId
 } from '../types/itty'
-import { hashCredential } from './credentials'
+import {
+  constantTimeEqual,
+  hashCredential,
+  parseDeviceCredential
+} from './credentials'
 import { apiError } from './http'
 
-interface PlayerIdentityRow {
+interface DeviceCredentialRow {
+  credential_id: string
   player_id: string
+  secret_hash: string
 }
 
 interface PlayerRequest extends RequestWithId {
@@ -35,16 +43,26 @@ export async function authenticatePlayerRequest(
     })
   }
 
-  const credentialHash = await hashCredential(credential)
-  const identity = await cloudflareEnvironment.PLAYERS_DB.prepare(
-    'SELECT player_id FROM players WHERE credential_hash = ?'
+  const { credentialId, secret } = parseDeviceCredential(credential)
+  const credentialHash = await hashCredential(secret)
+  const identity = await findDeviceCredential(
+    cloudflareEnvironment.PLAYERS_DB,
+    credentialId,
+    credentialHash
   )
-    .bind(credentialHash)
-    .first<PlayerIdentityRow>()
 
   const authenticatedPlayerId = playerIdSchema.safeParse(identity?.player_id)
+  const authenticatedCredentialId = credentialIdSchema.safeParse(
+    identity?.credential_id
+  )
+  const storedHash = credentialSchema.safeParse(identity?.secret_hash)
 
-  if (!authenticatedPlayerId.success) {
+  if (
+    !authenticatedPlayerId.success ||
+    !authenticatedCredentialId.success ||
+    !storedHash.success ||
+    !constantTimeEqual(credentialHash, storedHash.data)
+  ) {
     return apiError({
       status: 401,
       code: 'INVALID_PLAYER_CREDENTIAL',
@@ -53,7 +71,10 @@ export async function authenticatePlayerRequest(
     })
   }
 
-  request.principal = { playerId: authenticatedPlayerId.data }
+  request.principal = {
+    playerId: authenticatedPlayerId.data,
+    credentialId: authenticatedCredentialId.data
+  }
 
   const isAiSetup =
     request.playerId === AI_PLAYER_ID &&
@@ -79,8 +100,34 @@ function getBearerCredential(authorization: string | null): string | undefined {
     return undefined
   }
 
-  const credential = credentialSchema.safeParse(
+  const credential = playerCredentialSchema.safeParse(
     authorization.slice(prefix.length)
   )
   return credential.success ? credential.data : undefined
+}
+
+async function findDeviceCredential(
+  database: D1Database,
+  credentialId: string | undefined,
+  credentialHash: string
+): Promise<DeviceCredentialRow | null> {
+  if (credentialId !== undefined) {
+    return await database
+      .prepare(
+        `SELECT credential_id, player_id, secret_hash
+         FROM device_credentials
+         WHERE credential_id = ? AND revoked_at IS NULL`
+      )
+      .bind(credentialId)
+      .first<DeviceCredentialRow>()
+  }
+
+  return await database
+    .prepare(
+      `SELECT credential_id, player_id, secret_hash
+       FROM device_credentials
+       WHERE secret_hash = ? AND revoked_at IS NULL`
+    )
+    .bind(credentialHash)
+    .first<DeviceCredentialRow>()
 }
