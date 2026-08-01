@@ -110,6 +110,7 @@ export class MatchmakingDurableObject {
     const assignment = state.assignments[playerId]
 
     if (assignment !== undefined) {
+      await this.configureRankedRoom(assignment)
       return this.statusResponse({ status: 'matched', match: assignment })
     }
 
@@ -124,7 +125,7 @@ export class MatchmakingDurableObject {
       existingEntry.lastSeenAt = now
     }
 
-    this.matchOldestEligiblePlayer(state, now)
+    await this.matchOldestEligiblePlayer(state, now)
     await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
 
     return this.getPlayerStatus(state, playerId)
@@ -133,13 +134,17 @@ export class MatchmakingDurableObject {
   private async getStatus(playerId: string): Promise<Response> {
     const now = Date.now()
     const state = await this.getActiveState(now)
+    const assignment = state.assignments[playerId]
+    if (assignment !== undefined) {
+      await this.configureRankedRoom(assignment)
+    }
     const entry = state.waiting.find(
       (candidate) => candidate.playerId === playerId
     )
 
     if (entry !== undefined) {
       entry.lastSeenAt = now
-      this.matchPlayerIfEligible(state, entry, now)
+      await this.matchPlayerIfEligible(state, entry, now)
     }
 
     await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
@@ -169,7 +174,10 @@ export class MatchmakingDurableObject {
     return state
   }
 
-  private matchOldestEligiblePlayer(state: MatchmakingState, now: number) {
+  private async matchOldestEligiblePlayer(
+    state: MatchmakingState,
+    now: number
+  ) {
     const entry = [...state.waiting]
       .sort((left, right) => left.joinedAt - right.joinedAt)
       .find(
@@ -177,11 +185,11 @@ export class MatchmakingDurableObject {
       )
 
     if (entry !== undefined) {
-      this.matchPlayerIfEligible(state, entry, now)
+      await this.matchPlayerIfEligible(state, entry, now)
     }
   }
 
-  private matchPlayerIfEligible(
+  private async matchPlayerIfEligible(
     state: MatchmakingState,
     entry: QueueEntry,
     now: number
@@ -213,6 +221,8 @@ export class MatchmakingDurableObject {
       createdAt: now
     }
 
+    await this.configureRankedRoom(match)
+
     state.waiting = state.waiting.filter(
       (candidate) =>
         candidate.playerId !== entry.playerId &&
@@ -220,6 +230,27 @@ export class MatchmakingDurableObject {
     )
     state.assignments[entry.playerId] = match
     state.assignments[opponent.playerId] = match
+  }
+
+  private async configureRankedRoom(
+    assignment: RankedMatchAssignment
+  ): Promise<void> {
+    const id = this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      assignment.roomKey
+    )
+    const room = this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.get(id)
+    const response = await room.fetch(
+      'https://itty-durable/do/call/configureRankedMatch',
+      {
+        headers: {
+          'do-name': assignment.roomKey,
+          'do-content': JSON.stringify([assignment])
+        }
+      }
+    )
+    if (!response.ok) {
+      throw new Error('The ranked game room rejected its assignment.')
+    }
   }
 
   private getPlayerStatus(state: MatchmakingState, playerId: string): Response {

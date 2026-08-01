@@ -5,6 +5,7 @@ import {
   gameStateSchema,
   type IGameState,
   type ILobby,
+  type IPlayer,
   type IdempotentMutationResult,
   type InitializeGameCommand,
   type InitializeGameResult,
@@ -22,6 +23,8 @@ import {
   type RematchGameResult,
   rematchGameCommandSchema,
   rematchGameResultSchema,
+  type RankedMatchAssignment,
+  rankedMatchAssignmentSchema,
   roomKeySchema,
   toGameStateMessage,
   type UpdateDisplayNameResult,
@@ -59,6 +62,8 @@ export class GameStateDurableObject extends createDurable({
   connectedPlayers: Record<string, boolean>
   reconnectDeadlines: Record<string, number>
   pendingDisconnectBroadcast?: IGameState
+  rankedMatch?: RankedMatchAssignment
+  rankedPlayerClaims: Record<string, IPlayer>
 
   constructor(
     state: DurableObjectState,
@@ -69,6 +74,27 @@ export class GameStateDurableObject extends createDurable({
     this.processedMutations = {}
     this.connectedPlayers = {}
     this.reconnectDeadlines = {}
+    this.rankedPlayerClaims = {}
+  }
+
+  configureRankedMatch(assignment: RankedMatchAssignment): void {
+    const parsedAssignment = rankedMatchAssignmentSchema.parse(assignment)
+    if (this.rankedMatch !== undefined) {
+      if (
+        JSON.stringify(this.rankedMatch) === JSON.stringify(parsedAssignment)
+      ) {
+        return
+      }
+      throw new Error('The ranked room already has another assignment.')
+    }
+
+    if (this.gameState !== undefined || this.lobby.players.length > 0) {
+      throw new Error('The ranked room was already initialized.')
+    }
+
+    this.rankedMatch = parsedAssignment
+    this.rankedPlayerClaims = {}
+    this.configureDisconnectPolicy(parsedAssignment.roomKey)
   }
 
   configureDisconnectPolicy(
@@ -94,6 +120,25 @@ export class GameStateDurableObject extends createDurable({
     }
     if (this.disconnectPolicy === undefined) {
       return { status: 'disabled' }
+    }
+
+    if (this.gameState === undefined && this.rankedMatch !== undefined) {
+      const isAssignedPlayer =
+        parsedPlayerId === this.rankedMatch.playerOneId ||
+        parsedPlayerId === this.rankedMatch.playerTwoId
+      if (!isAssignedPlayer) {
+        return { status: 'ignored' }
+      }
+
+      const changed = this.connectedPlayers[parsedPlayerId] !== connected
+      this.connectedPlayers[parsedPlayerId] = connected
+      return changed
+        ? {
+            status: 'updated',
+            playerId: parsedPlayerId,
+            connected
+          }
+        : { status: 'unchanged' }
     }
 
     const gameState = this.readPlayerGameState(parsedPlayerId)
@@ -251,6 +296,15 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'existing', gameState: serializedGameState }
     }
 
+    if (this.rankedMatch !== undefined) {
+      return this.applyRankedInitializeGame({
+        playerId,
+        displayName,
+        difficulty,
+        boType
+      })
+    }
+
     const lobby = Lobby.fromJson(lobbySchema.parse(this.lobby))
     const player = new Player(playerId, displayName, difficulty)
 
@@ -269,6 +323,44 @@ export class GameStateDurableObject extends createDurable({
     const gameState = this.commitGameState(lobby.toGameState())
 
     return { status: 'created', gameState }
+  }
+
+  private applyRankedInitializeGame({
+    playerId,
+    displayName,
+    difficulty,
+    boType
+  }: Omit<InitializeGameCommand, 'mutationId'>): InitializeGameResult {
+    const assignment = this.rankedMatch!
+    if (
+      playerId !== assignment.playerOneId &&
+      playerId !== assignment.playerTwoId
+    ) {
+      return { status: 'not-assigned' }
+    }
+
+    if (difficulty !== undefined || (boType !== undefined && boType !== 1)) {
+      return { status: 'invalid-ranked-settings' }
+    }
+
+    this.rankedPlayerClaims[playerId] = new Player(
+      playerId,
+      displayName
+    ).toJson()
+    const playerOne = this.rankedPlayerClaims[assignment.playerOneId]
+    const playerTwo = this.rankedPlayerClaims[assignment.playerTwoId]
+    if (playerOne === undefined || playerTwo === undefined) {
+      return { status: 'waiting' }
+    }
+
+    const gameState = new GameState({
+      playerOne: Player.fromJson(playerOne),
+      playerTwo: Player.fromJson(playerTwo),
+      boType: 1
+    })
+    gameState.initialize()
+    this.rankedPlayerClaims = {}
+    return { status: 'created', gameState: this.commitGameState(gameState) }
   }
 
   play(command: PlayGameCommand): IdempotentMutationResult<PlayGameResult> {
@@ -333,6 +425,10 @@ export class GameStateDurableObject extends createDurable({
       playerId !== gameState.playerTwo.id
     ) {
       return { status: 'unknown-player' }
+    }
+
+    if (this.rankedMatch !== undefined) {
+      return { status: 'ranked-rematch-disabled' }
     }
 
     if (gameState.outcome === 'ongoing') {

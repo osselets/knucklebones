@@ -40,11 +40,19 @@ export type PresenceUpdateResult =
   | { status: 'adjudicated'; gameState: IGameState }
 
 export type InitializeGameResult =
-  | { status: 'waiting' }
+  | {
+      status: 'waiting' | 'not-assigned' | 'invalid-ranked-settings'
+    }
   | { status: 'created' | 'existing'; gameState: IGameState }
 
 export type RematchGameResult =
-  | { status: 'game-ongoing' | 'unchanged' | 'unknown-player' }
+  | {
+      status:
+        | 'game-ongoing'
+        | 'unchanged'
+        | 'unknown-player'
+        | 'ranked-rematch-disabled'
+    }
   | { status: 'updated'; gameState: IGameState }
 
 export type UpdateDisplayNameResult =

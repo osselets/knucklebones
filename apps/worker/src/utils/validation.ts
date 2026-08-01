@@ -49,6 +49,13 @@ export function validateRequestPath(
     return
   }
 
+  if (
+    segments[0] === 'v1' &&
+    (segments[1] === 'matchmaking' || segments[1] === 'ranked')
+  ) {
+    return
+  }
+
   if (segments.length >= 3) {
     const isValid =
       roomKeySchema.safeParse(segments[0]).success &&

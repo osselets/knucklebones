@@ -5,6 +5,7 @@ import {
   deviceCredentialListSchema,
   identityRecoverySchema,
   identityTransferSchema,
+  idempotentInitializeGameResultSchema,
   matchmakingStatusSchema,
   playerCredentialsSchema,
   playerIdentityBootstrapSchema,
@@ -98,7 +99,7 @@ describe('player identities and ranked profiles', () => {
   it('creates an authenticated UUID identity with a default rating', async () => {
     const player = await createPlayer()
 
-    const response = await request(`/players/${player.playerId}/rating`, {
+    const response = await request('/v1/ranked/profile', {
       headers: authorization(player)
     })
 
@@ -162,11 +163,16 @@ describe('player identities and ranked profiles', () => {
       method: 'POST',
       headers: authorization(player)
     })
+    const versioned = await request('/v1/identity/verify', {
+      method: 'POST',
+      headers: authorization(player)
+    })
 
     expect(missing.status).toBe(401)
     expect(malformed.status).toBe(401)
     expect(incorrect.status).toBe(401)
     expect(valid.status).toBe(204)
+    expect(versioned.status).toBe(204)
   })
 })
 
@@ -933,19 +939,28 @@ describe('WebSocket tickets', () => {
 })
 
 describe('ranked matchmaking', () => {
+  const joinQueue = (player: PlayerCredentials) =>
+    request('/v1/matchmaking/join', {
+      method: 'POST',
+      headers: authorization(player)
+    })
+  const getQueueStatus = (player: PlayerCredentials) =>
+    request('/v1/matchmaking/status', {
+      headers: authorization(player)
+    })
+  const leaveQueue = (player: PlayerCredentials) =>
+    request('/v1/matchmaking/queue', {
+      method: 'DELETE',
+      headers: authorization(player)
+    })
+
   it('keeps both players waiting during the fast selection window', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
 
     const [playerOneJoin, playerTwoJoin] = await Promise.all([
-      request(`/matchmaking/${playerOne.playerId}/join`, {
-        method: 'POST',
-        headers: authorization(playerOne)
-      }),
-      request(`/matchmaking/${playerTwo.playerId}/join`, {
-        method: 'POST',
-        headers: authorization(playerTwo)
-      })
+      joinQueue(playerOne),
+      joinQueue(playerTwo)
     ])
 
     expect(
@@ -960,20 +975,10 @@ describe('ranked matchmaking', () => {
     const player = await createPlayer()
 
     const first = matchmakingStatusSchema.parse(
-      await (
-        await request(`/matchmaking/${player.playerId}/join`, {
-          method: 'POST',
-          headers: authorization(player)
-        })
-      ).json()
+      await (await joinQueue(player)).json()
     )
     const duplicate = matchmakingStatusSchema.parse(
-      await (
-        await request(`/matchmaking/${player.playerId}/join`, {
-          method: 'POST',
-          headers: authorization(player)
-        })
-      ).json()
+      await (await joinQueue(player)).json()
     )
 
     expect(first.status).toBe('waiting')
@@ -983,25 +988,17 @@ describe('ranked matchmaking', () => {
   it('assigns two waiting players to the same BO1 room', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
+    const outsider = await createPlayer()
 
-    const firstJoin = await request(`/matchmaking/${playerOne.playerId}/join`, {
-      method: 'POST',
-      headers: authorization(playerOne)
-    })
+    const firstJoin = await joinQueue(playerOne)
     expect(matchmakingStatusSchema.parse(await firstJoin.json()).status).toBe(
       'waiting'
     )
 
     await new Promise((resolve) => setTimeout(resolve, 800))
 
-    const secondJoin = await request(
-      `/matchmaking/${playerTwo.playerId}/join`,
-      { method: 'POST', headers: authorization(playerTwo) }
-    )
-    const playerOneStatus = await request(
-      `/matchmaking/${playerOne.playerId}/status`,
-      { headers: authorization(playerOne) }
-    )
+    const secondJoin = await joinQueue(playerTwo)
+    const playerOneStatus = await getQueueStatus(playerOne)
     const playerTwoMatch = matchmakingStatusSchema.parse(
       await secondJoin.json()
     )
@@ -1024,26 +1021,145 @@ describe('ranked matchmaking', () => {
       playerOneId: playerOne.playerId,
       playerTwoId: playerTwo.playerId
     })
+
+    const environment = await server.getWorker().getEnv()
+    const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      playerOneMatch.match.roomKey
+    )
+    const room = environment.GAME_STATE_DURABLE_OBJECT.get(roomId)
+    const callRoom = async (method: string, args: unknown[]) => {
+      const response = await room.fetch(
+        `https://itty-durable/do/call/${method}`,
+        {
+          headers: {
+            'do-name': playerOneMatch.match.roomKey,
+            'do-content': JSON.stringify(args)
+          }
+        }
+      )
+      expect(response.ok).toBe(true)
+      return response.status === 204 ? undefined : await response.json()
+    }
+    expect(
+      await callRoom('updatePresence', [playerOne.playerId, true])
+    ).toMatchObject({ status: 'updated', connected: true })
+    expect(
+      await callRoom('updatePresence', [playerTwo.playerId, true])
+    ).toMatchObject({ status: 'updated', connected: true })
+
+    const initialize = (player: PlayerCredentials, body: unknown) =>
+      request(`/v1/rooms/${playerOneMatch.match.roomKey}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID()
+        },
+        body: JSON.stringify(body)
+      })
+    const outsiderClaim = await initialize(outsider, {
+      playerType: 'human',
+      boType: 1
+    })
+    const wrongSettings = await initialize(playerOne, {
+      playerType: 'human',
+      boType: 3
+    })
+    const playerTwoClaim = await initialize(playerTwo, {
+      playerType: 'human',
+      displayName: 'Player Two',
+      boType: 1
+    })
+    const playerOneClaim = await initialize(playerOne, {
+      playerType: 'human',
+      displayName: 'Player One',
+      boType: 1
+    })
+
+    expect(outsiderClaim.status).toBe(403)
+    await expect(outsiderClaim.json()).resolves.toMatchObject({
+      error: { code: 'NOT_ASSIGNED_TO_RANKED_MATCH' }
+    })
+    expect(wrongSettings.status).toBe(409)
+    await expect(wrongSettings.json()).resolves.toMatchObject({
+      error: { code: 'RANKED_SETTINGS_LOCKED' }
+    })
+    expect(playerTwoClaim.status).toBe(200)
+    expect(playerOneClaim.status).toBe(200)
+
+    const existing = idempotentInitializeGameResultSchema.parse(
+      await callRoom('initializeGame', [
+        {
+          mutationId: crypto.randomUUID(),
+          playerId: playerOne.playerId,
+          displayName: 'Player One',
+          boType: 1
+        }
+      ])
+    )
+    expect(existing.idempotencyStatus).toBe('applied')
+    if (
+      existing.idempotencyStatus !== 'conflict' &&
+      existing.value.status === 'existing'
+    ) {
+      expect(existing.value.gameState).toMatchObject({
+        playerOne: { id: playerOne.playerId },
+        playerTwo: { id: playerTwo.playerId },
+        boType: 1
+      })
+    } else {
+      throw new Error('Expected the initialized ranked room state.')
+    }
+
+    const disconnected = (await callRoom('updatePresence', [
+      playerOne.playerId,
+      false
+    ])) as PresenceUpdateResult
+    expect(disconnected).toMatchObject({
+      status: 'updated',
+      reconnectDeadline: expect.any(Number)
+    })
+    if (
+      disconnected.status !== 'updated' ||
+      disconnected.reconnectDeadline === undefined
+    ) {
+      throw new Error('Expected a ranked reconnect deadline.')
+    }
+    expect(
+      await callRoom('adjudicateDisconnects', [disconnected.reconnectDeadline])
+    ).toMatchObject({
+      status: 'adjudicated',
+      gameState: {
+        finishReason: 'forfeit',
+        winnerId: playerTwo.playerId
+      }
+    })
+
+    const rematch = await request(
+      `/v1/rooms/${playerOneMatch.match.roomKey}/rematch`,
+      {
+        method: 'POST',
+        headers: {
+          ...authorization(playerOne),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID()
+        },
+        body: '{}'
+      }
+    )
+    expect(rematch.status).toBe(409)
+    await expect(rematch.json()).resolves.toMatchObject({
+      error: { code: 'RANKED_REMATCH_DISABLED' }
+    })
   })
 
   it('removes a waiting player from the queue', async () => {
     const player = await createPlayer()
 
-    await request(`/matchmaking/${player.playerId}/join`, {
-      method: 'POST',
-      headers: authorization(player)
-    })
-    const leave = await request(`/matchmaking/${player.playerId}/queue`, {
-      method: 'DELETE',
-      headers: authorization(player)
-    })
-    const duplicateLeave = await request(
-      `/matchmaking/${player.playerId}/queue`,
-      { method: 'DELETE', headers: authorization(player) }
-    )
-    const status = await request(`/matchmaking/${player.playerId}/status`, {
-      headers: authorization(player)
-    })
+    await joinQueue(player)
+    const leave = await leaveQueue(player)
+    const duplicateLeave = await leaveQueue(player)
+    const status = await getQueueStatus(player)
 
     expect(leave.status).toBe(204)
     expect(duplicateLeave.status).toBe(204)
@@ -1051,10 +1167,7 @@ describe('ranked matchmaking', () => {
       status: 'idle'
     })
 
-    const rejoin = await request(`/matchmaking/${player.playerId}/join`, {
-      method: 'POST',
-      headers: authorization(player)
-    })
+    const rejoin = await joinQueue(player)
     expect(matchmakingStatusSchema.parse(await rejoin.json()).status).toBe(
       'waiting'
     )
@@ -1070,10 +1183,7 @@ describe('ranked matchmaking', () => {
 
     const joinResponses = await Promise.all(
       [player, distantOpponent, closeOpponent].map(async (candidate) =>
-        request(`/matchmaking/${candidate.playerId}/join`, {
-          method: 'POST',
-          headers: authorization(candidate)
-        })
+        joinQueue(candidate)
       )
     )
     for (const response of joinResponses) {
@@ -1083,9 +1193,7 @@ describe('ranked matchmaking', () => {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 800))
-    const response = await request(`/matchmaking/${player.playerId}/status`, {
-      headers: authorization(player)
-    })
+    const response = await getQueueStatus(player)
     const match = matchmakingStatusSchema.parse(await response.json())
 
     expect(match.status).toBe('matched')
@@ -1105,18 +1213,11 @@ describe('ranked matchmaking', () => {
     await setRating(opponent.playerId, 2400)
 
     await Promise.all(
-      [player, opponent].map(async (candidate) =>
-        request(`/matchmaking/${candidate.playerId}/join`, {
-          method: 'POST',
-          headers: authorization(candidate)
-        })
-      )
+      [player, opponent].map(async (candidate) => joinQueue(candidate))
     )
 
     await new Promise((resolve) => setTimeout(resolve, 800))
-    const response = await request(`/matchmaking/${player.playerId}/status`, {
-      headers: authorization(player)
-    })
+    const response = await getQueueStatus(player)
 
     expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(
       'matched'

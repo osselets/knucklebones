@@ -126,6 +126,15 @@ async function executeRematch(
     })
   }
 
+  if (mutation.status === 'ranked-rematch-disabled') {
+    return apiError({
+      status: 409,
+      code: 'RANKED_REMATCH_DISABLED',
+      message: 'Ranked BO1 matches cannot be rematched in the same room.',
+      requestId: request.requestId
+    })
+  }
+
   if (mutation.status === 'updated') {
     const gameState = GameState.fromJson(mutation.gameState)
     await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)

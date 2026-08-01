@@ -127,7 +127,25 @@ async function executeInitializeGame(
 
   const mutation = result.value
 
-  if (mutation.status !== 'waiting') {
+  if (mutation.status === 'not-assigned') {
+    return apiError({
+      status: 403,
+      code: 'NOT_ASSIGNED_TO_RANKED_MATCH',
+      message: 'This player is not assigned to the ranked match.',
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'invalid-ranked-settings') {
+    return apiError({
+      status: 409,
+      code: 'RANKED_SETTINGS_LOCKED',
+      message: 'Ranked match settings cannot be changed.',
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'created' || mutation.status === 'existing') {
     const gameState = GameState.fromJson(mutation.gameState)
     await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
 
