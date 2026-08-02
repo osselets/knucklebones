@@ -14,7 +14,7 @@ import {
 import { storeRankedMatchAssignment } from '../utils/rankedMatchStorage'
 import { Button } from './Button'
 
-const MATCHMAKING_POLL_MS = 300
+const MATCHMAKING_POLL_MS = 500
 const MATCHMAKING_RETRY_MS = 1_000
 
 export function RankedMatchmaking() {

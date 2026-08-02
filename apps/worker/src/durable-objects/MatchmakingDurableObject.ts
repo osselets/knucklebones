@@ -153,23 +153,10 @@ export class MatchmakingDurableObject {
   private async join(playerId: string, rating: number): Promise<Response> {
     const now = Date.now()
     const state = await this.getActiveState(now)
-    const activeMatch = await getActiveRankedMatchForPlayer(
-      this.cloudflareEnvironment.PLAYERS_DB,
-      playerId,
-      now
-    )
-    if (activeMatch !== undefined) {
-      await this.persistState(state, now)
-      await this.configureRankedRoom(activeMatch.assignment)
-      return this.statusResponse({
-        status: 'matched',
-        match: activeMatch.assignment
-      })
-    }
-
     const assignment = state.assignments[playerId]
 
     if (assignment !== undefined) {
+      await this.persistState(state, now)
       await this.configureRankedRoom(assignment)
       return this.statusResponse({ status: 'matched', match: assignment })
     }
@@ -179,6 +166,19 @@ export class MatchmakingDurableObject {
     )
 
     if (existingEntry === undefined) {
+      const activeMatch = await getActiveRankedMatchForPlayer(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        playerId,
+        now
+      )
+      if (activeMatch !== undefined) {
+        await this.persistState(state, now)
+        await this.configureRankedRoom(activeMatch.assignment)
+        return this.statusResponse({
+          status: 'matched',
+          match: activeMatch.assignment
+        })
+      }
       state.waiting.push({ playerId, rating, joinedAt: now, lastSeenAt: now })
     } else {
       existingEntry.rating = rating
@@ -194,6 +194,23 @@ export class MatchmakingDurableObject {
   private async getStatus(playerId: string): Promise<Response> {
     const now = Date.now()
     const state = await this.getActiveState(now)
+    const assignment = state.assignments[playerId]
+    if (assignment !== undefined) {
+      await this.configureRankedRoom(assignment)
+      await this.persistState(state, now)
+      return this.statusResponse({ status: 'matched', match: assignment })
+    }
+    const entry = state.waiting.find(
+      (candidate) => candidate.playerId === playerId
+    )
+
+    if (entry !== undefined) {
+      entry.lastSeenAt = now
+      await this.matchEligiblePlayers(state, now)
+      await this.persistState(state, now)
+      return this.getPlayerStatus(state, playerId)
+    }
+
     const activeMatch = await getActiveRankedMatchForPlayer(
       this.cloudflareEnvironment.PLAYERS_DB,
       playerId,
@@ -208,21 +225,8 @@ export class MatchmakingDurableObject {
       })
     }
 
-    const assignment = state.assignments[playerId]
-    if (assignment !== undefined) {
-      await this.configureRankedRoom(assignment)
-    }
-    const entry = state.waiting.find(
-      (candidate) => candidate.playerId === playerId
-    )
-
-    if (entry !== undefined) {
-      entry.lastSeenAt = now
-    }
-
-    await this.matchEligiblePlayers(state, now)
     await this.persistState(state, now)
-    return this.getPlayerStatus(state, playerId)
+    return this.statusResponse({ status: 'idle' })
   }
 
   private async leave(playerId: string): Promise<Response> {
