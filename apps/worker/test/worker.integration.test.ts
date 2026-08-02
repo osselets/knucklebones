@@ -1138,7 +1138,7 @@ describe('ranked matchmaking', () => {
       headers: authorization(player)
     })
 
-  it('keeps both players waiting during the fast selection window', async () => {
+  it('matches compatible players after the fast selection window', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
 
@@ -1153,6 +1153,26 @@ describe('ranked matchmaking', () => {
     expect(
       matchmakingStatusSchema.parse(await playerTwoJoin.json()).status
     ).toBe('waiting')
+
+    await new Promise((resolve) => setTimeout(resolve, 650))
+
+    const environment = await server.getWorker().getEnv()
+    const activeMatch = await environment.PLAYERS_DB.prepare(
+      `SELECT player_one_id, player_two_id
+       FROM active_ranked_matches
+       WHERE player_one_id IN (?, ?) OR player_two_id IN (?, ?)`
+    )
+      .bind(
+        playerOne.playerId,
+        playerTwo.playerId,
+        playerOne.playerId,
+        playerTwo.playerId
+      )
+      .first<{ player_one_id: string; player_two_id: string }>()
+    expect(activeMatch).toEqual({
+      player_one_id: playerOne.playerId,
+      player_two_id: playerTwo.playerId
+    })
   })
 
   it('does not reset the selection window when a player joins twice', async () => {
@@ -1535,7 +1555,7 @@ describe('ranked matchmaking', () => {
     ])
   })
 
-  it('falls back to a distant opponent instead of waiting indefinitely', async () => {
+  it('waits briefly before falling back to a distant opponent', async () => {
     const player = await createPlayer()
     const opponent = await createPlayer()
     await setRating(player.playerId, 800)
@@ -1546,6 +1566,12 @@ describe('ranked matchmaking', () => {
     )
 
     await new Promise((resolve) => setTimeout(resolve, 800))
+    const waiting = await getQueueStatus(player)
+    expect(matchmakingStatusSchema.parse(await waiting.json()).status).toBe(
+      'waiting'
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, 2_400))
     const response = await getQueueStatus(player)
 
     expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(

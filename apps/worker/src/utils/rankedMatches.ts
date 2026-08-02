@@ -385,6 +385,20 @@ export async function releaseRankedMatch(
     .run()
 }
 
+export async function expireRankedAssignment(
+  database: D1Database,
+  matchId: string,
+  now = Date.now()
+): Promise<void> {
+  await database
+    .prepare(
+      `DELETE FROM active_ranked_matches
+       WHERE match_id = ? AND state = 'assigned' AND expires_at <= ?`
+    )
+    .bind(matchId, now)
+    .run()
+}
+
 async function getRankedMatchSettlement(
   database: D1Database,
   matchId: string

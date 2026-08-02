@@ -11,13 +11,16 @@ import {
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { apiError } from '../utils/http'
 import {
+  expireRankedAssignment,
   getActiveRankedMatchForPlayer,
   releaseRankedMatch,
   reserveRankedMatch
 } from '../utils/rankedMatches'
 
 const MATCHMAKING_STATE_KEY = 'matchmaking-state'
-const RATING_SELECTION_WINDOW_MS = 750
+const RATING_SELECTION_WINDOW_MS = 500
+const PREFERRED_RATING_DIFFERENCE = 100
+const DISTANT_OPPONENT_WAIT_MS = 3_000
 const QUEUE_ENTRY_TTL_MS = 15_000
 const MATCH_ASSIGNMENT_TTL_MS = 15_000
 
@@ -110,6 +113,13 @@ export class MatchmakingDurableObject {
     }
   }
 
+  async alarm(): Promise<void> {
+    const now = Date.now()
+    const state = await this.getActiveState(now)
+    await this.matchEligiblePlayers(state, now)
+    await this.persistState(state, now)
+  }
+
   private async join(playerId: string, rating: number): Promise<Response> {
     const now = Date.now()
     const activeMatch = await getActiveRankedMatchForPlayer(
@@ -144,8 +154,8 @@ export class MatchmakingDurableObject {
       existingEntry.lastSeenAt = now
     }
 
-    await this.matchOldestEligiblePlayer(state, now)
-    await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
+    await this.matchEligiblePlayers(state, now)
+    await this.persistState(state, now)
 
     return this.getPlayerStatus(state, playerId)
   }
@@ -176,17 +186,19 @@ export class MatchmakingDurableObject {
 
     if (entry !== undefined) {
       entry.lastSeenAt = now
-      await this.matchPlayerIfEligible(state, entry, now)
     }
 
-    await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
+    await this.matchEligiblePlayers(state, now)
+    await this.persistState(state, now)
     return this.getPlayerStatus(state, playerId)
   }
 
   private async leave(playerId: string): Promise<Response> {
-    const state = await this.getActiveState(Date.now())
+    const now = Date.now()
+    const state = await this.getActiveState(now)
     state.waiting = state.waiting.filter((entry) => entry.playerId !== playerId)
-    await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
+    await this.matchEligiblePlayers(state, now)
+    await this.persistState(state, now)
     return new Response(null, { status: 204 })
   }
 
@@ -198,6 +210,20 @@ export class MatchmakingDurableObject {
     state.waiting = state.waiting.filter(
       (entry) => entry.lastSeenAt > now - QUEUE_ENTRY_TTL_MS
     )
+    const expiredAssignments = new Map(
+      Object.values(state.assignments)
+        .filter((match) => match.expiresAt <= now)
+        .map((match) => [match.matchId, match])
+    )
+    await Promise.all(
+      [...expiredAssignments.values()].map(async (match) =>
+        expireRankedAssignment(
+          this.cloudflareEnvironment.PLAYERS_DB,
+          match.matchId,
+          now
+        )
+      )
+    )
     state.assignments = Object.fromEntries(
       Object.entries(state.assignments).filter(
         ([, match]) => match.expiresAt > now
@@ -206,43 +232,78 @@ export class MatchmakingDurableObject {
     return state
   }
 
-  private async matchOldestEligiblePlayer(
+  private async matchEligiblePlayers(
     state: MatchmakingState,
     now: number
-  ) {
-    const entry = [...state.waiting]
-      .sort((left, right) => left.joinedAt - right.joinedAt)
-      .find(
-        (candidate) => now - candidate.joinedAt >= RATING_SELECTION_WINDOW_MS
+  ): Promise<void> {
+    while (true) {
+      const entries = [...state.waiting].sort(
+        (left, right) => left.joinedAt - right.joinedAt
       )
+      const matchableEntry = entries.find(
+        (entry) => this.getEligibleOpponent(state, entry, now) !== undefined
+      )
+      if (matchableEntry === undefined) {
+        return
+      }
 
-    if (entry !== undefined) {
-      await this.matchPlayerIfEligible(state, entry, now)
+      const opponent = this.getEligibleOpponent(state, matchableEntry, now)
+      if (opponent === undefined) {
+        return
+      }
+      await this.createMatch(state, matchableEntry, opponent, now)
     }
   }
 
-  private async matchPlayerIfEligible(
+  private getEligibleOpponent(
     state: MatchmakingState,
     entry: QueueEntry,
     now: number
-  ) {
+  ): QueueEntry | undefined {
     if (now - entry.joinedAt < RATING_SELECTION_WINDOW_MS) {
       return
     }
 
-    const opponent = state.waiting
+    const opponents = state.waiting
       .filter((candidate) => candidate.playerId !== entry.playerId)
       .sort((left, right) => {
         const ratingDifference =
           Math.abs(left.rating - entry.rating) -
           Math.abs(right.rating - entry.rating)
         return ratingDifference || left.joinedAt - right.joinedAt
-      })[0]
+      })
 
-    if (opponent === undefined) {
-      return
+    const preferredOpponent = opponents.find(
+      (opponent) =>
+        Math.abs(opponent.rating - entry.rating) <= PREFERRED_RATING_DIFFERENCE
+    )
+    if (preferredOpponent !== undefined) {
+      return preferredOpponent
     }
 
+    const firstDistantOpponentAt = opponents.reduce<number | undefined>(
+      (oldest, opponent) =>
+        oldest === undefined
+          ? opponent.joinedAt
+          : Math.min(oldest, opponent.joinedAt),
+      undefined
+    )
+    if (
+      firstDistantOpponentAt === undefined ||
+      now - Math.max(entry.joinedAt, firstDistantOpponentAt) <
+        DISTANT_OPPONENT_WAIT_MS
+    ) {
+      return
+    }
+    return opponents[0]
+  }
+
+  private async createMatch(
+    state: MatchmakingState,
+    entry: QueueEntry,
+    opponent: QueueEntry,
+    now: number
+  ): Promise<void> {
     const match: RankedMatchAssignment = {
       matchId: crypto.randomUUID(),
       roomKey: crypto.randomUUID(),
@@ -275,6 +336,62 @@ export class MatchmakingDurableObject {
     )
     state.assignments[entry.playerId] = match
     state.assignments[opponent.playerId] = match
+  }
+
+  private async persistState(
+    state: MatchmakingState,
+    now: number
+  ): Promise<void> {
+    await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
+    const nextAlarmAt = this.getNextAlarmAt(state, now)
+    if (nextAlarmAt === undefined) {
+      await this.state.storage.deleteAlarm()
+    } else {
+      await this.state.storage.setAlarm(nextAlarmAt)
+    }
+  }
+
+  private getNextAlarmAt(
+    state: MatchmakingState,
+    now: number
+  ): number | undefined {
+    const deadlines = [
+      ...state.waiting.map((entry) => entry.lastSeenAt + QUEUE_ENTRY_TTL_MS),
+      ...Object.values(state.assignments).map((match) => match.expiresAt)
+    ]
+
+    for (const entry of state.waiting) {
+      const opponents = state.waiting.filter(
+        (candidate) => candidate.playerId !== entry.playerId
+      )
+      if (opponents.length === 0) {
+        continue
+      }
+
+      const hasPreferredOpponent = opponents.some(
+        (opponent) =>
+          Math.abs(opponent.rating - entry.rating) <=
+          PREFERRED_RATING_DIFFERENCE
+      )
+      if (hasPreferredOpponent) {
+        deadlines.push(entry.joinedAt + RATING_SELECTION_WINDOW_MS)
+      } else {
+        const firstDistantOpponentAt = Math.min(
+          ...opponents.map((opponent) => opponent.joinedAt)
+        )
+        deadlines.push(
+          Math.max(
+            entry.joinedAt + RATING_SELECTION_WINDOW_MS,
+            Math.max(entry.joinedAt, firstDistantOpponentAt) +
+              DISTANT_OPPONENT_WAIT_MS
+          )
+        )
+      }
+    }
+
+    return deadlines
+      .filter((deadline) => deadline > now)
+      .sort((left, right) => left - right)[0]
   }
 
   private async configureRankedRoom(
