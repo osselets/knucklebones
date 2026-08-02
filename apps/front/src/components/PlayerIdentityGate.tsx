@@ -24,14 +24,6 @@ export function PlayerIdentityGate({ children }: React.PropsWithChildren) {
     void initializeIdentity()
   }, [initializeIdentity])
 
-  if (status === 'loading') {
-    return (
-      <h2 className='text-center text-3xl font-semibold md:text-5xl'>
-        {t('identity.loading')}
-      </h2>
-    )
-  }
-
   if (status === 'error') {
     return (
       <div className='flex flex-col items-center gap-4 text-center'>

@@ -15,7 +15,7 @@ describe('PlayerIdentityGate', () => {
     vi.mocked(ensurePlayerIdentity).mockReset()
   })
 
-  it('waits for an identity before rendering application routes', async () => {
+  it('renders application routes while identity initializes in the background', () => {
     let resolveIdentity: (() => void) | undefined
     vi.mocked(ensurePlayerIdentity).mockReturnValue(
       new Promise((resolve) => {
@@ -33,12 +33,10 @@ describe('PlayerIdentityGate', () => {
       </PlayerIdentityGate>
     )
 
-    expect(screen.getByText('identity.loading')).toBeInTheDocument()
-    expect(screen.queryByText('application')).not.toBeInTheDocument()
+    expect(screen.queryByText('identity.loading')).not.toBeInTheDocument()
+    expect(screen.getByText('application')).toBeInTheDocument()
 
     resolveIdentity?.()
-
-    expect(await screen.findByText('application')).toBeInTheDocument()
   })
 
   it('offers a retry after identity creation fails', async () => {
