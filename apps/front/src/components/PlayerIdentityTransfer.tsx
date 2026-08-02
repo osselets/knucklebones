@@ -260,9 +260,10 @@ export function PlayerIdentityTransfer() {
               {importError}
             </p>
           )}
-          <label className='flex items-start gap-2'>
+          <label className='flex cursor-pointer items-start gap-2'>
             <input
               type='checkbox'
+              className='mx-0 mt-1 size-4 shrink-0 cursor-pointer'
               checked={revokeOtherDevicesOnTransfer}
               onChange={(event) =>
                 setRevokeOtherDevicesOnTransfer(event.target.checked)
@@ -333,9 +334,10 @@ export function PlayerIdentityTransfer() {
             rows={3}
             className='resize-none rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
           />
-          <label className='flex items-start gap-2'>
+          <label className='flex cursor-pointer items-start gap-2'>
             <input
               type='checkbox'
+              className='mx-0 mt-1 size-4 shrink-0 cursor-pointer'
               checked={revokeOtherDevicesOnRecovery}
               onChange={(event) =>
                 setRevokeOtherDevicesOnRecovery(event.target.checked)
