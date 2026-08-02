@@ -13,6 +13,7 @@ import {
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { apiError } from '../utils/http'
+import { recordOperationalEvent } from '../utils/observability'
 import {
   expireRankedAssignment,
   getActiveRankedMatchForPlayer,
@@ -180,6 +181,12 @@ export class MatchmakingDurableObject {
         })
       }
       state.waiting.push({ playerId, rating, joinedAt: now, lastSeenAt: now })
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'matchmaking.queue',
+        outcome: 'joined',
+        queue_key: RANKED_QUEUE_KEY,
+        queue_size: state.waiting.length
+      })
     } else {
       existingEntry.rating = rating
       existingEntry.lastSeenAt = now
@@ -232,7 +239,15 @@ export class MatchmakingDurableObject {
   private async leave(playerId: string): Promise<Response> {
     const now = Date.now()
     const state = await this.getActiveState(now)
+    const previousQueueSize = state.waiting.length
     state.waiting = state.waiting.filter((entry) => entry.playerId !== playerId)
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'matchmaking.queue',
+      outcome:
+        state.waiting.length < previousQueueSize ? 'cancelled' : 'not-found',
+      queue_key: RANKED_QUEUE_KEY,
+      queue_size: state.waiting.length
+    })
     await this.matchEligiblePlayers(state, now)
     await this.persistState(state, now)
     return new Response(null, { status: 204 })
@@ -287,9 +302,20 @@ export class MatchmakingDurableObject {
     now: number,
     broadcastExpirations: boolean
   ): Promise<void> {
+    const previousQueueSize = state.waiting.length
     state.waiting = state.waiting.filter(
       (entry) => entry.lastSeenAt > now - QUEUE_ENTRY_TTL_MS
     )
+    const expiredQueueEntries = previousQueueSize - state.waiting.length
+    if (expiredQueueEntries > 0) {
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'matchmaking.queue',
+        outcome: 'expired',
+        queue_key: RANKED_QUEUE_KEY,
+        expired_count: expiredQueueEntries,
+        queue_size: state.waiting.length
+      })
+    }
     const expiredAssignments = new Map(
       Object.values(state.assignments)
         .filter((match) => match.expiresAt <= now)
@@ -323,6 +349,15 @@ export class MatchmakingDurableObject {
             this.sentry.captureException(error)
           }
         }
+        recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+          event: 'matchmaking.assignment',
+          outcome: 'expired',
+          queue_key: match.queueKey,
+          connected_players: connectedPlayerIds.length,
+          requeued_players: state.waiting.filter((entry) =>
+            connectedPlayerIds.includes(entry.playerId)
+          ).length
+        })
       }
       delete state.assignmentEntries[match.matchId]
       delete state.assignmentPresence[match.matchId]
@@ -443,6 +478,16 @@ export class MatchmakingDurableObject {
       playerTwo: opponent
     }
     state.assignmentPresence[match.matchId] = []
+    const ratingDifference = Math.abs(entry.rating - opponent.rating)
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'matchmaking.assignment',
+      outcome: 'created',
+      queue_key: match.queueKey,
+      wait_ms: Math.max(now - entry.joinedAt, now - opponent.joinedAt),
+      rating_difference: ratingDifference,
+      preferred: ratingDifference <= PREFERRED_RATING_DIFFERENCE,
+      queue_size: state.waiting.length
+    })
   }
 
   private async broadcastAssignmentExpired(

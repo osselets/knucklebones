@@ -40,6 +40,7 @@ import {
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
 import { applyPlayCommand } from '../utils/authoritativeGame'
+import { recordOperationalEvent } from '../utils/observability'
 import {
   activateRankedMatch,
   settleRankedMatch as settleRankedMatchInDatabase
@@ -318,6 +319,14 @@ export class GameStateDurableObject extends createDurable({
       this.gameState
     )
     this.rankedSettlement = result.settlement
+    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+      event: 'ranked.settlement',
+      outcome: result.status,
+      queue_key: result.settlement.queueKey,
+      result: result.settlement.result,
+      finish_reason: result.settlement.finishReason,
+      absolute_rating_change: Math.abs(result.settlement.playerOne.change)
+    })
     return result
   }
 

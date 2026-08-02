@@ -11,6 +11,7 @@ import {
 } from '../utils/endpoints'
 import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
+import { recordOperationalEvent } from '../utils/observability'
 
 export async function resignRoom(
   request: Request & AuthenticatedMutationRoomRequestWithProps,
@@ -36,6 +37,10 @@ export async function resignRoom(
   rankedMatchSettlementResultSchema.parse(
     await gameStateStore.settleRankedResult()
   )
+  recordOperationalEvent(cloudflareEnvironment.ENVIRONMENT, {
+    event: 'ranked.resignation',
+    outcome: result.idempotencyStatus === 'replayed' ? 'replayed' : 'accepted'
+  })
   await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
   return status(200)
 }
