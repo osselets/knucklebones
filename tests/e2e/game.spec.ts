@@ -13,6 +13,15 @@ async function waitForHome(page: Page) {
   await expect(
     page.getByRole('button', { name: 'Play against an AI' })
   ).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          localStorage.getItem('knucklebones.identity.v1.deviceCredential') !==
+          null
+      )
+    )
+    .toBe(true)
 
   const acknowledgeRecovery = page.getByRole('button', {
     name: "I've saved it"
@@ -487,6 +496,7 @@ test('recovers an identity once and rotates its recovery phrase', async ({
       target.waitForEvent('load'),
       target.getByRole('button', { name: 'Recover this identity' }).click()
     ])
+    await target.getByRole('button', { name: 'Transfer identity' }).click()
     await expect(
       target.getByLabel('Player identity recovery phrase')
     ).toHaveValue(/^knucklebones-recovery-v1\./)
