@@ -28,6 +28,7 @@ import {
   resignGameCommandSchema,
   resignGameResultSchema,
   type RankedMatchAssignment,
+  type RankedRematchStatus,
   type RankedMatchSettlement,
   type RankedMatchSettlementResult,
   rankedMatchAssignmentSchema,
@@ -43,6 +44,8 @@ import { applyPlayCommand } from '../utils/authoritativeGame'
 import { recordOperationalEvent } from '../utils/observability'
 import {
   activateRankedMatch,
+  releaseRankedMatch,
+  reserveRankedMatch,
   settleRankedMatch as settleRankedMatchInDatabase
 } from '../utils/rankedMatches'
 
@@ -57,6 +60,17 @@ type ProcessedMutations = Record<string, ProcessedMutation>
 const PROCESSED_MUTATION_TTL_MS = 15 * 60 * 1000
 const MAX_PROCESSED_MUTATIONS = 200
 const DEFAULT_DISCONNECT_GRACE_MS = 60_000
+const RANKED_REMATCH_ASSIGNMENT_TTL_MS = 15_000
+
+type RankedRematchRequestResult =
+  | RankedRematchStatus
+  | { status: 'game-ongoing' | 'not-ranked' | 'unknown-player' }
+  | ({ status: 'waiting' } & { gameState: IGameState })
+
+interface RatingRow {
+  player_id: string
+  rating: number
+}
 
 interface DisconnectPolicy {
   roomKey: string
@@ -75,6 +89,7 @@ export class GameStateDurableObject extends createDurable({
   reconnectDeadlines: Record<string, number>
   pendingDisconnectBroadcast?: IGameState
   rankedMatch?: RankedMatchAssignment
+  rankedRematch?: RankedMatchAssignment
   rankedSettlement?: RankedMatchSettlement
   rankedPlayerClaims: Record<string, IPlayer>
 
@@ -163,8 +178,16 @@ export class GameStateDurableObject extends createDurable({
     }
 
     const gameState = this.readPlayerGameState(parsedPlayerId)
-    if (gameState === undefined || gameState.outcome !== 'ongoing') {
+    if (gameState === undefined) {
       return { status: 'ignored' }
+    }
+
+    if (gameState.outcome !== 'ongoing') {
+      const changed = this.connectedPlayers[parsedPlayerId] !== connected
+      this.connectedPlayers[parsedPlayerId] = connected
+      return changed
+        ? { status: 'updated', playerId: parsedPlayerId, connected }
+        : { status: 'unchanged' }
     }
 
     if (connected) {
@@ -529,6 +552,157 @@ export class GameStateDurableObject extends createDurable({
     }
 
     return { status: 'unchanged' }
+  }
+
+  async requestRankedRematch(
+    playerId: string
+  ): Promise<RankedRematchRequestResult> {
+    const gameState = this.getInitializedGameState()
+    const validation = this.validateRankedRematch(gameState, playerId)
+    if (validation !== undefined) {
+      return validation
+    }
+    if (this.rankedRematch !== undefined) {
+      return { status: 'matched', match: this.rankedRematch }
+    }
+
+    const opponentId =
+      playerId === gameState.playerOne.id
+        ? gameState.playerTwo.id
+        : gameState.playerOne.id
+    if (this.connectedPlayers[opponentId] !== true) {
+      return { status: 'opponent-unavailable' }
+    }
+
+    if (gameState.rematchVote === undefined) {
+      gameState.rematchVote = playerId
+      return {
+        status: 'waiting',
+        gameState: this.commitGameState(gameState)
+      }
+    }
+    if (gameState.rematchVote === playerId) {
+      return { status: 'waiting' }
+    }
+
+    this.rankedRematch = await this.createRankedRematch(gameState)
+    return { status: 'matched', match: this.rankedRematch }
+  }
+
+  getRankedRematchStatus(playerId: string): RankedRematchRequestResult {
+    const gameState = this.getInitializedGameState()
+    const validation = this.validateRankedRematch(gameState, playerId)
+    if (validation !== undefined) {
+      return validation
+    }
+    if (this.rankedRematch !== undefined) {
+      return { status: 'matched', match: this.rankedRematch }
+    }
+
+    const opponentId =
+      playerId === gameState.playerOne.id
+        ? gameState.playerTwo.id
+        : gameState.playerOne.id
+    return {
+      status:
+        this.connectedPlayers[opponentId] === true
+          ? 'waiting'
+          : 'opponent-unavailable'
+    }
+  }
+
+  private validateRankedRematch(
+    gameState: GameState,
+    playerId: string
+  ): { status: 'game-ongoing' | 'not-ranked' | 'unknown-player' } | undefined {
+    if (
+      playerId !== gameState.playerOne.id &&
+      playerId !== gameState.playerTwo.id
+    ) {
+      return { status: 'unknown-player' }
+    }
+    if (this.rankedMatch === undefined) {
+      return { status: 'not-ranked' }
+    }
+    if (gameState.outcome === 'ongoing') {
+      return { status: 'game-ongoing' }
+    }
+  }
+
+  private async createRankedRematch(
+    gameState: GameState
+  ): Promise<RankedMatchAssignment> {
+    const previousMatch = this.rankedMatch
+    if (previousMatch === undefined) {
+      throw new Error('The ranked rematch has no previous assignment.')
+    }
+    const players = [gameState.playerOne.id, gameState.playerTwo.id]
+    const ratings = await this.cloudflareEnvironment.PLAYERS_DB.prepare(
+      `SELECT player_id, rating
+       FROM player_ratings
+       WHERE rating_pool = ? AND player_id IN (?, ?)`
+    )
+      .bind(previousMatch.ratingPool, ...players)
+      .all<RatingRow>()
+    const ratingByPlayerId = new Map(
+      ratings.results.map((row) => [row.player_id, row.rating])
+    )
+    const playerOneRating = ratingByPlayerId.get(gameState.playerOne.id)
+    const playerTwoRating = ratingByPlayerId.get(gameState.playerTwo.id)
+    if (
+      !Number.isSafeInteger(playerOneRating) ||
+      !Number.isSafeInteger(playerTwoRating)
+    ) {
+      throw new Error('The ranked rematch ratings are invalid.')
+    }
+
+    const createdAt = Date.now()
+    const assignment: RankedMatchAssignment = {
+      matchId: crypto.randomUUID(),
+      roomKey: crypto.randomUUID(),
+      queueKey: previousMatch.queueKey,
+      ratingPool: previousMatch.ratingPool,
+      format: previousMatch.format,
+      playerOneId: gameState.playerOne.id,
+      playerTwoId: gameState.playerTwo.id,
+      playerOneRating: playerOneRating!,
+      playerTwoRating: playerTwoRating!,
+      createdAt,
+      expiresAt: createdAt + RANKED_REMATCH_ASSIGNMENT_TTL_MS
+    }
+
+    await reserveRankedMatch(this.cloudflareEnvironment.PLAYERS_DB, assignment)
+    try {
+      await this.configureRankedRematchRoom(assignment)
+    } catch (error) {
+      await releaseRankedMatch(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        assignment.matchId
+      )
+      throw error
+    }
+    return assignment
+  }
+
+  private async configureRankedRematchRoom(
+    assignment: RankedMatchAssignment
+  ): Promise<void> {
+    const id = this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      assignment.roomKey
+    )
+    const room = this.cloudflareEnvironment.GAME_STATE_DURABLE_OBJECT.get(id)
+    const response = await room.fetch(
+      'https://itty-durable/do/call/configureRankedMatch',
+      {
+        headers: {
+          'do-name': assignment.roomKey,
+          'do-content': JSON.stringify([assignment])
+        }
+      }
+    )
+    if (!response.ok) {
+      throw new Error('The ranked rematch room rejected its assignment.')
+    }
   }
 
   resign(

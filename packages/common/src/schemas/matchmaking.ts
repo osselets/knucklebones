@@ -5,7 +5,8 @@ import {
   RANKED_MATCH_FORMAT,
   RANKED_QUEUE_KEY,
   type RankedMatchSettlement,
-  type RankedMatchSettlementResult
+  type RankedMatchSettlementResult,
+  type RankedRematchStatus
 } from '../types'
 import { gameFinishReasonSchema } from './gameState'
 import { matchIdSchema, playerIdSchema, roomKeySchema } from './identifiers'
@@ -76,3 +77,11 @@ export const rankedMatchSettlementResultSchema = z.union([
     settlement: rankedMatchSettlementSchema
   })
 ]) satisfies z.ZodMiniType<RankedMatchSettlementResult>
+
+export const rankedRematchStatusSchema = z.union([
+  z.object({ status: z.enum(['waiting', 'opponent-unavailable']) }),
+  z.object({
+    status: z.literal('matched'),
+    match: rankedMatchAssignmentSchema
+  })
+]) satisfies z.ZodMiniType<RankedRematchStatus>

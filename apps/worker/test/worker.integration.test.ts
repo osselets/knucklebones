@@ -1536,6 +1536,21 @@ describe('ranked matchmaking', () => {
     await expect(rematch.json()).resolves.toMatchObject({
       error: { code: 'RANKED_REMATCH_DISABLED' }
     })
+
+    const rankedRematch = await request(
+      `/v1/rooms/${playerOneMatch.match.roomKey}/ranked-rematch`,
+      {
+        method: 'POST',
+        headers: {
+          ...authorization(playerTwo),
+          'Idempotency-Key': crypto.randomUUID()
+        }
+      }
+    )
+    expect(rankedRematch.status).toBe(200)
+    await expect(rankedRematch.json()).resolves.toEqual({
+      status: 'opponent-unavailable'
+    })
   })
 
   it('settles an authenticated ranked resignation exactly once', async () => {

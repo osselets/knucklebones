@@ -3,12 +3,14 @@ import {
   GameState,
   gameSettingsQuerySchema,
   idempotentRematchGameResultSchema,
+  rankedRematchStatusSchema,
   rematchRoomSchema,
   type GameSettings
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import {
   type AuthenticatedMutationRoomRequestWithProps,
+  type AuthenticatedRoomRequestWithProps,
   type MutationRequestWithProps
 } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
@@ -85,6 +87,65 @@ export async function rematchRoom(
     cloudflareEnvironment,
     context
   )
+}
+
+export async function requestRankedRematch(
+  request: Request & AuthenticatedMutationRoomRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment
+): Promise<Response> {
+  const result = await getGameStateDurableObject(request).requestRankedRematch(
+    request.principal.playerId
+  )
+  if ('gameState' in result) {
+    await broadcastGameState(result.gameState, request, cloudflareEnvironment)
+  }
+  return rankedRematchResponse(result, request.requestId)
+}
+
+export async function getRankedRematchStatus(
+  request: Request & AuthenticatedRoomRequestWithProps
+): Promise<Response> {
+  const result = await getGameStateDurableObject(
+    request
+  ).getRankedRematchStatus(request.principal.playerId)
+  return rankedRematchResponse(result, request.requestId)
+}
+
+function rankedRematchResponse(
+  result: Awaited<
+    ReturnType<
+      ReturnType<typeof getGameStateDurableObject>['requestRankedRematch']
+    >
+  >,
+  requestId: string
+): Response {
+  switch (result.status) {
+    case 'game-ongoing':
+      return apiError({
+        status: 409,
+        code: 'GAME_STILL_ONGOING',
+        message: 'The game is still ongoing.',
+        requestId
+      })
+    case 'not-ranked':
+      return apiError({
+        status: 409,
+        code: 'NOT_A_RANKED_MATCH',
+        message: 'Only ranked matches support ranked rematches.',
+        requestId
+      })
+    case 'unknown-player':
+      return apiError({
+        status: 403,
+        code: 'NOT_A_PLAYER',
+        message: 'Only a player in this game can request a rematch.',
+        requestId
+      })
+    default:
+      return Response.json(rankedRematchStatusSchema.parse(result), {
+        headers: { 'Cache-Control': 'no-store' }
+      })
+  }
 }
 
 async function executeRematch(

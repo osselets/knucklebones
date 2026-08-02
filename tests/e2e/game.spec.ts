@@ -303,12 +303,36 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
     await expect(
       secondPlayer.getByText('Your opponent resigned. You win!')
     ).toBeVisible()
+    const completedRoomPath = new URL(firstPlayer.url()).pathname
     for (const player of [firstPlayer, secondPlayer]) {
       await expect(
         player.getByRole('link', { name: 'Find another ranked match' })
       ).toBeVisible()
       await expect(player.getByText(/Rating: 1200 →/)).toBeVisible()
     }
+
+    await Promise.all([
+      firstPlayer.getByRole('button', { name: 'Play again' }).click(),
+      secondPlayer.getByRole('button', { name: 'Play again' }).click()
+    ])
+    await Promise.all([
+      firstPlayer.waitForURL(
+        (url) =>
+          /\/room\/[0-9a-f-]+$/.test(url.pathname) &&
+          url.pathname !== completedRoomPath
+      ),
+      secondPlayer.waitForURL(
+        (url) =>
+          /\/room\/[0-9a-f-]+$/.test(url.pathname) &&
+          url.pathname !== completedRoomPath
+      )
+    ])
+    expect(new URL(firstPlayer.url()).pathname).not.toBe(completedRoomPath)
+    expect(new URL(firstPlayer.url()).pathname).toBe(
+      new URL(secondPlayer.url()).pathname
+    )
+    await expect(firstPlayer.getByText('Opponent rating: 1216')).toBeVisible()
+    await expect(secondPlayer.getByText('Opponent rating: 1184')).toBeVisible()
   } finally {
     await firstContext.close()
     await secondContext.close()

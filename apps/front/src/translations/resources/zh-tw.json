@@ -19,7 +19,14 @@
     "result": {
       "rating-change": "評分：{{before}} → {{after}}（{{change}}）",
       "rating-error": "無法載入您的新評分。",
-      "play-again": "尋找另一場排名對戰"
+      "play-again": "尋找另一場排名對戰",
+      "rematch": "再玩一次",
+      "requesting-rematch": "正在請求…",
+      "waiting-rematch": "等待中…",
+      "rematch-pending": "正在等待對手同意再玩一次。",
+      "opponent-rematch": "對手想再玩一次！",
+      "opponent-left": "對手已離開房間。",
+      "rematch-error": "無法請求再玩一次，請重試。"
     },
     "resign": {
       "action": "認輸",

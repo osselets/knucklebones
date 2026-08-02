@@ -69,3 +69,7 @@ export type RankedMatchSettlementResult =
       status: 'settled' | 'already-settled'
       settlement: RankedMatchSettlement
     }
+
+export type RankedRematchStatus =
+  | { status: 'waiting' | 'opponent-unavailable' }
+  | { status: 'matched'; match: RankedMatchAssignment }

@@ -5,11 +5,13 @@ import {
   getMatchmakingStatus,
   getRankedAvailability,
   getRankedProfile,
+  getRankedRematchStatus,
   initGame,
   joinMatchmaking,
   leaveMatchmaking,
   play,
   resignGame,
+  requestRankedRematch,
   updateDisplayName,
   voteRematch
 } from './api'
@@ -206,5 +208,24 @@ describe('mutation requests', () => {
       [expect.stringContaining('/v1/matchmaking/queue'), 'DELETE']
     ])
     expect(fetchMock.mock.calls.at(-1)?.[1]?.keepalive).toBe(true)
+  })
+
+  it('requests and polls a ranked rematch', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ status: 'waiting' }))
+      .mockResolvedValueOnce(Response.json({ status: 'opponent-unavailable' }))
+
+    await expect(requestRankedRematch(room.roomKey)).resolves.toEqual({
+      status: 'waiting'
+    })
+    await expect(getRankedRematchStatus(room.roomKey)).resolves.toEqual({
+      status: 'opponent-unavailable'
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      `/v1/rooms/${room.roomKey}/ranked-rematch`
+    )
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('GET')
   })
 })

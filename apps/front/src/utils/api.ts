@@ -17,6 +17,8 @@ import {
   type RankedProfile,
   type RankedAvailability,
   rankedAvailabilitySchema,
+  type RankedRematchStatus,
+  rankedRematchStatusSchema,
   rankedProfileSchema,
   type WebSocketTicket,
   webSocketTicketSchema
@@ -178,6 +180,37 @@ export async function leaveMatchmaking({
     undefined,
     keepalive
   )
+}
+
+export async function requestRankedRematch(
+  roomKey: string
+): Promise<RankedRematchStatus> {
+  const response = await sendApiRequest(
+    `/v1/rooms/${roomKey}/ranked-rematch`,
+    'POST',
+    undefined,
+    undefined,
+    crypto.randomUUID()
+  )
+  return parseRankedRematchStatus(await response.json())
+}
+
+export async function getRankedRematchStatus(
+  roomKey: string
+): Promise<RankedRematchStatus> {
+  const response = await sendApiRequest(
+    `/v1/rooms/${roomKey}/ranked-rematch`,
+    'GET'
+  )
+  return parseRankedRematchStatus(await response.json())
+}
+
+function parseRankedRematchStatus(value: unknown): RankedRematchStatus {
+  const result = rankedRematchStatusSchema.safeParse(value)
+  if (!result.success) {
+    throw new Error('The server returned an invalid ranked rematch status.')
+  }
+  return result.data
 }
 
 async function getMatchmakingResponse(

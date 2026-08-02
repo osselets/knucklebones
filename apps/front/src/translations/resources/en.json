@@ -19,7 +19,14 @@
     "result": {
       "rating-change": "Rating: {{before}} → {{after}} ({{change}})",
       "rating-error": "Your new rating couldn't be loaded.",
-      "play-again": "Find another ranked match"
+      "play-again": "Find another ranked match",
+      "rematch": "Play again",
+      "requesting-rematch": "Requesting…",
+      "waiting-rematch": "Waiting…",
+      "rematch-pending": "Waiting for your opponent to play again.",
+      "opponent-rematch": "Your opponent wants to play again!",
+      "opponent-left": "Your opponent has left the room.",
+      "rematch-error": "We couldn't request a rematch. Try again."
     },
     "resign": {
       "action": "Resign",

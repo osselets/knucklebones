@@ -19,7 +19,14 @@
     "result": {
       "rating-change": "Classement : {{before}} → {{after}} ({{change}})",
       "rating-error": "Impossible de charger votre nouveau classement.",
-      "play-again": "Rechercher une autre partie classée"
+      "play-again": "Rechercher une autre partie classée",
+      "rematch": "Rejouer",
+      "requesting-rematch": "Demande…",
+      "waiting-rematch": "En attente…",
+      "rematch-pending": "En attente de votre adversaire pour rejouer.",
+      "opponent-rematch": "Votre adversaire veut rejouer !",
+      "opponent-left": "Votre adversaire a quitté la salle.",
+      "rematch-error": "Impossible de demander une revanche. Réessayez."
     },
     "resign": {
       "action": "Abandonner",

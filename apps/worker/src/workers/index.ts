@@ -9,6 +9,7 @@ import {
   deleteDisplayName,
   displayName,
   getRankedProfile,
+  getRankedRematchStatus,
   getRankedAvailability,
   getMatchmakingStatus,
   init,
@@ -22,6 +23,7 @@ import {
   reportClientProtocolDiagnostic,
   rematch,
   rematchRoom,
+  requestRankedRematch,
   resignRoom,
   redeemIdentityTransfer,
   redeemIdentityRecovery,
@@ -96,6 +98,12 @@ router
   .post('/v1/rooms/:roomKey/init', withAuthenticatedMutationId, initializeRoom)
   .post('/v1/rooms/:roomKey/play', withAuthenticatedMutationId, playIntent)
   .post('/v1/rooms/:roomKey/rematch', withAuthenticatedMutationId, rematchRoom)
+  .get('/v1/rooms/:roomKey/ranked-rematch', getRankedRematchStatus)
+  .post(
+    '/v1/rooms/:roomKey/ranked-rematch',
+    withAuthenticatedMutationId,
+    requestRankedRematch
+  )
   .post('/v1/rooms/:roomKey/resign', withAuthenticatedMutationId, resignRoom)
   .post(
     '/v1/rooms/:roomKey/display-name',
