@@ -18,7 +18,7 @@ export function SideBarActions({ children }: React.PropsWithChildren) {
   const [sideBarActionContainer, setSideBarActionContainer] =
     React.useState<Element>()
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const quickActionsNode = document.querySelector(
       `#${SIDE_BAR_ACTION_CONTAINER}`
     )
