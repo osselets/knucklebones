@@ -22,14 +22,6 @@ async function waitForHome(page: Page) {
       )
     )
     .toBe(true)
-
-  const acknowledgeRecovery = page.getByRole('button', {
-    name: "I've saved it"
-  })
-  if (await acknowledgeRecovery.isVisible()) {
-    await acknowledgeRecovery.click()
-    await page.keyboard.press('Escape')
-  }
 }
 
 async function readIdentity(page: Page): Promise<StoredIdentity> {
@@ -526,6 +518,12 @@ test('recovers an identity once and rotates its recovery phrase', async ({
     await expect(
       source.getByLabel('Player identity recovery phrase')
     ).toHaveValue(/^knucklebones-recovery-v1\./)
+    await expect(
+      source.getByRole('button', { name: "I've saved it" })
+    ).toHaveCount(0)
+    await expect(
+      source.getByRole('button', { name: 'Replace recovery phrase' })
+    ).toHaveCount(0)
     const recoveryPhrase = await source
       .getByLabel('Player identity recovery phrase')
       .inputValue()

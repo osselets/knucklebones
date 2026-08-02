@@ -18,7 +18,6 @@ import {
   rotateIdentityRecovery
 } from '../utils/api'
 import {
-  confirmRecoveryPhrase,
   getPendingRecoveryPhrase,
   storePendingRecoveryPhrase,
   storePlayerCredentials
@@ -148,12 +147,6 @@ export function PlayerIdentityTransfer() {
     if (recoveryPhrase !== undefined) {
       await navigator.clipboard.writeText(recoveryPhrase)
     }
-  }
-
-  function acknowledgeRecoveryPhrase() {
-    confirmRecoveryPhrase()
-    setRecoveryPhrase(undefined)
-    setIsRecoveryVisible(false)
   }
 
   async function recoverPlayerIdentity() {
@@ -308,22 +301,17 @@ export function PlayerIdentityTransfer() {
                       : 'identity.recovery.show'
                   )}
                 </Button>
-                <Button variant='secondary' onClick={acknowledgeRecoveryPhrase}>
-                  {t('identity.recovery.saved')}
-                </Button>
               </div>
             </>
           )}
-          <Button
-            disabled={isRotatingRecovery}
-            onClick={() => void rotateRecoveryPhrase()}
-          >
-            {t(
-              recoveryPhrase === undefined
-                ? 'identity.recovery.generate'
-                : 'identity.recovery.regenerate'
-            )}
-          </Button>
+          {recoveryPhrase === undefined && (
+            <Button
+              disabled={isRotatingRecovery}
+              onClick={() => void rotateRecoveryPhrase()}
+            >
+              {t('identity.recovery.generate')}
+            </Button>
+          )}
 
           <h4 className='font-semibold'>{t('identity.recovery.use-title')}</h4>
           <textarea
