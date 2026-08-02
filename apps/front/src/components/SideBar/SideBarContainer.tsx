@@ -20,9 +20,8 @@ export function SideBarContainer({
   actions,
   swipeableAreaRef
 }: SideBarContainerProps) {
-  // Always displayed by default
-  const [showToolbar, setShowToolbar] = React.useState(true)
   const isOnMobile = useIsOnMobile()
+  const [showToolbar, setShowToolbar] = React.useState(!isOnMobile)
   const localizedPath = useLocalizedPath()
 
   // Makes it appear/disappear on mobile after scrolling left/right
@@ -44,18 +43,8 @@ export function SideBarContainer({
     }
   )
 
-  // Automatically closes it on mobile after 1,5 second
   React.useEffect(() => {
-    if (isOnMobile) {
-      const timeout = setTimeout(() => {
-        setShowToolbar(false)
-      }, 1500)
-      return () => {
-        clearTimeout(timeout)
-      }
-    } else {
-      setShowToolbar(true)
-    }
+    setShowToolbar(!isOnMobile)
   }, [isOnMobile])
 
   return (
