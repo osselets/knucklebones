@@ -32,7 +32,10 @@
     "queue": {
       "title": "排名配對",
       "joining": "正在加入配對佇列…",
-      "waiting": "正在尋找對手… {{seconds}} 秒",
+      "looking": "正在尋找對手",
+      "elapsed": "等待時間：{{duration}}",
+      "slow": "這次配對花費的時間比預期更久。",
+      "scarce": "目前可能沒有足夠的玩家可以進行配對。",
       "best-effort": "系統會優先配對評分相近的玩家，同時盡量縮短等待時間。",
       "cancel": "取消配對",
       "cancelling": "正在取消…",

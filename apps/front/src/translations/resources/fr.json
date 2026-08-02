@@ -32,7 +32,10 @@
     "queue": {
       "title": "Recherche de partie classée",
       "joining": "Connexion à la file…",
-      "waiting": "Recherche d'un adversaire… {{seconds}} s",
+      "looking": "Recherche d'un adversaire",
+      "elapsed": "Temps d'attente : {{duration}}",
+      "slow": "Cela prend plus de temps que nous le souhaiterions.",
+      "scarce": "Il n'y a peut-être pas assez de joueurs disponibles pour le matchmaking en ce moment.",
       "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",
       "cancel": "Annuler la recherche",
       "cancelling": "Annulation…",

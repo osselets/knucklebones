@@ -9,7 +9,11 @@ import {
   leaveMatchmaking
 } from '../utils/api'
 import { getStoredRankedMatchAssignment } from '../utils/rankedMatchStorage'
-import { RankedMatchmaking } from './RankedMatchmaking'
+import {
+  formatMatchmakingDuration,
+  getMatchmakingDelayMessage,
+  RankedMatchmaking
+} from './RankedMatchmaking'
 
 vi.mock('../utils/api', () => ({
   getMatchmakingStatus: vi.fn(),
@@ -34,6 +38,22 @@ const assignment = {
   createdAt: 1000,
   expiresAt: 16_000
 }
+
+describe('matchmaking wait display', () => {
+  it('formats seconds and minute boundaries', () => {
+    expect(formatMatchmakingDuration(0)).toBe('0s')
+    expect(formatMatchmakingDuration(59)).toBe('59s')
+    expect(formatMatchmakingDuration(60)).toBe('1m 0s')
+    expect(formatMatchmakingDuration(62)).toBe('1m 2s')
+  })
+
+  it('escalates the wait message at 30 and 60 seconds', () => {
+    expect(getMatchmakingDelayMessage(29)).toBeUndefined()
+    expect(getMatchmakingDelayMessage(30)).toBe('ranked.queue.slow')
+    expect(getMatchmakingDelayMessage(59)).toBe('ranked.queue.slow')
+    expect(getMatchmakingDelayMessage(60)).toBe('ranked.queue.scarce')
+  })
+})
 
 function renderMatchmaking() {
   return render(

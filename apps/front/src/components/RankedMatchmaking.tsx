@@ -14,9 +14,29 @@ import {
 } from '../utils/api'
 import { storeRankedMatchAssignment } from '../utils/rankedMatchStorage'
 import { Button } from './Button'
+import { LoadingDots } from './Loading'
 
 const MATCHMAKING_POLL_MS = 500
 const MATCHMAKING_RETRY_MS = 1_000
+
+export function formatMatchmakingDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`
+  }
+
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
+
+export function getMatchmakingDelayMessage(
+  seconds: number
+): 'ranked.queue.slow' | 'ranked.queue.scarce' | undefined {
+  if (seconds >= 60) {
+    return 'ranked.queue.scarce'
+  }
+  if (seconds >= 30) {
+    return 'ranked.queue.slow'
+  }
+}
 
 export function RankedMatchmaking() {
   const { t } = useTranslation()
@@ -106,6 +126,7 @@ export function RankedMatchmaking() {
     joinedAt === undefined
       ? 0
       : Math.max(0, Math.floor((now - joinedAt) / 1000))
+  const delayMessage = getMatchmakingDelayMessage(elapsedSeconds)
 
   async function cancelMatchmaking() {
     setIsCancelling(true)
@@ -130,11 +151,26 @@ export function RankedMatchmaking() {
             ? t('ranked.rating-loading')
             : t('ranked.rating', { rating: profile.rating })}
         </p>
-        <p aria-live='polite' className='text-lg'>
-          {joinedAt === undefined
-            ? t('ranked.queue.joining')
-            : t('ranked.queue.waiting', { seconds: elapsedSeconds })}
-        </p>
+        {joinedAt === undefined ? (
+          <p className='text-lg'>{t('ranked.queue.joining')}</p>
+        ) : (
+          <div className='flex flex-col items-center gap-1'>
+            <p className='text-lg'>
+              {t('ranked.queue.looking')}
+              <LoadingDots dotsShown={elapsedSeconds % 4} />
+            </p>
+            <p className='font-mono text-sm tabular-nums'>
+              {t('ranked.queue.elapsed', {
+                duration: formatMatchmakingDuration(elapsedSeconds)
+              })}
+            </p>
+            {delayMessage !== undefined && (
+              <p aria-live='polite' className='mt-2 text-sm font-medium'>
+                {t(delayMessage)}
+              </p>
+            )}
+          </div>
+        )}
         <p className='text-sm text-slate-600 dark:text-slate-300'>
           {t('ranked.queue.best-effort')}
         </p>
