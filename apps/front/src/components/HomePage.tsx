@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { type PlayerType } from '@knucklebones/common'
+import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../svgs/logo.svg'
 import { getRankedAvailability } from '../utils/api'
 import { Button } from './Button'
@@ -13,6 +14,7 @@ export function HomePage() {
   const [isEditingGameSettings, setEditingGameSettings] = React.useState(false)
   const [isRankedEnabled, setIsRankedEnabled] = React.useState(false)
   const { t } = useTranslation()
+  const localizedPath = useLocalizedPath()
 
   React.useEffect(() => {
     let disposed = false
@@ -48,7 +50,7 @@ export function HomePage() {
           <Button
             as={Link}
             size='large'
-            to='/ranked'
+            to={localizedPath('/ranked')}
             aria-hidden={!isRankedEnabled}
             tabIndex={isRankedEnabled ? undefined : -1}
             className={
@@ -73,7 +75,7 @@ export function HomePage() {
           >
             {t('home.play.ai')}
           </Button>
-          <Button as={Link} size='large' to='/how-to-play'>
+          <Button as={Link} size='large' to={localizedPath('/how-to-play')}>
             {t('guide.label')}
           </Button>
         </div>

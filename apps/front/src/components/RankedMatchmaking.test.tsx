@@ -40,8 +40,10 @@ function renderMatchmaking() {
     <MemoryRouter initialEntries={['/ranked']}>
       <Routes>
         <Route path='/' element={<p>Home</p>} />
+        <Route path='/:language/' element={<p>Home</p>} />
         <Route path='/ranked' element={<RankedMatchmaking />} />
         <Route path='/room/:roomKey' element={<p>Ranked room</p>} />
+        <Route path='/:language/room/:roomKey' element={<p>Ranked room</p>} />
       </Routes>
     </MemoryRouter>
   )

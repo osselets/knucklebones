@@ -9,8 +9,8 @@ export function getPathWithoutLanguage(pathname = window.location.pathname) {
   return path ?? pathname
 }
 
-export function getPathLanguage() {
-  const [, lang] = window.location.pathname.match(LANGUAGE_REGEX) ?? []
+export function getPathLanguage(pathname = window.location.pathname) {
+  const [, lang] = pathname.match(LANGUAGE_REGEX) ?? []
   if (lang !== undefined && isLanguageSupported(lang)) {
     return lang
   }

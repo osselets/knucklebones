@@ -5,6 +5,7 @@ import {
   type MatchmakingStatus,
   type RankedProfile
 } from '@knucklebones/common'
+import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import {
   getMatchmakingStatus,
   getRankedProfile,
@@ -20,6 +21,7 @@ const MATCHMAKING_RETRY_MS = 1_000
 export function RankedMatchmaking() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const localizedPath = useLocalizedPath()
   const [profile, setProfile] = React.useState<RankedProfile>()
   const [joinedAt, setJoinedAt] = React.useState<number>()
   const [now, setNow] = React.useState(Date.now)
@@ -34,7 +36,7 @@ export function RankedMatchmaking() {
     const handleStatus = (status: MatchmakingStatus): boolean => {
       if (status.status === 'matched') {
         storeRankedMatchAssignment(status.match)
-        navigate(`/room/${status.match.roomKey}`, {
+        navigate(localizedPath(`/room/${status.match.roomKey}`), {
           replace: true,
           state: { playerType: 'human', boType: 1 }
         })
@@ -98,7 +100,7 @@ export function RankedMatchmaking() {
       clearInterval(clockInterval)
       clearTimeout(pollTimeout)
     }
-  }, [navigate, t])
+  }, [localizedPath, navigate, t])
 
   const elapsedSeconds =
     joinedAt === undefined
@@ -109,7 +111,7 @@ export function RankedMatchmaking() {
     setIsCancelling(true)
     try {
       await leaveMatchmaking()
-      navigate('/', { replace: true })
+      navigate(localizedPath('/'), { replace: true })
     } catch {
       setErrorMessage(t('ranked.queue.cancel-error'))
       setIsCancelling(false)

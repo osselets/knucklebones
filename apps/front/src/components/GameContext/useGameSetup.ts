@@ -13,6 +13,7 @@ import {
   PROTOCOL_VERSION,
   type GameSettings
 } from '@knucklebones/common'
+import { useLocalizedPath } from '../../hooks/useLocalizedPath'
 import { useRoomKey } from '../../hooks/useRoomKey'
 import {
   createWebSocketTicket,
@@ -42,6 +43,7 @@ const useWebSocket =
 export function useGameSetup() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const localizedPath = useLocalizedPath()
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
@@ -156,7 +158,7 @@ export function useGameSetup() {
           })
         } else if (serverEvent.data.type === 'game.error') {
           if (serverEvent.data.payload.code === 'RANKED_ASSIGNMENT_EXPIRED') {
-            navigate('/ranked', { replace: true })
+            navigate(localizedPath('/ranked'), { replace: true })
             return
           }
           setErrorMessage(serverEvent.data.payload.message)
@@ -210,7 +212,7 @@ export function useGameSetup() {
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage, navigate, roomKey, t])
+  }, [lastJsonMessage, localizedPath, navigate, roomKey, t])
 
   React.useEffect(() => {
     setPresenceByPlayerId({})
@@ -223,11 +225,11 @@ export function useGameSetup() {
     }
 
     const timeout = setTimeout(
-      () => navigate('/ranked', { replace: true }),
+      () => navigate(localizedPath('/ranked'), { replace: true }),
       Math.max(0, rankedAssignment.expiresAt - Date.now()) + 500
     )
     return () => clearTimeout(timeout)
-  }, [gameState, navigate, rankedAssignment])
+  }, [gameState, localizedPath, navigate, rankedAssignment])
 
   React.useEffect(() => {
     if (readyState === ReadyState.OPEN && playerId !== undefined) {

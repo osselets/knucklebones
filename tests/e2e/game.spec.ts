@@ -160,6 +160,11 @@ test('starts a hard BO1 AI game with valid versioned state updates', async ({
 })
 
 test('keeps an AI game open when switching languages', async ({ page }) => {
+  let gameSocketCount = 0
+  page.on('websocket', (webSocket) => {
+    if (webSocket.url().includes('/websocket?')) gameSocketCount++
+  })
+
   await waitForHome(page)
   await chooseGame(page, 'Play against an AI')
   await page.getByRole('radio', { name: 'Hard' }).click()
@@ -167,13 +172,26 @@ test('keeps an AI game open when switching languages', async ({ page }) => {
   await page.getByRole('link', { name: 'Start game' }).click()
 
   await expect(page.getByText('Round 1 of 1')).toBeVisible()
-  const roomPath = new URL(page.url()).pathname
+  await expect.poll(() => gameSocketCount).toBe(1)
+  const roomPath = new URL(page.url()).pathname.replace(/^\/en/, '')
+  const documentMarker = await page.evaluate(() => {
+    const marker = crypto.randomUUID()
+    ;(window as Window & { documentMarker?: string }).documentMarker = marker
+    return marker
+  })
 
   await page.getByRole('link', { name: 'English' }).click()
 
   await expect(page).toHaveURL(`/fr${roomPath}`)
+  expect(
+    await page.evaluate(
+      () => (window as Window & { documentMarker?: string }).documentMarker
+    )
+  ).toBe(documentMarker)
   await expect(page.getByText('Manche 1 sur 1')).toBeVisible()
   await expect(page.getByText('IA (Difficile)')).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(gameSocketCount).toBe(1)
 })
 
 test('synchronizes a human game across independent browser identities', async ({
@@ -330,7 +348,7 @@ test('returns a connected ranked player to the queue when the opponent never con
     expect(opponentJoinStatus).toBe(200)
 
     await player.waitForURL(/\/room\/[0-9a-f-]+$/)
-    await player.waitForURL((url) => url.pathname === '/ranked', {
+    await player.waitForURL((url) => url.pathname === '/en/ranked', {
       timeout: 20_000
     })
     await expect(

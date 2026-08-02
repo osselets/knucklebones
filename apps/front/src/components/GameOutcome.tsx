@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { PlayIcon } from '@heroicons/react/24/outline'
 import { t } from 'i18next'
 import { useIsOnDesktop } from '../hooks/detectDevice'
+import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import { useRoomKey } from '../hooks/useRoomKey'
 import { getRankedProfile } from '../utils/api'
 import { getStoredPlayerId } from '../utils/identityStorage'
@@ -191,6 +192,7 @@ function RankedResultRating({
   rating?: number
 }) {
   const { t } = useTranslation()
+  const localizedPath = useLocalizedPath()
   const playerId = getStoredPlayerId()
   const previousRating =
     playerId === assignment.playerOneId
@@ -211,7 +213,7 @@ function RankedResultRating({
                 change: change > 0 ? `+${change}` : String(change)
               })}
       </p>
-      <Button as={Link} to='/ranked'>
+      <Button as={Link} to={localizedPath('/ranked')}>
         {t('ranked.result.play-again')}
       </Button>
     </div>
