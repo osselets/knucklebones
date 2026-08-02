@@ -19,6 +19,8 @@ export {
   storePendingRecoveryPhrase
 } from './identityStorage'
 
+let identityInitialization: Promise<PlayerCredentials> | undefined
+
 export function getStoredPlayerCredentials(): PlayerCredentials | undefined {
   const result = playerCredentialsSchema.safeParse({
     playerId: getStoredPlayerId(),
@@ -31,7 +33,19 @@ export function storePlayerCredentials(credentials: PlayerCredentials): void {
   storeIdentity(credentials.playerId, credentials.credential)
 }
 
-export async function ensurePlayerIdentity(): Promise<PlayerCredentials> {
+export function ensurePlayerIdentity(): Promise<PlayerCredentials> {
+  if (identityInitialization !== undefined) {
+    return identityInitialization
+  }
+
+  identityInitialization = initializePlayerIdentity().finally(() => {
+    identityInitialization = undefined
+  })
+
+  return identityInitialization
+}
+
+async function initializePlayerIdentity(): Promise<PlayerCredentials> {
   const storedCredentials = getStoredPlayerCredentials()
   if (storedCredentials !== undefined) {
     ensurePlayerDisplayName()

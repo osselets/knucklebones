@@ -1,8 +1,8 @@
 import * as React from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { getPathLanguage } from '../translations'
+import { ensurePlayerIdentity } from '../utils/playerIdentity'
 import { Language } from './Language'
-import { PlayerIdentityGate } from './PlayerIdentityGate'
 import { PlayerIdentityTransfer } from './PlayerIdentityTransfer'
 import { Router } from './Router'
 import {
@@ -15,6 +15,12 @@ import { Theme } from './Theme'
 
 export function App() {
   const mainContentRef = React.useRef<React.ElementRef<'div'>>(null)
+
+  React.useEffect(() => {
+    void ensurePlayerIdentity().catch((error) => {
+      console.error('Failed to initialize player identity.', error)
+    })
+  }, [])
 
   return (
     <BrowserRouter basename={getPathLanguage()}>
@@ -31,14 +37,10 @@ export function App() {
           />
 
           <MainContent ref={mainContentRef}>
-            <PlayerIdentityGate>
-              <>
-                <SideBarActions>
-                  <PlayerIdentityTransfer />
-                </SideBarActions>
-                <Router />
-              </>
-            </PlayerIdentityGate>
+            <SideBarActions>
+              <PlayerIdentityTransfer />
+            </SideBarActions>
+            <Router />
           </MainContent>
         </SideBarLayout>
       </div>

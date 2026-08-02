@@ -25,6 +25,7 @@ import {
   getStoredDeviceCredential,
   getStoredDisplayName
 } from './identityStorage'
+import { ensurePlayerIdentity } from './playerIdentity'
 
 type Method = 'GET' | 'POST' | 'DELETE'
 
@@ -34,7 +35,7 @@ interface IdentificationParams {
 }
 
 export async function createPlayer(): Promise<PlayerIdentityBootstrap> {
-  const response = await sendApiRequest('/players', 'POST')
+  const response = await sendApiRequest('/players', 'POST', undefined, null)
   const result = playerIdentityBootstrapSchema.safeParse(await response.json())
 
   if (!result.success) {
@@ -259,9 +260,17 @@ async function sendApiRequest(
   path: string,
   method: Method,
   body?: unknown,
-  credential = getStoredDeviceCredential(),
+  credential?: string | null,
   mutationId?: string
 ) {
+  if (credential === undefined) {
+    credential = getStoredDeviceCredential()
+    if (credential === null) {
+      await ensurePlayerIdentity()
+      credential = getStoredDeviceCredential()
+    }
+  }
+
   const headers = {
     Accept: 'application/json',
     ...(credential !== null && {
