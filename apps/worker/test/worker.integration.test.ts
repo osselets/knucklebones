@@ -1006,6 +1006,121 @@ describe('WebSocket tickets', () => {
   })
 })
 
+describe('ranked match persistence', () => {
+  const insertActiveMatch = async ({
+    matchId,
+    roomKey,
+    playerOne,
+    playerTwo,
+    state = 'assigned'
+  }: {
+    matchId: string
+    roomKey: string
+    playerOne: PlayerCredentials
+    playerTwo: PlayerCredentials
+    state?: 'assigned' | 'active'
+  }) => {
+    const environment = await server.getWorker().getEnv()
+    const createdAt = Date.now()
+    const activatedAt = state === 'active' ? createdAt + 1 : null
+    await environment.PLAYERS_DB.prepare(
+      `INSERT INTO active_ranked_matches (
+         match_id, room_key, queue_key, rating_pool, format,
+         player_one_id, player_two_id,
+         player_one_rating, player_two_rating,
+         state, created_at, expires_at, activated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        matchId,
+        roomKey,
+        'classic:bo1',
+        'classic',
+        'bo1',
+        playerOne.playerId,
+        playerTwo.playerId,
+        1200,
+        1200,
+        state,
+        createdAt,
+        createdAt + 15_000,
+        activatedAt
+      )
+      .run()
+    return { createdAt, activatedAt }
+  }
+
+  it('allows only one active ranked assignment per player', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const playerThree = await createPlayer()
+
+    await insertActiveMatch({
+      matchId: crypto.randomUUID(),
+      roomKey: crypto.randomUUID(),
+      playerOne,
+      playerTwo
+    })
+
+    await expect(
+      insertActiveMatch({
+        matchId: crypto.randomUUID(),
+        roomKey: crypto.randomUUID(),
+        playerOne: playerThree,
+        playerTwo
+      })
+    ).rejects.toThrow(/PLAYER_ALREADY_IN_RANKED_MATCH/)
+  })
+
+  it('rejects a result that does not match its active assignment', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const environment = await server.getWorker().getEnv()
+    const matchId = crypto.randomUUID()
+    const roomKey = crypto.randomUUID()
+    const { createdAt, activatedAt } = await insertActiveMatch({
+      matchId,
+      roomKey,
+      playerOne,
+      playerTwo,
+      state: 'active'
+    })
+
+    const settlement = environment.PLAYERS_DB.prepare(
+      `INSERT INTO rated_matches (
+         match_id, room_key, queue_key, rating_pool, format,
+         player_one_id, player_two_id, result, finish_reason,
+         player_one_rating_before, player_two_rating_before,
+         player_one_rating_after, player_two_rating_after, rating_delta,
+         created_at, activated_at, finished_at, settled_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      matchId,
+      roomKey,
+      'classic:bo1',
+      'classic',
+      'bo1',
+      playerOne.playerId,
+      playerTwo.playerId,
+      'player-one-win',
+      'completed',
+      1199,
+      1200,
+      1215,
+      1184,
+      16,
+      createdAt,
+      activatedAt,
+      activatedAt! + 1,
+      activatedAt! + 2
+    )
+
+    await expect(settlement.run()).rejects.toThrow(
+      /INVALID_RANKED_MATCH_SETTLEMENT/
+    )
+  })
+})
+
 describe('ranked matchmaking', () => {
   const joinQueue = (player: PlayerCredentials) =>
     request('/v1/matchmaking/join', {
