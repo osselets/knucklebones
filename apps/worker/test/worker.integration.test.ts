@@ -10,6 +10,7 @@ import {
   playerCredentialsSchema,
   playerIdentityBootstrapSchema,
   type PresenceUpdateResult,
+  rankedMatchSettlementResultSchema,
   rankedProfileSchema,
   webSocketTicketSchema,
   type PlayerCredentials
@@ -1352,6 +1353,66 @@ describe('ranked matchmaking', () => {
         winnerId: playerTwo.playerId
       }
     })
+
+    const settlement = rankedMatchSettlementResultSchema.parse(
+      await callRoom('settleRankedResult', [])
+    )
+    expect(settlement).toMatchObject({
+      status: 'settled',
+      settlement: {
+        matchId: playerOneMatch.match.matchId,
+        result: 'player-two-win',
+        finishReason: 'forfeit',
+        playerOne: { before: 1200, after: 1184, change: -16 },
+        playerTwo: { before: 1200, after: 1216, change: 16 }
+      }
+    })
+    if (settlement.status !== 'settled') {
+      throw new Error('Expected the ranked result to settle.')
+    }
+    const repeatedSettlement = rankedMatchSettlementResultSchema.parse(
+      await callRoom('settleRankedResult', [])
+    )
+    expect(repeatedSettlement).toMatchObject({
+      status: 'already-settled',
+      settlement: settlement.settlement
+    })
+
+    const profiles = await environment.PLAYERS_DB.prepare(
+      `SELECT player_id, rating, games_played, wins, draws, losses
+       FROM player_ratings
+       WHERE player_id IN (?, ?)
+       ORDER BY player_id`
+    )
+      .bind(playerOne.playerId, playerTwo.playerId)
+      .all()
+    expect(profiles.results).toEqual(
+      [
+        {
+          player_id: playerOne.playerId,
+          rating: 1184,
+          games_played: 1,
+          wins: 0,
+          draws: 0,
+          losses: 1
+        },
+        {
+          player_id: playerTwo.playerId,
+          rating: 1216,
+          games_played: 1,
+          wins: 1,
+          draws: 0,
+          losses: 0
+        }
+      ].sort((left, right) => left.player_id.localeCompare(right.player_id))
+    )
+    await expect(
+      environment.PLAYERS_DB.prepare(
+        'SELECT match_id FROM active_ranked_matches WHERE match_id = ?'
+      )
+        .bind(playerOneMatch.match.matchId)
+        .first()
+    ).resolves.toBeNull()
 
     const rematch = await request(
       `/v1/rooms/${playerOneMatch.match.roomKey}/rematch`,

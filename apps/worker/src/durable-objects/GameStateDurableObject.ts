@@ -24,6 +24,8 @@ import {
   rematchGameCommandSchema,
   rematchGameResultSchema,
   type RankedMatchAssignment,
+  type RankedMatchSettlement,
+  type RankedMatchSettlementResult,
   rankedMatchAssignmentSchema,
   roomKeySchema,
   toGameStateMessage,
@@ -34,7 +36,10 @@ import {
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
 import { applyPlayCommand } from '../utils/authoritativeGame'
-import { activateRankedMatch } from '../utils/rankedMatches'
+import {
+  activateRankedMatch,
+  settleRankedMatch as settleRankedMatchInDatabase
+} from '../utils/rankedMatches'
 
 interface ProcessedMutation {
   fingerprint: string
@@ -65,6 +70,7 @@ export class GameStateDurableObject extends createDurable({
   reconnectDeadlines: Record<string, number>
   pendingDisconnectBroadcast?: IGameState
   rankedMatch?: RankedMatchAssignment
+  rankedSettlement?: RankedMatchSettlement
   rankedPlayerClaims: Record<string, IPlayer>
 
   constructor(
@@ -239,6 +245,8 @@ export class GameStateDurableObject extends createDurable({
     await this.persist()
 
     if (this.pendingDisconnectBroadcast !== undefined) {
+      await this.settleRankedResult()
+      await this.persist()
       await this.broadcastAlarmResult(this.pendingDisconnectBroadcast)
       this.pendingDisconnectBroadcast = undefined
       await this.persist()
@@ -280,6 +288,26 @@ export class GameStateDurableObject extends createDurable({
           boType: command.boType
         })
     )
+  }
+
+  async settleRankedResult(): Promise<RankedMatchSettlementResult> {
+    if (this.rankedMatch === undefined) {
+      return { status: 'not-ranked' }
+    }
+    if (
+      this.gameState === undefined ||
+      this.gameState.outcome !== 'game-ended'
+    ) {
+      return { status: 'not-finished' }
+    }
+
+    const result = await settleRankedMatchInDatabase(
+      this.cloudflareEnvironment.PLAYERS_DB,
+      this.rankedMatch,
+      this.gameState
+    )
+    this.rankedSettlement = result.settlement
+    return result
   }
 
   private async applyInitializeGame({
