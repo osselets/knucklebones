@@ -159,6 +159,23 @@ test('starts a hard BO1 AI game with valid versioned state updates', async ({
   }
 })
 
+test('keeps an AI game open when switching languages', async ({ page }) => {
+  await waitForHome(page)
+  await chooseGame(page, 'Play against an AI')
+  await page.getByRole('radio', { name: 'Hard' }).click()
+  await page.getByRole('radio', { name: 'Best of 1' }).click()
+  await page.getByRole('link', { name: 'Start game' }).click()
+
+  await expect(page.getByText('Round 1 of 1')).toBeVisible()
+  const roomPath = new URL(page.url()).pathname
+
+  await page.getByRole('link', { name: 'English' }).click()
+
+  await expect(page).toHaveURL(`/fr${roomPath}`)
+  await expect(page.getByText('Manche 1 sur 1')).toBeVisible()
+  await expect(page.getByText('IA (Difficile)')).toBeVisible()
+})
+
 test('synchronizes a human game across independent browser identities', async ({
   browser
 }) => {
@@ -402,6 +419,11 @@ test('keeps the same identity and home route across language changes', async ({
   expect(await readIdentity(page)).toEqual(identity)
 
   await page.getByRole('link', { name: 'Français' }).click()
+  await expect(page.getByRole('button', { name: '與 AI 對戰' })).toBeVisible()
+  await expect(page).toHaveURL(/\/zh-tw\/$/)
+  expect(await readIdentity(page)).toEqual(identity)
+
+  await page.getByRole('link', { name: '正體中文（臺灣）' }).click()
   await expect(
     page.getByRole('button', { name: 'Play against an AI' })
   ).toBeVisible()
