@@ -52,6 +52,7 @@ export function RankedMatchmaking() {
   const [now, setNow] = React.useState(Date.now)
   const [errorMessage, setErrorMessage] = React.useState<string>()
   const [isAccepting, setIsAccepting] = React.useState(false)
+  const [isDeclining, setIsDeclining] = React.useState(false)
   const shouldLeaveQueue = React.useRef(true)
   const hasSeenReadyCheck = React.useRef(false)
   const exitCancellationTimeout = React.useRef<
@@ -206,6 +207,18 @@ export function RankedMatchmaking() {
     }
   }
 
+  async function declineMatch() {
+    setIsDeclining(true)
+    try {
+      await leaveMatchmaking()
+      shouldLeaveQueue.current = false
+      navigate(localizedPath('/'), { replace: true })
+    } catch {
+      setErrorMessage(t('ranked.queue.decline-error'))
+      setIsDeclining(false)
+    }
+  }
+
   return (
     <main className='mx-auto flex w-full max-w-xl flex-col items-center justify-center gap-6 p-6 text-center'>
       <h1 className='font-mona text-4xl font-bold'>
@@ -240,15 +253,33 @@ export function RankedMatchmaking() {
                 <LoadingDots dotsShown={readyCheckSeconds % 4} />
               </p>
             ) : (
-              <Button
-                size='medium'
-                disabled={isAccepting || readyCheckSeconds === 0}
-                onClick={() => void acceptMatch()}
-              >
-                {t(
-                  isAccepting ? 'ranked.queue.accepting' : 'ranked.queue.accept'
-                )}
-              </Button>
+              <div className='flex flex-wrap justify-center gap-3'>
+                <Button
+                  size='medium'
+                  disabled={
+                    isAccepting || isDeclining || readyCheckSeconds === 0
+                  }
+                  onClick={() => void acceptMatch()}
+                >
+                  {t(
+                    isAccepting
+                      ? 'ranked.queue.accepting'
+                      : 'ranked.queue.accept'
+                  )}
+                </Button>
+                <Button
+                  size='medium'
+                  variant='secondary'
+                  disabled={isAccepting || isDeclining}
+                  onClick={() => void declineMatch()}
+                >
+                  {t(
+                    isDeclining
+                      ? 'ranked.queue.declining'
+                      : 'ranked.queue.decline'
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         ) : joinedAt === undefined ? (

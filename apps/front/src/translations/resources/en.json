@@ -44,8 +44,11 @@
       "accept-progress": "Time left to accept",
       "accept": "Accept",
       "accepting": "Accepting…",
+      "decline": "Decline",
+      "declining": "Declining…",
       "waiting-for-accept": "Waiting for your opponent to accept",
       "accept-error": "We couldn't accept the match. Try again.",
+      "decline-error": "We couldn't decline the match. Try again.",
       "join-error": "We couldn't join ranked matchmaking. Retrying…",
       "connection-error": "The matchmaking connection was interrupted. Reconnecting…"
     }

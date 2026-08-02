@@ -1673,6 +1673,40 @@ describe('ranked matchmaking', () => {
     expect(playerTwoStatus).toEqual({ status: 'idle' })
   }, 25_000)
 
+  it('requeues the opponent immediately when a player declines', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    const firstJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerOne)).json()
+    )
+    if (firstJoin.status !== 'waiting') {
+      throw new Error('Expected the first player to be waiting.')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 550))
+    const found = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    expect(found.status).toBe('match-found')
+
+    await acceptMatch(playerOne)
+    expect((await leaveQueue(playerTwo)).status).toBe(204)
+
+    const playerOneStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerOne)).json()
+    )
+    const playerTwoStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerTwo)).json()
+    )
+    expect(playerOneStatus).toEqual({
+      status: 'waiting',
+      joinedAt: firstJoin.joinedAt,
+      population: { queuedPlayers: 1, activePlayers: 0 }
+    })
+    expect(playerTwoStatus).toEqual({ status: 'idle' })
+  })
+
   it('rejects initialization after the ranked assignment expires', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()

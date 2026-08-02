@@ -124,6 +124,23 @@ describe('RankedMatchmaking', () => {
     expect(acceptMatchmaking).toHaveBeenCalledOnce()
   })
 
+  it('declines a ready check and returns home', async () => {
+    vi.mocked(joinMatchmaking).mockResolvedValue({
+      status: 'match-found',
+      match: assignment,
+      acceptBy: Date.now() + 15_000,
+      accepted: false
+    })
+
+    renderMatchmaking()
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'ranked.queue.decline' })
+    )
+
+    expect(await screen.findByText('Home')).toBeInTheDocument()
+    expect(leaveMatchmaking).toHaveBeenCalledOnce()
+  })
+
   it('stores an assignment and navigates to its ranked room', async () => {
     vi.mocked(joinMatchmaking).mockResolvedValue({
       status: 'matched',
