@@ -12,6 +12,10 @@
     "identity-warning": "Votre progression classée appartient à l'identité de ce navigateur. Sauvegardez votre phrase de récupération avant d'effacer ses données.",
     "rating": "Classement : {{rating}}",
     "rating-loading": "Chargement du classement…",
+    "match": {
+      "label": "Classé · Une manche gagnante",
+      "opponent-rating": "Classement adverse : {{rating}}"
+    },
     "result": {
       "rating-change": "Classement : {{before}} → {{after}} ({{change}})",
       "rating-error": "Impossible de charger votre nouveau classement.",

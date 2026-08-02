@@ -12,6 +12,10 @@
     "identity-warning": "Ranked progress belongs to this browser identity. Save your recovery phrase before clearing browser data.",
     "rating": "Rating: {{rating}}",
     "rating-loading": "Loading rating…",
+    "match": {
+      "label": "Ranked · Best of 1",
+      "opponent-rating": "Opponent rating: {{rating}}"
+    },
     "result": {
       "rating-change": "Rating: {{before}} → {{after}} ({{change}})",
       "rating-error": "Your new rating couldn't be loaded.",

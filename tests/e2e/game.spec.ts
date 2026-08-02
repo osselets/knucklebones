@@ -232,6 +232,8 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
 
     for (const player of [firstPlayer, secondPlayer]) {
       await expect(player.getByText('Round 1 of 1')).toBeVisible()
+      await expect(player.getByText('Ranked · Best of 1')).toBeVisible()
+      await expect(player.getByText('Opponent rating: 1200')).toBeVisible()
       await expect(
         player.getByText('Waiting for game to start...')
       ).toHaveCount(0)

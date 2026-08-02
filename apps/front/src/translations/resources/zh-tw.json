@@ -12,6 +12,10 @@
     "identity-warning": "排名進度綁定於此瀏覽器的玩家身分。清除瀏覽器資料前，請先保存復原短語。",
     "rating": "評分：{{rating}}",
     "rating-loading": "正在載入評分…",
+    "match": {
+      "label": "排名對戰 · 一局定勝負",
+      "opponent-rating": "對手評分：{{rating}}"
+    },
     "result": {
       "rating-change": "評分：{{before}} → {{after}}（{{change}}）",
       "rating-error": "無法載入您的新評分。",

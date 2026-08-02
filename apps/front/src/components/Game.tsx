@@ -8,6 +8,7 @@ import { Loading } from './Loading'
 import { OutcomeHistory } from './OutcomeHistory'
 import { PlayerOneBoard, PlayerTwoBoard } from './PlayerBoard'
 import { QRCodeModal } from './QRCode'
+import { RankedMatchInfo } from './RankedMatchInfo'
 import { ReconnectNotice } from './ReconnectNotice'
 import { ResignGame } from './ResignGame'
 import { SideBarActions } from './SideBar'
@@ -31,6 +32,7 @@ export function Game() {
   return (
     <>
       <SideBarActions>
+        <RankedMatchInfo />
         <HowToPlayModal />
         <QRCodeModal />
         <OutcomeHistory />
