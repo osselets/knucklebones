@@ -26,6 +26,7 @@ import {
 } from '../../utils/api'
 import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
+import { ensurePlayerIdentity } from '../../utils/playerIdentity'
 import { getStoredRankedMatchAssignment } from '../../utils/rankedMatchStorage'
 import { getWebSocketUrl, preparePlayers } from './utils'
 
@@ -56,20 +57,50 @@ export function useGameSetup() {
   )
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
-  const playerId = getStoredPlayerId()!
+  const [playerId, setPlayerId] = React.useState(
+    () => getStoredPlayerId() ?? undefined
+  )
+  React.useEffect(() => {
+    if (playerId !== undefined) {
+      return
+    }
+
+    let disposed = false
+    void ensurePlayerIdentity()
+      .then(({ playerId: nextPlayerId }) => {
+        if (!disposed) {
+          setPlayerId(nextPlayerId)
+        }
+      })
+      .catch((error) => {
+        if (!disposed) {
+          setErrorMessage(
+            error instanceof Error ? error.message : t('identity.error')
+          )
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [playerId, t])
   const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
-    const { ticket } = await createWebSocketTicket({ roomKey, playerId })
+    const { ticket } = await createWebSocketTicket({
+      roomKey,
+      playerId: playerId!
+    })
     return getWebSocketUrl(roomKey, ticket)
   }, [playerId, roomKey])
   const { lastJsonMessage, readyState } = useWebSocket(
-    getAuthenticatedWebSocketUrl
+    playerId === undefined ? null : getAuthenticatedWebSocketUrl
   )
 
   const isGameStateReady = gameState !== null
 
-  const playerSide = isGameStateReady
-    ? getPlayerSide(playerId, gameState)
-    : 'spectator'
+  const playerSide =
+    isGameStateReady && playerId !== undefined
+      ? getPlayerSide(playerId, gameState)
+      : 'spectator'
   const [playerOne, playerTwo] = isGameStateReady
     ? preparePlayers(playerSide, gameState)
     : []
@@ -199,7 +230,7 @@ export function useGameSetup() {
   }, [gameState, navigate, rankedAssignment])
 
   React.useEffect(() => {
-    if (readyState === ReadyState.OPEN) {
+    if (readyState === ReadyState.OPEN && playerId !== undefined) {
       initGame(
         { roomKey, playerId },
         { playerType: 'human', boType: state?.boType }
@@ -231,7 +262,7 @@ export function useGameSetup() {
       const body = {
         column,
         dice,
-        author: playerId
+        author: playerId!
       }
 
       const previousGameState = gameState
@@ -242,11 +273,13 @@ export function useGameSetup() {
 
       setGameState(mutatedGameState)
 
-      await play({ roomKey, playerId }, { column }).catch((error) => {
-        setErrorMessage(error.message)
-        setGameState(previousGameState)
-        setIsLoading(false)
-      })
+      await play({ roomKey, playerId: playerId! }, { column }).catch(
+        (error) => {
+          setErrorMessage(error.message)
+          setGameState(previousGameState)
+          setIsLoading(false)
+        }
+      )
     }
   }
 
@@ -257,7 +290,7 @@ export function useGameSetup() {
   // Mouais à voir comment on peut repenser les options ici
 
   async function _voteRematch() {
-    await voteRematch({ roomKey, playerId }).catch((error) => {
+    await voteRematch({ roomKey, playerId: playerId! }).catch((error) => {
       setErrorMessage(error.message)
     })
   }
@@ -275,27 +308,30 @@ export function useGameSetup() {
   }
 
   async function voteContinueBo() {
-    await voteRematch({ roomKey, playerId }).catch((error) => {
+    await voteRematch({ roomKey, playerId: playerId! }).catch((error) => {
       setErrorMessage(error.message)
     })
   }
 
   async function voteContinueIndefinitely() {
-    await voteRematch({ roomKey, playerId }, { boType: 'indefinite' }).catch(
-      (error) => {
-        setErrorMessage(error.message)
-      }
-    )
+    await voteRematch(
+      { roomKey, playerId: playerId! },
+      { boType: 'indefinite' }
+    ).catch((error) => {
+      setErrorMessage(error.message)
+    })
   }
 
   async function _updateDisplayName(newDisplayName: string) {
     if (isEmptyOrBlank(newDisplayName)) {
-      await deleteDisplayName({ roomKey, playerId }).catch((error) => {
-        setErrorMessage(error.message)
-      })
+      await deleteDisplayName({ roomKey, playerId: playerId! }).catch(
+        (error) => {
+          setErrorMessage(error.message)
+        }
+      )
     } else {
       await updateDisplayName(
-        { roomKey, playerId },
+        { roomKey, playerId: playerId! },
         { displayName: newDisplayName }
       ).catch((error) => {
         setErrorMessage(error.message)
@@ -304,7 +340,7 @@ export function useGameSetup() {
   }
 
   // Easy way to do a type guard
-  if (!isGameStateReady) {
+  if (!isGameStateReady || playerId === undefined) {
     return null
   }
 
