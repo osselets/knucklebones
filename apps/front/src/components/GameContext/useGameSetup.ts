@@ -56,7 +56,46 @@ export function useGameSetup() {
     [roomKey]
   )
   const latestRevision = React.useRef({ roomKey, value: -1 })
-  const state = useLocation().state as GameSettings | undefined
+  const location = useLocation()
+  const state = React.useMemo<GameSettings | undefined>(() => {
+    if (location.state !== null && location.state !== undefined) {
+      return location.state as GameSettings
+    }
+
+    const params = new URLSearchParams(location.search)
+    const playerType = params.get('playerType')
+    const boType = params.get('boType')
+    const difficulty = params.get('difficulty')
+
+    if (playerType !== 'human' && playerType !== 'ai') {
+      return undefined
+    }
+
+    const parsedBoType = boType === 'indefinite' ? boType : Number(boType)
+    if (
+      parsedBoType !== 'indefinite' &&
+      parsedBoType !== 1 &&
+      parsedBoType !== 3 &&
+      parsedBoType !== 5
+    ) {
+      return undefined
+    }
+
+    if (
+      difficulty !== null &&
+      difficulty !== 'easy' &&
+      difficulty !== 'medium' &&
+      difficulty !== 'hard'
+    ) {
+      return undefined
+    }
+
+    return {
+      playerType,
+      boType: parsedBoType,
+      difficulty: playerType === 'ai' ? (difficulty ?? undefined) : undefined
+    }
+  }, [location.search, location.state])
   const [playerId, setPlayerId] = React.useState(
     () => getStoredPlayerId() ?? undefined
   )
