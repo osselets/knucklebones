@@ -145,6 +145,15 @@ async function executeInitializeGame(
     })
   }
 
+  if (mutation.status === 'ranked-assignment-expired') {
+    return apiError({
+      status: 409,
+      code: 'RANKED_ASSIGNMENT_EXPIRED',
+      message: 'The ranked match assignment has expired.',
+      requestId: request.requestId
+    })
+  }
+
   if (mutation.status === 'created' || mutation.status === 'existing') {
     const gameState = GameState.fromJson(mutation.gameState)
     await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)

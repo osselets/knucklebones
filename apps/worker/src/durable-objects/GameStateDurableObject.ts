@@ -34,6 +34,7 @@ import {
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
 import { applyPlayCommand } from '../utils/authoritativeGame'
+import { activateRankedMatch } from '../utils/rankedMatches'
 
 interface ProcessedMutation {
   fingerprint: string
@@ -55,6 +56,7 @@ interface DisconnectPolicy {
 export class GameStateDurableObject extends createDurable({
   autoPersist: true
 }) {
+  cloudflareEnvironment: CloudflareEnvironment
   lobby: ILobby
   gameState?: IGameState
   processedMutations: ProcessedMutations
@@ -70,6 +72,7 @@ export class GameStateDurableObject extends createDurable({
     cloudflareEnvironment: CloudflareEnvironment
   ) {
     super(state, cloudflareEnvironment)
+    this.cloudflareEnvironment = cloudflareEnvironment
     this.lobby = new Lobby().toJson()
     this.processedMutations = {}
     this.connectedPlayers = {}
@@ -242,13 +245,15 @@ export class GameStateDurableObject extends createDurable({
     }
   }
 
-  initializeGame({
+  async initializeGame({
     mutationId,
     playerId,
     displayName,
     difficulty,
     boType
-  }: InitializeGameCommand): IdempotentMutationResult<InitializeGameResult> {
+  }: InitializeGameCommand): Promise<
+    IdempotentMutationResult<InitializeGameResult>
+  > {
     const command = initializeGameCommandSchema.parse({
       mutationId,
       playerId,
@@ -257,7 +262,7 @@ export class GameStateDurableObject extends createDurable({
       boType
     })
 
-    return this.runIdempotently(
+    return await this.runIdempotentlyAsync(
       command.mutationId,
       'initialize-game',
       {
@@ -267,8 +272,8 @@ export class GameStateDurableObject extends createDurable({
         boType: command.boType
       },
       initializeGameResultSchema,
-      () =>
-        this.applyInitializeGame({
+      async () =>
+        await this.applyInitializeGame({
           playerId: command.playerId,
           displayName: command.displayName,
           difficulty: command.difficulty,
@@ -277,12 +282,12 @@ export class GameStateDurableObject extends createDurable({
     )
   }
 
-  private applyInitializeGame({
+  private async applyInitializeGame({
     playerId,
     displayName,
     difficulty,
     boType
-  }: Omit<InitializeGameCommand, 'mutationId'>): InitializeGameResult {
+  }: Omit<InitializeGameCommand, 'mutationId'>): Promise<InitializeGameResult> {
     if (this.gameState !== undefined) {
       const gameState = GameState.fromJson(
         gameStateSchema.parse(this.gameState)
@@ -297,7 +302,7 @@ export class GameStateDurableObject extends createDurable({
     }
 
     if (this.rankedMatch !== undefined) {
-      return this.applyRankedInitializeGame({
+      return await this.applyRankedInitializeGame({
         playerId,
         displayName,
         difficulty,
@@ -325,12 +330,12 @@ export class GameStateDurableObject extends createDurable({
     return { status: 'created', gameState }
   }
 
-  private applyRankedInitializeGame({
+  private async applyRankedInitializeGame({
     playerId,
     displayName,
     difficulty,
     boType
-  }: Omit<InitializeGameCommand, 'mutationId'>): InitializeGameResult {
+  }: Omit<InitializeGameCommand, 'mutationId'>): Promise<InitializeGameResult> {
     const assignment = this.rankedMatch!
     if (
       playerId !== assignment.playerOneId &&
@@ -351,6 +356,15 @@ export class GameStateDurableObject extends createDurable({
     const playerTwo = this.rankedPlayerClaims[assignment.playerTwoId]
     if (playerOne === undefined || playerTwo === undefined) {
       return { status: 'waiting' }
+    }
+
+    const activationStatus = await activateRankedMatch(
+      this.cloudflareEnvironment.PLAYERS_DB,
+      assignment
+    )
+    if (activationStatus === 'expired') {
+      this.rankedPlayerClaims = {}
+      return { status: 'ranked-assignment-expired' }
     }
 
     const gameState = new GameState({
@@ -594,6 +608,45 @@ export class GameStateDurableObject extends createDurable({
     }
 
     const value = mutation()
+    const processedAt = Date.now()
+    const activeMutations = Object.entries(this.processedMutations)
+      .filter(
+        ([, processed]) =>
+          processed.processedAt > processedAt - PROCESSED_MUTATION_TTL_MS
+      )
+      .sort(([, left], [, right]) => right.processedAt - left.processedAt)
+      .slice(0, MAX_PROCESSED_MUTATIONS - 1)
+
+    this.processedMutations = Object.fromEntries([
+      [mutationId, { fingerprint, processedAt, value }],
+      ...activeMutations
+    ])
+
+    return { idempotencyStatus: 'applied', value }
+  }
+
+  private async runIdempotentlyAsync<T>(
+    mutationId: string,
+    operation: string,
+    payload: unknown,
+    resultSchema: { parse(value: unknown): T },
+    mutation: () => Promise<T>
+  ): Promise<IdempotentMutationResult<T>> {
+    const fingerprint = JSON.stringify({ operation, payload })
+    const processedMutation = this.processedMutations[mutationId]
+
+    if (processedMutation !== undefined) {
+      if (processedMutation.fingerprint !== fingerprint) {
+        return { idempotencyStatus: 'conflict' }
+      }
+
+      return {
+        idempotencyStatus: 'replayed',
+        value: resultSchema.parse(processedMutation.value)
+      }
+    }
+
+    const value = await mutation()
     const processedAt = Date.now()
     const activeMutations = Object.entries(this.processedMutations)
       .filter(

@@ -41,7 +41,11 @@ export type PresenceUpdateResult =
 
 export type InitializeGameResult =
   | {
-      status: 'waiting' | 'not-assigned' | 'invalid-ranked-settings'
+      status:
+        | 'waiting'
+        | 'not-assigned'
+        | 'invalid-ranked-settings'
+        | 'ranked-assignment-expired'
     }
   | { status: 'created' | 'existing'; gameState: IGameState }
 

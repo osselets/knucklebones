@@ -25,6 +25,9 @@ export interface ActiveRankedMatch {
   activatedAt?: number
 }
 
+export type RankedMatchActivationStatus =
+  'activated' | 'already-active' | 'expired'
+
 export async function getActiveRankedMatchForPlayer(
   database: D1Database,
   playerId: string,
@@ -113,6 +116,69 @@ export async function reserveRankedMatch(
   if (result.meta.changes !== 1) {
     throw new Error('The ranked assignment was not reserved.')
   }
+}
+
+export async function activateRankedMatch(
+  database: D1Database,
+  assignment: RankedMatchAssignment,
+  activatedAt = Date.now()
+): Promise<RankedMatchActivationStatus> {
+  const parsedAssignment = rankedMatchAssignmentSchema.parse(assignment)
+  const result = await database
+    .prepare(
+      `UPDATE active_ranked_matches
+       SET state = 'active', activated_at = ?
+       WHERE match_id = ?
+         AND room_key = ?
+         AND queue_key = ?
+         AND rating_pool = ?
+         AND format = ?
+         AND player_one_id = ?
+         AND player_two_id = ?
+         AND player_one_rating = ?
+         AND player_two_rating = ?
+         AND created_at = ?
+         AND expires_at = ?
+         AND state = 'assigned'
+         AND expires_at > ?`
+    )
+    .bind(
+      activatedAt,
+      parsedAssignment.matchId,
+      parsedAssignment.roomKey,
+      parsedAssignment.queueKey,
+      parsedAssignment.ratingPool,
+      parsedAssignment.format,
+      parsedAssignment.playerOneId,
+      parsedAssignment.playerTwoId,
+      parsedAssignment.playerOneRating,
+      parsedAssignment.playerTwoRating,
+      parsedAssignment.createdAt,
+      parsedAssignment.expiresAt,
+      activatedAt
+    )
+    .run()
+
+  if (result.meta.changes === 1) {
+    return 'activated'
+  }
+
+  const activeMatch = await getActiveRankedMatchForPlayer(
+    database,
+    parsedAssignment.playerOneId,
+    activatedAt
+  )
+  if (activeMatch === undefined) {
+    return 'expired'
+  }
+  if (
+    activeMatch.state === 'active' &&
+    JSON.stringify(activeMatch.assignment) === JSON.stringify(parsedAssignment)
+  ) {
+    return 'already-active'
+  }
+
+  throw new Error('The ranked assignment does not match its reservation.')
 }
 
 export async function releaseRankedMatch(

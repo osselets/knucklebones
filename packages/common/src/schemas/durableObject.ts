@@ -56,7 +56,12 @@ const updatedGameStateResultSchema = z.object({
 
 export const initializeGameResultSchema = z.union([
   z.object({
-    status: z.enum(['waiting', 'not-assigned', 'invalid-ranked-settings'])
+    status: z.enum([
+      'waiting',
+      'not-assigned',
+      'invalid-ranked-settings',
+      'ranked-assignment-expired'
+    ])
   }),
   z.object({
     status: z.enum(['created', 'existing']),

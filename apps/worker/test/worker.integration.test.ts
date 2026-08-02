@@ -1293,6 +1293,18 @@ describe('ranked matchmaking', () => {
     expect(playerTwoClaim.status).toBe(200)
     expect(playerOneClaim.status).toBe(200)
 
+    const activatedMatch = await environment.PLAYERS_DB.prepare(
+      `SELECT state, activated_at
+       FROM active_ranked_matches
+       WHERE match_id = ?`
+    )
+      .bind(playerOneMatch.match.matchId)
+      .first<{ state: string; activated_at: number | null }>()
+    expect(activatedMatch).toEqual({
+      state: 'active',
+      activated_at: expect.any(Number)
+    })
+
     const existing = idempotentInitializeGameResultSchema.parse(
       await callRoom('initializeGame', [
         {
@@ -1377,6 +1389,56 @@ describe('ranked matchmaking', () => {
     expect(matchmakingStatusSchema.parse(await rejoin.json()).status).toBe(
       'waiting'
     )
+  })
+
+  it('rejects initialization after the ranked assignment expires', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    await joinQueue(playerOne)
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const status = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (status.status !== 'matched') {
+      throw new Error('Expected both players to be matched.')
+    }
+
+    const initialize = (player: PlayerCredentials) =>
+      request(`/v1/rooms/${status.match.roomKey}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID()
+        },
+        body: JSON.stringify({ playerType: 'human', boType: 1 })
+      })
+
+    expect((await initialize(playerOne)).status).toBe(200)
+
+    const environment = await server.getWorker().getEnv()
+    const expiredAt = Date.now() - 1
+    await environment.PLAYERS_DB.prepare(
+      `UPDATE active_ranked_matches
+       SET created_at = ?, expires_at = ?
+       WHERE match_id = ?`
+    )
+      .bind(expiredAt - 1, expiredAt, status.match.matchId)
+      .run()
+
+    const expired = await initialize(playerTwo)
+    expect(expired.status).toBe(409)
+    await expect(expired.json()).resolves.toMatchObject({
+      error: { code: 'RANKED_ASSIGNMENT_EXPIRED' }
+    })
+    await expect(
+      environment.PLAYERS_DB.prepare(
+        'SELECT match_id FROM active_ranked_matches WHERE match_id = ?'
+      )
+        .bind(status.match.matchId)
+        .first()
+    ).resolves.toBeNull()
   })
 
   it('chooses the closest rating after the selection window', async () => {
