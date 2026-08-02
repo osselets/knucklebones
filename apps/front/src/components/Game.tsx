@@ -35,8 +35,8 @@ export function Game() {
         <HowToPlayModal />
         <QRCodeModal />
         <OutcomeHistory />
-        <RankedMatchInfo />
         <ResignGame />
+        <RankedMatchInfo />
         {isOnMobile && gameOutcome}
       </SideBarActions>
       <div ref={gameRef} className='flex flex-col items-center justify-around'>
