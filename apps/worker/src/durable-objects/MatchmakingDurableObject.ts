@@ -5,15 +5,21 @@ import {
   matchmakingStatusSchema,
   playerIdSchema,
   RANKED_MATCH_FORMAT,
+  RANKED_QUEUE_KEY,
   type RankedMatchAssignment
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { apiError } from '../utils/http'
+import {
+  getActiveRankedMatchForPlayer,
+  releaseRankedMatch,
+  reserveRankedMatch
+} from '../utils/rankedMatches'
 
 const MATCHMAKING_STATE_KEY = 'matchmaking-state'
 const RATING_SELECTION_WINDOW_MS = 750
 const QUEUE_ENTRY_TTL_MS = 15_000
-const MATCH_ASSIGNMENT_TTL_MS = 5 * 60 * 1000
+const MATCH_ASSIGNMENT_TTL_MS = 15_000
 
 interface QueueEntry {
   playerId: string
@@ -106,6 +112,19 @@ export class MatchmakingDurableObject {
 
   private async join(playerId: string, rating: number): Promise<Response> {
     const now = Date.now()
+    const activeMatch = await getActiveRankedMatchForPlayer(
+      this.cloudflareEnvironment.PLAYERS_DB,
+      playerId,
+      now
+    )
+    if (activeMatch !== undefined) {
+      await this.configureRankedRoom(activeMatch.assignment)
+      return this.statusResponse({
+        status: 'matched',
+        match: activeMatch.assignment
+      })
+    }
+
     const state = await this.getActiveState(now)
     const assignment = state.assignments[playerId]
 
@@ -133,6 +152,19 @@ export class MatchmakingDurableObject {
 
   private async getStatus(playerId: string): Promise<Response> {
     const now = Date.now()
+    const activeMatch = await getActiveRankedMatchForPlayer(
+      this.cloudflareEnvironment.PLAYERS_DB,
+      playerId,
+      now
+    )
+    if (activeMatch !== undefined) {
+      await this.configureRankedRoom(activeMatch.assignment)
+      return this.statusResponse({
+        status: 'matched',
+        match: activeMatch.assignment
+      })
+    }
+
     const state = await this.getActiveState(now)
     const assignment = state.assignments[playerId]
     if (assignment !== undefined) {
@@ -168,7 +200,7 @@ export class MatchmakingDurableObject {
     )
     state.assignments = Object.fromEntries(
       Object.entries(state.assignments).filter(
-        ([, match]) => match.createdAt > now - MATCH_ASSIGNMENT_TTL_MS
+        ([, match]) => match.expiresAt > now
       )
     )
     return state
@@ -214,14 +246,27 @@ export class MatchmakingDurableObject {
     const match: RankedMatchAssignment = {
       matchId: crypto.randomUUID(),
       roomKey: crypto.randomUUID(),
+      queueKey: RANKED_QUEUE_KEY,
       ratingPool: DEFAULT_RATING_POOL,
       format: RANKED_MATCH_FORMAT,
       playerOneId: entry.playerId,
       playerTwoId: opponent.playerId,
-      createdAt: now
+      playerOneRating: entry.rating,
+      playerTwoRating: opponent.rating,
+      createdAt: now,
+      expiresAt: now + MATCH_ASSIGNMENT_TTL_MS
     }
 
-    await this.configureRankedRoom(match)
+    await reserveRankedMatch(this.cloudflareEnvironment.PLAYERS_DB, match)
+    try {
+      await this.configureRankedRoom(match)
+    } catch (error) {
+      await releaseRankedMatch(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        match.matchId
+      )
+      throw error
+    }
 
     state.waiting = state.waiting.filter(
       (candidate) =>

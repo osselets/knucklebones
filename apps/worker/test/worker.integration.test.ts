@@ -1199,13 +1199,36 @@ describe('ranked matchmaking', () => {
     }
     expect(playerOneMatch.match).toEqual(playerTwoMatch.match)
     expect(playerOneMatch.match).toMatchObject({
+      queueKey: 'classic:bo1',
       ratingPool: 'classic',
       format: 'bo1',
       playerOneId: playerOne.playerId,
-      playerTwoId: playerTwo.playerId
+      playerTwoId: playerTwo.playerId,
+      playerOneRating: 1200,
+      playerTwoRating: 1200,
+      expiresAt: expect.any(Number)
     })
 
     const environment = await server.getWorker().getEnv()
+    const activeMatch = await environment.PLAYERS_DB.prepare(
+      `SELECT match_id, player_one_id, player_two_id, state
+       FROM active_ranked_matches
+       WHERE match_id = ?`
+    )
+      .bind(playerOneMatch.match.matchId)
+      .first()
+    expect(activeMatch).toEqual({
+      match_id: playerOneMatch.match.matchId,
+      player_one_id: playerOne.playerId,
+      player_two_id: playerTwo.playerId,
+      state: 'assigned'
+    })
+
+    const duplicateJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerOne)).json()
+    )
+    expect(duplicateJoin).toEqual(playerOneMatch)
+
     const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
       playerOneMatch.match.roomKey
     )
