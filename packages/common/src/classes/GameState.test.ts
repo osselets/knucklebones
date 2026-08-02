@@ -149,6 +149,7 @@ describe('GameState play validation', () => {
     expect(gameState.finishByForfeit('player-one')).toBe(true)
     expect(gameState.outcome).toBe('game-ended')
     expect(gameState.finishReason).toBe('forfeit')
+    expect(gameState.forfeitReason).toBe('disconnect')
     expect(gameState.winnerId).toBe('player-two')
     expect(gameState.outcomeHistory).toEqual([
       {
@@ -157,6 +158,16 @@ describe('GameState play validation', () => {
       }
     ])
     expect(gameState.finishByForfeit('player-one')).toBe(false)
+  })
+
+  it('distinguishes a resignation from a disconnect forfeit', () => {
+    const gameState = createGameState()
+
+    expect(gameState.finishByForfeit('player-one', 'resignation')).toBe(true)
+    expect(gameState.forfeitReason).toBe('resignation')
+    expect(GameState.fromJson(gameState.toJson()).forfeitReason).toBe(
+      'resignation'
+    )
   })
 
   it('records a no-contest without a winner or rated history', () => {

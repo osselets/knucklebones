@@ -2,6 +2,7 @@ import { type IGameState, type IPlayer } from '../interfaces'
 import {
   type Outcome,
   type GameFinishReason,
+  type GameForfeitReason,
   type Play,
   type PlayIntentRejectionReason,
   type OutcomeHistory,
@@ -33,6 +34,7 @@ export class GameState implements IGameState {
   winnerId?: string
   outcome!: Outcome
   finishReason?: GameFinishReason
+  forfeitReason?: GameForfeitReason
   outcomeHistory: OutcomeHistory
   rematchVote?: string
 
@@ -42,6 +44,7 @@ export class GameState implements IGameState {
     nextPlayer,
     outcome,
     finishReason,
+    forfeitReason,
     rematchVote,
     winnerId,
     boType = 'indefinite',
@@ -60,6 +63,7 @@ export class GameState implements IGameState {
     this.boType = boType
     this.winnerId = winnerId
     this.finishReason = finishReason
+    this.forfeitReason = forfeitReason
 
     // Only assign these if we have one
     // otherwise they will be assigned in the initialize() method
@@ -245,26 +249,30 @@ export class GameState implements IGameState {
     return false
   }
 
-  finishByForfeit(disconnectedPlayerId: string): boolean {
+  finishByForfeit(
+    forfeitingPlayerId: string,
+    forfeitReason: GameForfeitReason = 'disconnect'
+  ): boolean {
     if (this.outcome !== 'ongoing') {
       return false
     }
 
-    const disconnectedPlayer =
-      disconnectedPlayerId === this.playerOne.id
+    const forfeitingPlayer =
+      forfeitingPlayerId === this.playerOne.id
         ? this.playerOne
-        : disconnectedPlayerId === this.playerTwo.id
+        : forfeitingPlayerId === this.playerTwo.id
           ? this.playerTwo
           : undefined
-    if (disconnectedPlayer === undefined || disconnectedPlayer.isAi()) {
+    if (forfeitingPlayer === undefined || forfeitingPlayer.isAi()) {
       return false
     }
 
     const winner =
-      disconnectedPlayer === this.playerOne ? this.playerTwo : this.playerOne
+      forfeitingPlayer === this.playerOne ? this.playerTwo : this.playerOne
     this.winnerId = winner.id
     this.outcome = 'game-ended'
     this.finishReason = 'forfeit'
+    this.forfeitReason = forfeitReason
     this.outcomeHistory.push({
       playerOne: {
         id: this.playerOne.id,
@@ -275,8 +283,10 @@ export class GameState implements IGameState {
         score: winner === this.playerTwo ? 1 : 0
       }
     })
+    const forfeitAction =
+      forfeitReason === 'resignation' ? 'resigned' : 'disconnected'
     this.addToLogs(
-      `${winner.getName()} wins because ${disconnectedPlayer.getName()} disconnected.`
+      `${winner.getName()} wins because ${forfeitingPlayer.getName()} ${forfeitAction}.`
     )
     return true
   }
@@ -289,6 +299,7 @@ export class GameState implements IGameState {
     this.winnerId = undefined
     this.outcome = 'game-ended'
     this.finishReason = 'no-contest'
+    this.forfeitReason = undefined
     this.addToLogs(
       'The game ended with no contest because both players disconnected.'
     )
@@ -342,6 +353,7 @@ export class GameState implements IGameState {
     })
     this.outcome = this.hasBoEnded() ? 'game-ended' : 'round-ended'
     this.finishReason = 'completed'
+    this.forfeitReason = undefined
 
     if (winner !== undefined) {
       this.addToLogs(`${winner.getName()} wins with ${winner.score} points!`)
@@ -413,6 +425,7 @@ export class GameState implements IGameState {
       logs: this.logs.map((log) => log.toJson()),
       outcome: this.outcome,
       finishReason: this.finishReason,
+      forfeitReason: this.forfeitReason,
       nextPlayer: this.nextPlayer.toJson(),
       rematchVote: this.rematchVote,
       spectators: this.spectators,

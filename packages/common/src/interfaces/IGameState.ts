@@ -1,6 +1,7 @@
 import {
   type BoType,
   type GameFinishReason,
+  type GameForfeitReason,
   type Outcome,
   type OutcomeHistory
 } from '../types'
@@ -18,6 +19,7 @@ export interface IGameState {
   winnerId?: string
   outcome: Outcome
   finishReason?: GameFinishReason
+  forfeitReason?: GameForfeitReason
   outcomeHistory: OutcomeHistory
   rematchVote?: string
 }

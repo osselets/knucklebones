@@ -235,7 +235,7 @@ export class GameStateDurableObject extends createDurable({
       if (this.connectedPlayers[opponentId] !== true) {
         return { status: 'unchanged' }
       }
-      gameState.finishByForfeit(disconnectedPlayerId)
+      gameState.finishByForfeit(disconnectedPlayerId, 'disconnect')
     } else {
       return { status: 'unchanged' }
     }
@@ -564,7 +564,7 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'not-ranked' }
     }
 
-    gameState.finishByForfeit(playerId)
+    gameState.finishByForfeit(playerId, 'resignation')
     this.reconnectDeadlines = {}
     return { status: 'updated', gameState: this.commitGameState(gameState) }
   }

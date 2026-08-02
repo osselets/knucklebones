@@ -13,11 +13,47 @@ import { Button } from './Button'
 import { useGame, type InGameContext } from './GameContext'
 import { ShortcutModal } from './ShortcutModal'
 
-type GetWinMessageArgs = Pick<InGameContext, 'outcome' | 'winner'>
+type GetWinMessageArgs = Pick<
+  InGameContext,
+  | 'finishReason'
+  | 'forfeitReason'
+  | 'outcome'
+  | 'playerOne'
+  | 'playerSide'
+  | 'playerTwo'
+  | 'winner'
+>
 
-function getWinMessage({ outcome, winner }: GetWinMessageArgs) {
+function getWinMessage({
+  finishReason,
+  forfeitReason,
+  outcome,
+  playerOne,
+  playerSide,
+  playerTwo,
+  winner
+}: GetWinMessageArgs) {
   if (outcome !== 'ongoing') {
     if (winner !== undefined) {
+      if (
+        outcome === 'game-ended' &&
+        finishReason === 'forfeit' &&
+        forfeitReason !== undefined
+      ) {
+        if (playerSide === 'spectator') {
+          const loser = winner.id === playerOne.id ? playerTwo : playerOne
+          return t(`game.forfeit.${forfeitReason}.spectator` as const, {
+            loser: loser.inGameName,
+            winner: winner.inGameName
+          })
+        }
+        return t(
+          `game.forfeit.${forfeitReason}.${
+            winner.isPlayerOne ? 'you-win' : 'opponent-win'
+          }` as const,
+          { player: winner.inGameName }
+        )
+      }
       const gameScope = outcome === 'round-ended' ? 'round' : 'game'
       const playerWin = winner.isPlayerOne ? 'you-win' : 'opponent-win'
       return t(`game.${gameScope}.${playerWin}` as const, {
@@ -78,6 +114,8 @@ export function GameOutcome() {
   const {
     outcome,
     winner,
+    finishReason,
+    forfeitReason,
     playerSide,
     playerOne,
     playerTwo,
@@ -129,7 +167,17 @@ export function GameOutcome() {
 
   const content = (
     <div className='grid justify-items-center gap-2 font-semibold'>
-      <p>{getWinMessage({ outcome, winner })}</p>
+      <p>
+        {getWinMessage({
+          finishReason,
+          forfeitReason,
+          outcome,
+          playerOne,
+          playerSide,
+          playerTwo,
+          winner
+        })}
+      </p>
       {!isSpectator && rankedAssignment !== undefined ? (
         <RankedResultRating
           assignment={rankedAssignment}

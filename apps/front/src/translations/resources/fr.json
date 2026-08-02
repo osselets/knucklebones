@@ -122,6 +122,18 @@
       "tie": "Égalité ! Personne n'a gagné !",
       "you-win": "Vous avez gagné la partie avec {{points}} points !",
       "opponent-win": "{{player}} a gagné la partie avec {{points}} points !"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "Votre adversaire a abandonné. Vous gagnez !",
+        "opponent-win": "Vous avez abandonné. {{player}} gagne.",
+        "spectator": "{{loser}} a abandonné. {{winner}} gagne."
+      },
+      "disconnect": {
+        "you-win": "Votre adversaire s'est déconnecté. Vous gagnez !",
+        "opponent-win": "Vous vous êtes déconnecté. {{player}} gagne.",
+        "spectator": "{{loser}} s'est déconnecté. {{winner}} gagne."
+      }
     }
   },
   "loading": "En attente du début de la partie",

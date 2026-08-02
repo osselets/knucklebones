@@ -299,6 +299,10 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
     await firstPlayer
       .getByRole('button', { name: 'Confirm resignation' })
       .click()
+    await expect(firstPlayer.getByText(/You resigned\./)).toBeVisible()
+    await expect(
+      secondPlayer.getByText('Your opponent resigned. You win!')
+    ).toBeVisible()
     for (const player of [firstPlayer, secondPlayer]) {
       await expect(
         player.getByRole('link', { name: 'Find another ranked match' })

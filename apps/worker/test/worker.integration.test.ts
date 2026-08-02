@@ -864,6 +864,7 @@ describe('ranked disconnect adjudication', () => {
       gameState: {
         outcome: 'game-ended',
         finishReason: 'forfeit',
+        forfeitReason: 'disconnect',
         winnerId: playerTwo.playerId
       }
     })
@@ -1454,6 +1455,7 @@ describe('ranked matchmaking', () => {
       status: 'adjudicated',
       gameState: {
         finishReason: 'forfeit',
+        forfeitReason: 'disconnect',
         winnerId: playerTwo.playerId
       }
     })

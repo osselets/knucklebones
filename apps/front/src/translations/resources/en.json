@@ -121,6 +121,18 @@
       "tie": "This is a tie! Nobody wins!",
       "you-win": "You won the game with {{points}} points!",
       "opponent-win": "{{player}} won the game with {{points}} points!"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "Your opponent resigned. You win!",
+        "opponent-win": "You resigned. {{player}} wins.",
+        "spectator": "{{loser}} resigned. {{winner}} wins."
+      },
+      "disconnect": {
+        "you-win": "Your opponent disconnected. You win!",
+        "opponent-win": "You disconnected. {{player}} wins.",
+        "spectator": "{{loser}} disconnected. {{winner}} wins."
+      }
     }
   },
   "loading": "Waiting for game to start",

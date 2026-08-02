@@ -121,6 +121,18 @@
       "tie": "平局！沒有人贏！",
       "you-win": "你以 {{points}} 分贏了遊戲！",
       "opponent-win": "{{player}} 以 {{points}} 分贏了遊戲！"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "對手已投降，你獲勝了！",
+        "opponent-win": "你已投降，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已投降，{{winner}} 獲勝。"
+      },
+      "disconnect": {
+        "you-win": "對手已斷線，你獲勝了！",
+        "opponent-win": "你已斷線，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已斷線，{{winner}} 獲勝。"
+      }
     }
   },
   "loading": "等待遊戲開始",
