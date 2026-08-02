@@ -14,6 +14,7 @@ import {
   joinMatchmaking,
   leaveMatchmaking
 } from '../utils/api'
+import { getStoredPlayerId } from '../utils/identityStorage'
 import { storeRankedMatchAssignment } from '../utils/rankedMatchStorage'
 import { Button } from './Button'
 import { LoadingDots } from './Loading'
@@ -210,6 +211,27 @@ export function RankedMatchmaking() {
           Math.ceil((readyCheck.acceptBy - readyCheck.match.createdAt) / 1_000)
         )
   const readyCheckProgress = (readyCheckSeconds / readyCheckDuration) * 100
+  const playerId = profile?.playerId ?? getStoredPlayerId()
+  const playerRating =
+    readyCheck === undefined || playerId === null
+      ? undefined
+      : playerId === readyCheck.match.playerOneId
+        ? readyCheck.match.playerOneRating
+        : playerId === readyCheck.match.playerTwoId
+          ? readyCheck.match.playerTwoRating
+          : undefined
+  const opponentRating =
+    readyCheck === undefined || playerId === null
+      ? undefined
+      : playerId === readyCheck.match.playerOneId
+        ? readyCheck.match.playerTwoRating
+        : playerId === readyCheck.match.playerTwoId
+          ? readyCheck.match.playerOneRating
+          : undefined
+  const ratingDifference =
+    playerRating === undefined || opponentRating === undefined
+      ? undefined
+      : opponentRating - playerRating
 
   React.useEffect(() => {
     if (
@@ -261,6 +283,23 @@ export function RankedMatchmaking() {
             <p className='text-2xl font-semibold'>
               {t('ranked.queue.match-found')}
             </p>
+            {opponentRating !== undefined && ratingDifference !== undefined && (
+              <div className='grid gap-1'>
+                <p>
+                  {t('ranked.match.opponent-rating', {
+                    rating: opponentRating
+                  })}
+                </p>
+                <p className='text-sm text-slate-600 dark:text-slate-300'>
+                  {t('ranked.queue.rating-difference', {
+                    difference:
+                      ratingDifference > 0
+                        ? `+${ratingDifference}`
+                        : ratingDifference
+                  })}
+                </p>
+              </div>
+            )}
             <p className='font-mono text-xl font-semibold tabular-nums'>
               {t('ranked.queue.accept-countdown', {
                 seconds: readyCheckSeconds

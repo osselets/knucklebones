@@ -6,6 +6,7 @@ import {
   EyeSlashIcon,
   IdentificationIcon
 } from '@heroicons/react/24/outline'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   createIdentityTransferCode,
   parseIdentityTransferCode,
@@ -202,6 +203,20 @@ export function PlayerIdentityTransfer() {
             aria-label={t('identity.transfer.code-label')}
             className='rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
           />
+          {isCodeVisible && transferCode !== '' && (
+            <div className='flex flex-col items-center gap-2'>
+              <div
+                role='img'
+                aria-label={t('identity.transfer.qr-label')}
+                className='rounded-lg border-2 border-slate-200 bg-white p-3'
+              >
+                <QRCodeSVG value={transferCode} size={192} />
+              </div>
+              <p className='text-center text-sm text-slate-600 dark:text-slate-300'>
+                {t('identity.transfer.qr-description')}
+              </p>
+            </div>
+          )}
           <div className='flex flex-wrap gap-2'>
             <Button
               disabled={isExporting}
