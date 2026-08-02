@@ -132,10 +132,15 @@ describe('player identities and ranked profiles', () => {
   it('creates an authenticated UUID identity with a default rating', async () => {
     const player = await createPlayer()
 
+    const availability = await request('/v1/ranked/availability', {
+      headers: authorization(player)
+    })
     const response = await request('/v1/ranked/profile', {
       headers: authorization(player)
     })
 
+    expect(availability.status).toBe(200)
+    await expect(availability.json()).resolves.toEqual({ enabled: true })
     expect(response.status).toBe(200)
     expect(rankedProfileSchema.parse(await response.json())).toEqual({
       playerId: player.playerId,

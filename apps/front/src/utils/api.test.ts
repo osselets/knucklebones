@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createWebSocketTicket,
   getMatchmakingStatus,
+  getRankedAvailability,
   getRankedProfile,
   initGame,
   joinMatchmaking,
@@ -160,6 +161,7 @@ describe('mutation requests', () => {
   it('uses authenticated ranked profile and matchmaking endpoints', async () => {
     const joinedAt = Date.now()
     fetchMock
+      .mockResolvedValueOnce(Response.json({ enabled: true }))
       .mockResolvedValueOnce(
         Response.json({
           playerId: room.playerId,
@@ -175,6 +177,7 @@ describe('mutation requests', () => {
       .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
 
+    await expect(getRankedAvailability()).resolves.toEqual({ enabled: true })
     await expect(getRankedProfile()).resolves.toMatchObject({ rating: 1200 })
     await expect(joinMatchmaking()).resolves.toEqual({
       status: 'waiting',
@@ -189,6 +192,7 @@ describe('mutation requests', () => {
     expect(
       fetchMock.mock.calls.map(([url, init]) => [url, init?.method])
     ).toEqual([
+      [expect.stringContaining('/v1/ranked/availability'), 'GET'],
       [expect.stringContaining('/v1/ranked/profile'), 'GET'],
       [expect.stringContaining('/v1/matchmaking/join'), 'POST'],
       [expect.stringContaining('/v1/matchmaking/status'), 'GET'],

@@ -5,4 +5,5 @@ export interface CloudflareEnvironment {
   PLAYERS_DB: D1Database
   SENTRY_DSN: string
   ENVIRONMENT: 'development' | 'staging' | 'production'
+  RANKED_MATCHMAKING_ENABLED: 'true' | 'false'
 }

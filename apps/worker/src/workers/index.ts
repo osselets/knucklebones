@@ -8,6 +8,7 @@ import {
   deleteDisplayName,
   displayName,
   getRankedProfile,
+  getRankedAvailability,
   getMatchmakingStatus,
   init,
   initializeRoom,
@@ -70,6 +71,7 @@ router
   .post('/v1/identity/credentials/revoke-others', revokeOtherDeviceCredentials)
   .delete('/v1/identity/credentials/:credentialId', revokeDeviceCredential)
   .all('/v1/ranked/*', authenticatePlayerRequest)
+  .get('/v1/ranked/availability', getRankedAvailability)
   .get('/v1/ranked/profile', getRankedProfile)
   .all('/v1/matchmaking/*', authenticatePlayerRequest)
   .post('/v1/matchmaking/join', joinMatchmaking)
