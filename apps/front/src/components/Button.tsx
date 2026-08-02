@@ -30,7 +30,7 @@ export function Button<E extends React.ElementType = typeof defaultElement>({
     <Component
       {...props}
       className={clsx(
-        'flex flex-row items-center gap-2 rounded-md text-center font-medium text-slate-900 transition-colors duration-100 disabled:opacity-50 dark:text-slate-50',
+        'flex cursor-pointer flex-row items-center gap-2 rounded-md text-center font-medium text-slate-900 transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-50',
         {
           'justify-center': center,
           'justify-start': !center,

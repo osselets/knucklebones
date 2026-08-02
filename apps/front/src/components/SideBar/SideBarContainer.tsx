@@ -82,7 +82,7 @@ export function SideBarContainer({
           <div className='flex h-screen w-64 flex-col gap-12 border-r border-slate-300 bg-slate-50 p-2 pt-4 pl-4 shadow-lg transition-colors duration-150 ease-in-out lg:border-0 lg:shadow-none dark:border-slate-600 dark:bg-slate-900'>
             <Link
               to={localizedPath('/')}
-              className='flex flex-row items-center gap-2 underline decoration-transparent decoration-4 underline-offset-2 transition-all duration-100 ease-in-out hover:decoration-slate-900'
+              className='flex flex-row items-center gap-2'
             >
               <img
                 src={KnucklebonesLogo}
