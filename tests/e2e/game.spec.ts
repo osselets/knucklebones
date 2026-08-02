@@ -258,6 +258,52 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
   }
 })
 
+test('returns a connected ranked player to the queue when the opponent never connects', async ({
+  browser
+}) => {
+  const playerContext = await browser.newContext()
+  const opponentContext = await browser.newContext()
+  const player = await playerContext.newPage()
+  const opponent = await opponentContext.newPage()
+
+  try {
+    await Promise.all([waitForHome(player), waitForHome(opponent)])
+    const opponentIdentity = await readIdentity(opponent)
+
+    await player.getByRole('link', { name: 'Play ranked' }).click()
+    await expect(
+      player.getByRole('heading', { name: 'Ranked matchmaking' })
+    ).toBeVisible()
+
+    const opponentJoinStatus = await opponent.evaluate(
+      async ({ credential }) => {
+        const response = await fetch(
+          'http://localhost:8787/v1/matchmaking/join',
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${credential}` }
+          }
+        )
+        return response.status
+      },
+      { credential: opponentIdentity.playerCredential }
+    )
+    expect(opponentJoinStatus).toBe(200)
+
+    await player.waitForURL(/\/room\/[0-9a-f-]+$/)
+    await player.waitForURL((url) => url.pathname === '/ranked', {
+      timeout: 20_000
+    })
+    await expect(
+      player.getByRole('heading', { name: 'Ranked matchmaking' })
+    ).toBeVisible()
+    await expect(player.getByText(/Looking for an opponent/)).toBeVisible()
+  } finally {
+    await playerContext.close()
+    await opponentContext.close()
+  }
+})
+
 test('keeps a spectator read-only while synchronizing a human move', async ({
   browser
 }) => {

@@ -3,10 +3,13 @@ import {
   DEFAULT_RATING_POOL,
   type MatchmakingStatus,
   matchmakingStatusSchema,
+  matchIdSchema,
   playerIdSchema,
+  requestIdSchema,
   RANKED_MATCH_FORMAT,
   RANKED_QUEUE_KEY,
-  type RankedMatchAssignment
+  type RankedMatchAssignment,
+  toGameErrorMessage
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { apiError } from '../utils/http'
@@ -34,6 +37,11 @@ interface QueueEntry {
 interface MatchmakingState {
   waiting: QueueEntry[]
   assignments: Record<string, RankedMatchAssignment>
+  assignmentEntries: Record<
+    string,
+    { playerOne: QueueEntry; playerTwo: QueueEntry }
+  >
+  assignmentPresence: Record<string, string[]>
 }
 
 export class MatchmakingDurableObject {
@@ -92,6 +100,28 @@ export class MatchmakingDurableObject {
           return await this.getStatus(parsedPlayerId.data)
         case 'DELETE /queue':
           return await this.leave(parsedPlayerId.data)
+        case 'POST /presence': {
+          const matchId = matchIdSchema.safeParse(
+            request.headers.get('X-Match-Id')
+          )
+          const connected = request.headers.get('X-Connected')
+          if (
+            !matchId.success ||
+            !['true', 'false'].includes(connected ?? '')
+          ) {
+            return apiError({
+              status: 400,
+              code: 'INVALID_MATCHMAKING_PRESENCE',
+              message: 'The matchmaking presence update is invalid.',
+              requestId
+            })
+          }
+          return await this.updateAssignmentPresence(
+            parsedPlayerId.data,
+            matchId.data,
+            connected === 'true'
+          )
+        }
         default:
           return apiError({
             status: 404,
@@ -122,12 +152,14 @@ export class MatchmakingDurableObject {
 
   private async join(playerId: string, rating: number): Promise<Response> {
     const now = Date.now()
+    const state = await this.getActiveState(now)
     const activeMatch = await getActiveRankedMatchForPlayer(
       this.cloudflareEnvironment.PLAYERS_DB,
       playerId,
       now
     )
     if (activeMatch !== undefined) {
+      await this.persistState(state, now)
       await this.configureRankedRoom(activeMatch.assignment)
       return this.statusResponse({
         status: 'matched',
@@ -135,7 +167,6 @@ export class MatchmakingDurableObject {
       })
     }
 
-    const state = await this.getActiveState(now)
     const assignment = state.assignments[playerId]
 
     if (assignment !== undefined) {
@@ -162,12 +193,14 @@ export class MatchmakingDurableObject {
 
   private async getStatus(playerId: string): Promise<Response> {
     const now = Date.now()
+    const state = await this.getActiveState(now)
     const activeMatch = await getActiveRankedMatchForPlayer(
       this.cloudflareEnvironment.PLAYERS_DB,
       playerId,
       now
     )
     if (activeMatch !== undefined) {
+      await this.persistState(state, now)
       await this.configureRankedRoom(activeMatch.assignment)
       return this.statusResponse({
         status: 'matched',
@@ -175,7 +208,6 @@ export class MatchmakingDurableObject {
       })
     }
 
-    const state = await this.getActiveState(now)
     const assignment = state.assignments[playerId]
     if (assignment !== undefined) {
       await this.configureRankedRoom(assignment)
@@ -202,11 +234,55 @@ export class MatchmakingDurableObject {
     return new Response(null, { status: 204 })
   }
 
+  private async updateAssignmentPresence(
+    playerId: string,
+    matchId: string,
+    connected: boolean
+  ): Promise<Response> {
+    const now = Date.now()
+    const state = await this.loadState()
+    const assignment = state.assignments[playerId]
+    if (assignment?.matchId === matchId) {
+      const connectedPlayerIds = new Set(
+        state.assignmentPresence[matchId] ?? []
+      )
+      if (connected) {
+        connectedPlayerIds.add(playerId)
+      } else {
+        connectedPlayerIds.delete(playerId)
+      }
+      state.assignmentPresence[matchId] = [...connectedPlayerIds]
+    }
+    await this.removeInactiveState(state, now, false)
+    await this.persistState(state, now)
+    return new Response(null, { status: 204 })
+  }
+
   private async getActiveState(now: number): Promise<MatchmakingState> {
+    const state = await this.loadState()
+    await this.removeInactiveState(state, now, true)
+    return state
+  }
+
+  private async loadState(): Promise<MatchmakingState> {
     const state = (await this.state.storage.get<MatchmakingState>(
       MATCHMAKING_STATE_KEY
-    )) ?? { waiting: [], assignments: {} }
+    )) ?? {
+      waiting: [],
+      assignments: {},
+      assignmentEntries: {},
+      assignmentPresence: {}
+    }
+    state.assignmentEntries ??= {}
+    state.assignmentPresence ??= {}
+    return state
+  }
 
+  private async removeInactiveState(
+    state: MatchmakingState,
+    now: number,
+    broadcastExpirations: boolean
+  ): Promise<void> {
     state.waiting = state.waiting.filter(
       (entry) => entry.lastSeenAt > now - QUEUE_ENTRY_TTL_MS
     )
@@ -215,21 +291,43 @@ export class MatchmakingDurableObject {
         .filter((match) => match.expiresAt <= now)
         .map((match) => [match.matchId, match])
     )
-    await Promise.all(
-      [...expiredAssignments.values()].map(async (match) =>
-        expireRankedAssignment(
-          this.cloudflareEnvironment.PLAYERS_DB,
-          match.matchId,
-          now
-        )
+    for (const match of expiredAssignments.values()) {
+      const connectedPlayerIds = state.assignmentPresence[match.matchId] ?? []
+      const expired = await expireRankedAssignment(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        match.matchId,
+        now
       )
-    )
+      if (expired) {
+        const entries = state.assignmentEntries[match.matchId]
+        if (entries !== undefined) {
+          for (const entry of [entries.playerOne, entries.playerTwo]) {
+            if (
+              connectedPlayerIds.includes(entry.playerId) &&
+              !state.waiting.some(
+                (waitingEntry) => waitingEntry.playerId === entry.playerId
+              )
+            ) {
+              state.waiting.push({ ...entry, lastSeenAt: now })
+            }
+          }
+        }
+        if (broadcastExpirations && connectedPlayerIds.length > 0) {
+          try {
+            await this.broadcastAssignmentExpired(match)
+          } catch (error) {
+            this.sentry.captureException(error)
+          }
+        }
+      }
+      delete state.assignmentEntries[match.matchId]
+      delete state.assignmentPresence[match.matchId]
+    }
     state.assignments = Object.fromEntries(
       Object.entries(state.assignments).filter(
         ([, match]) => match.expiresAt > now
       )
     )
-    return state
   }
 
   private async matchEligiblePlayers(
@@ -336,6 +434,36 @@ export class MatchmakingDurableObject {
     )
     state.assignments[entry.playerId] = match
     state.assignments[opponent.playerId] = match
+    state.assignmentEntries[match.matchId] = {
+      playerOne: entry,
+      playerTwo: opponent
+    }
+    state.assignmentPresence[match.matchId] = []
+  }
+
+  private async broadcastAssignmentExpired(
+    assignment: RankedMatchAssignment
+  ): Promise<void> {
+    const requestId = requestIdSchema.parse(crypto.randomUUID())
+    const id = this.cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.idFromName(
+      assignment.roomKey
+    )
+    const room = this.cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.get(id)
+    const response = await room.fetch('https://dummy-url/broadcast', {
+      method: 'POST',
+      headers: { 'X-Request-Id': requestId },
+      body: JSON.stringify(
+        toGameErrorMessage({
+          code: 'RANKED_ASSIGNMENT_EXPIRED',
+          message: 'The opponent did not connect. Returning to matchmaking.',
+          requestId,
+          retryable: true
+        })
+      )
+    })
+    if (!response.ok) {
+      throw new Error('The WebSocket room rejected the assignment expiry.')
+    }
   }
 
   private async persistState(

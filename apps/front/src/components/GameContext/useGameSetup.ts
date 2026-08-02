@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
   AI_PLAYER_ID,
@@ -25,6 +25,7 @@ import {
 } from '../../utils/api'
 import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
+import { getStoredRankedMatchAssignment } from '../../utils/rankedMatchStorage'
 import { getWebSocketUrl, preparePlayers } from './utils'
 
 // react-use-websocket 4.13 publishes a CommonJS object containing its default
@@ -38,6 +39,7 @@ const useWebSocket =
 
 export function useGameSetup() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
@@ -47,6 +49,10 @@ export function useGameSetup() {
   const [reconnectDeadlineByPlayerId, setReconnectDeadlineByPlayerId] =
     React.useState<Record<string, number>>({})
   const roomKey = useRoomKey()
+  const rankedAssignment = React.useMemo(
+    () => getStoredRankedMatchAssignment(roomKey),
+    [roomKey]
+  )
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
   const playerId = getStoredPlayerId()!
@@ -117,6 +123,10 @@ export function useGameSetup() {
             return nextDeadlines
           })
         } else if (serverEvent.data.type === 'game.error') {
+          if (serverEvent.data.payload.code === 'RANKED_ASSIGNMENT_EXPIRED') {
+            navigate('/ranked', { replace: true })
+            return
+          }
           setErrorMessage(serverEvent.data.payload.message)
         }
         return
@@ -168,12 +178,24 @@ export function useGameSetup() {
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage, roomKey, t])
+  }, [lastJsonMessage, navigate, roomKey, t])
 
   React.useEffect(() => {
     setPresenceByPlayerId({})
     setReconnectDeadlineByPlayerId({})
   }, [roomKey])
+
+  React.useEffect(() => {
+    if (gameState !== null || rankedAssignment === undefined) {
+      return
+    }
+
+    const timeout = setTimeout(
+      () => navigate('/ranked', { replace: true }),
+      Math.max(0, rankedAssignment.expiresAt - Date.now()) + 500
+    )
+    return () => clearTimeout(timeout)
+  }, [gameState, navigate, rankedAssignment])
 
   React.useEffect(() => {
     if (readyState === ReadyState.OPEN) {

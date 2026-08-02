@@ -86,6 +86,12 @@ export class GameStateDurableObject extends createDurable({
     this.rankedPlayerClaims = {}
   }
 
+  getPersistable(): Record<string, unknown> {
+    const persistable = super.getPersistable() as Record<string, unknown>
+    delete persistable.cloudflareEnvironment
+    return persistable
+  }
+
   configureRankedMatch(assignment: RankedMatchAssignment): void {
     const parsedAssignment = rankedMatchAssignmentSchema.parse(assignment)
     if (this.rankedMatch !== undefined) {
@@ -141,6 +147,7 @@ export class GameStateDurableObject extends createDurable({
 
       const changed = this.connectedPlayers[parsedPlayerId] !== connected
       this.connectedPlayers[parsedPlayerId] = connected
+      await this.reportRankedAssignmentPresence(parsedPlayerId, connected)
       return changed
         ? {
             status: 'updated',
@@ -575,6 +582,33 @@ export class GameStateDurableObject extends createDurable({
     }
 
     await this.setAlarm(Math.min(...deadlines))
+  }
+
+  private async reportRankedAssignmentPresence(
+    playerId: string,
+    connected: boolean
+  ): Promise<void> {
+    const assignment = this.rankedMatch
+    if (assignment === undefined) {
+      return
+    }
+
+    const id = this.cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.idFromName(
+      assignment.queueKey
+    )
+    const matchmaking =
+      this.cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.get(id)
+    const response = await matchmaking.fetch('https://dummy-url/presence', {
+      method: 'POST',
+      headers: {
+        'X-Player-Id': playerId,
+        'X-Match-Id': assignment.matchId,
+        'X-Connected': String(connected)
+      }
+    })
+    if (!response.ok) {
+      throw new Error('The matchmaker rejected a ranked presence update.')
+    }
   }
 
   private async broadcastAlarmResult(gameState: IGameState): Promise<void> {

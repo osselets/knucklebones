@@ -5,6 +5,7 @@ import {
   compatibleGameStateMessageSchema,
   gameServerEventSchema,
   getGameStateMessagePayload,
+  toGameErrorMessage,
   toGameStateMessage
 } from './gameStateMessage'
 
@@ -108,5 +109,16 @@ describe('gameServerEventSchema', () => {
         payload: {}
       }).success
     ).toBe(false)
+  })
+
+  it('creates a versioned game error from API error details', () => {
+    const message = toGameErrorMessage({
+      code: 'RANKED_ASSIGNMENT_EXPIRED',
+      message: 'Returning to matchmaking.',
+      requestId,
+      retryable: true
+    })
+
+    expect(gameServerEventSchema.parse(message)).toEqual(message)
   })
 })

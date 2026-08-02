@@ -813,6 +813,14 @@ describe('ranked disconnect adjudication', () => {
     return { callGame, playerOne, playerTwo }
   }
 
+  it('excludes runtime bindings from persisted room state', async () => {
+    const { callGame } = await createActiveRoom()
+
+    expect(
+      await callGame<Record<string, unknown>>('getPersistable', [])
+    ).not.toHaveProperty('cloudflareEnvironment')
+  })
+
   it('cancels a deadline on reconnect and forfeits only after a later expiry', async () => {
     const { callGame, playerOne, playerTwo } = await createActiveRoom()
     const now = Date.now() + 60_000
@@ -1521,6 +1529,65 @@ describe('ranked matchmaking', () => {
         .first()
     ).resolves.toBeNull()
   })
+
+  it('requeues the connected player when an opponent never connects', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    const firstJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerOne)).json()
+    )
+    if (firstJoin.status !== 'waiting') {
+      throw new Error('Expected the first player to be waiting.')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 550))
+    const match = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (match.status !== 'matched') {
+      throw new Error('Expected the players to be matched.')
+    }
+
+    const environment = await server.getWorker().getEnv()
+    const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      match.match.roomKey
+    )
+    const room = environment.GAME_STATE_DURABLE_OBJECT.get(roomId)
+    const presence = await room.fetch(
+      'https://itty-durable/do/call/updatePresence',
+      {
+        headers: {
+          'do-name': match.match.roomKey,
+          'do-content': JSON.stringify([playerOne.playerId, true])
+        }
+      }
+    )
+    expect(presence.ok).toBe(true)
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, match.match.expiresAt - Date.now()) + 750)
+    )
+
+    const playerOneStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerOne)).json()
+    )
+    const playerTwoStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerTwo)).json()
+    )
+    expect(playerOneStatus).toEqual({
+      status: 'waiting',
+      joinedAt: firstJoin.joinedAt
+    })
+    expect(playerTwoStatus).toEqual({ status: 'idle' })
+    await expect(
+      environment.PLAYERS_DB.prepare(
+        'SELECT match_id FROM active_ranked_matches WHERE match_id = ?'
+      )
+        .bind(match.match.matchId)
+        .first()
+    ).resolves.toBeNull()
+  }, 25_000)
 
   it('chooses the closest rating after the selection window', async () => {
     const player = await createPlayer()

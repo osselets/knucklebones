@@ -389,14 +389,15 @@ export async function expireRankedAssignment(
   database: D1Database,
   matchId: string,
   now = Date.now()
-): Promise<void> {
-  await database
+): Promise<boolean> {
+  const result = await database
     .prepare(
       `DELETE FROM active_ranked_matches
        WHERE match_id = ? AND state = 'assigned' AND expires_at <= ?`
     )
     .bind(matchId, now)
     .run()
+  return result.meta.changes === 1
 }
 
 async function getRankedMatchSettlement(
