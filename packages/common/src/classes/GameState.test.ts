@@ -143,6 +143,38 @@ describe('GameState play validation', () => {
     ).toBe('game-ended')
   })
 
+  it('ends a BO1 as a draw when the completed board is tied', () => {
+    const playerOne = new Player('player-one', 'Player One', undefined, 6, [
+      [1, 2, 3],
+      [1, 2, 3],
+      [4, 5]
+    ])
+    const playerTwo = new Player('player-two', 'Player Two', undefined, 1, [
+      [6, 6],
+      [3],
+      []
+    ])
+    const gameState = new GameState({
+      playerOne,
+      playerTwo,
+      nextPlayer: playerOne,
+      outcome: 'ongoing',
+      boType: 1
+    })
+
+    gameState.applyPlay({ author: 'player-one', column: 2, dice: 6 })
+
+    expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.finishReason).toBe('completed')
+    expect(gameState.winnerId).toBeUndefined()
+    expect(gameState.outcomeHistory).toEqual([
+      {
+        playerOne: { id: 'player-one', score: 27 },
+        playerTwo: { id: 'player-two', score: 27 }
+      }
+    ])
+  })
+
   it('records an authoritative forfeit outcome', () => {
     const gameState = createGameState()
 

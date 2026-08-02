@@ -123,6 +123,7 @@ export function GameOutcome() {
     winner,
     finishReason,
     forfeitReason,
+    isLoading,
     playerSide,
     playerOne,
     playerTwo,
@@ -147,7 +148,11 @@ export function GameOutcome() {
 
   React.useEffect(() => {
     let cancelled = false
-    if (outcome === 'game-ended' && rankedAssignment !== undefined) {
+    if (
+      outcome === 'game-ended' &&
+      rankedAssignment !== undefined &&
+      !isLoading
+    ) {
       void getRankedProfile()
         .then((profile) => {
           if (!cancelled) {
@@ -164,7 +169,7 @@ export function GameOutcome() {
     return () => {
       cancelled = true
     }
-  }, [outcome, rankedAssignment])
+  }, [isLoading, outcome, rankedAssignment])
 
   if (outcome === 'ongoing') {
     // On peut mettre un VS semi-transparent dans le fond de la partie

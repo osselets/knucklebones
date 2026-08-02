@@ -368,6 +368,9 @@ export class GameState implements IGameState {
     if (this.boType === 'indefinite') {
       return true
     }
+    if (this.boType === 1) {
+      return true
+    }
     const majority = Math.ceil(this.boType / 2)
     const { playerOne, playerTwo } = getWinHistory(this.outcomeHistory).at(-1)!
     return playerOne.wins === majority || playerTwo.wins === majority
