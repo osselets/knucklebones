@@ -7,7 +7,8 @@ function getNextLanguagePath(currentLanguage: string) {
   const currentIndex = supportedLanguages.findIndex(({ value }) =>
     currentLanguage.startsWith(value)
   )
-  const nextLang = supportedLanguages[currentIndex === 0 ? 1 : 0].value
+  const nextLang =
+    supportedLanguages[(currentIndex + 1) % supportedLanguages.length].value
   return `/${nextLang}${getPathWithoutLanguage()}`
 }
 
