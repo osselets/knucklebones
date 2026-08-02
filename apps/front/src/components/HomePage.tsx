@@ -45,11 +45,18 @@ export function HomePage() {
           </h1>
         </div>
         <div className='flex flex-col gap-4 md:gap-8'>
-          {isRankedEnabled && (
-            <Button as={Link} size='large' to='/ranked'>
-              {t('home.play.ranked')}
-            </Button>
-          )}
+          <Button
+            as={Link}
+            size='large'
+            to='/ranked'
+            aria-hidden={!isRankedEnabled}
+            tabIndex={isRankedEnabled ? undefined : -1}
+            className={
+              isRankedEnabled ? undefined : 'pointer-events-none invisible'
+            }
+          >
+            {t('home.play.ranked')}
+          </Button>
           <Button
             size='large'
             onClick={() => {
