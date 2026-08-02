@@ -171,6 +171,35 @@ export async function reserveRankedMatch(
   }
 }
 
+export async function extendRankedAssignment(
+  database: D1Database,
+  assignment: RankedMatchAssignment,
+  expiresAt: number
+): Promise<RankedMatchAssignment> {
+  const parsedAssignment = rankedMatchAssignmentSchema.parse(assignment)
+  if (expiresAt <= parsedAssignment.expiresAt) {
+    throw new Error('The ranked assignment expiry was not extended.')
+  }
+
+  const result = await database
+    .prepare(
+      `UPDATE active_ranked_matches
+       SET expires_at = ?
+       WHERE match_id = ? AND state = 'assigned' AND expires_at = ?`
+    )
+    .bind(expiresAt, parsedAssignment.matchId, parsedAssignment.expiresAt)
+    .run()
+
+  if (result.meta.changes !== 1) {
+    throw new Error('The ranked assignment could not be extended.')
+  }
+
+  return rankedMatchAssignmentSchema.parse({
+    ...parsedAssignment,
+    expiresAt
+  })
+}
+
 export async function activateRankedMatch(
   database: D1Database,
   assignment: RankedMatchAssignment,

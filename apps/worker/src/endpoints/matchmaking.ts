@@ -67,6 +67,19 @@ export async function getMatchmakingStatus(
   )
 }
 
+export async function acceptMatchmaking(
+  request: Request & MatchmakingRequest,
+  cloudflareEnvironment: CloudflareEnvironment
+): Promise<Response> {
+  return await fetchMatchmakingObject(
+    request,
+    request.principal.playerId,
+    cloudflareEnvironment,
+    '/accept',
+    { method: 'POST' }
+  )
+}
+
 export async function leaveMatchmaking(
   request: Request & MatchmakingRequest,
   cloudflareEnvironment: CloudflareEnvironment

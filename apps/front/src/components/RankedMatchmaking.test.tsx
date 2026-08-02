@@ -1,7 +1,9 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
+  acceptMatchmaking,
   getMatchmakingStatus,
   getRankedProfile,
   joinMatchmaking,
@@ -15,6 +17,7 @@ import {
 } from './RankedMatchmaking'
 
 vi.mock('../utils/api', () => ({
+  acceptMatchmaking: vi.fn(),
   getMatchmakingStatus: vi.fn(),
   getRankedProfile: vi.fn(),
   joinMatchmaking: vi.fn(),
@@ -70,6 +73,7 @@ function renderMatchmaking() {
 
 describe('RankedMatchmaking', () => {
   beforeEach(() => {
+    vi.mocked(acceptMatchmaking).mockReset()
     vi.mocked(getRankedProfile).mockReset()
     vi.mocked(joinMatchmaking).mockReset()
     vi.mocked(getMatchmakingStatus).mockReset()
@@ -90,6 +94,34 @@ describe('RankedMatchmaking', () => {
       population: { queuedPlayers: 3, activePlayers: 8 }
     })
     vi.mocked(leaveMatchmaking).mockResolvedValue()
+  })
+
+  it('shows a ready check and enters the room after accepting', async () => {
+    vi.mocked(joinMatchmaking).mockResolvedValue({
+      status: 'match-found',
+      match: assignment,
+      acceptBy: Date.now() + 15_000,
+      accepted: false
+    })
+    vi.mocked(acceptMatchmaking).mockResolvedValue({
+      status: 'matched',
+      match: assignment
+    })
+
+    renderMatchmaking()
+
+    expect(await screen.findByText('ranked.queue.match-found')).toBeVisible()
+    expect(
+      screen.getByRole('progressbar', {
+        name: 'ranked.queue.accept-progress'
+      })
+    ).toBeVisible()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'ranked.queue.accept' })
+    )
+
+    expect(await screen.findByText('Ranked room')).toBeInTheDocument()
+    expect(acceptMatchmaking).toHaveBeenCalledOnce()
   })
 
   it('stores an assignment and navigates to its ranked room', async () => {

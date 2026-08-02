@@ -1145,11 +1145,35 @@ describe('ranked matchmaking', () => {
     request('/v1/matchmaking/status', {
       headers: authorization(player)
     })
+  const acceptMatch = (player: PlayerCredentials) =>
+    request('/v1/matchmaking/accept', {
+      method: 'POST',
+      headers: authorization(player)
+    })
   const leaveQueue = (player: PlayerCredentials) =>
     request('/v1/matchmaking/queue', {
       method: 'DELETE',
       headers: authorization(player)
     })
+  const acceptReadyCheck = async (
+    playerOne: PlayerCredentials,
+    playerTwo: PlayerCredentials
+  ) => {
+    await acceptMatch(playerOne)
+    const playerTwoStatus = matchmakingStatusSchema.parse(
+      await (await acceptMatch(playerTwo)).json()
+    )
+    const playerOneStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerOne)).json()
+    )
+    if (
+      playerOneStatus.status !== 'matched' ||
+      playerTwoStatus.status !== 'matched'
+    ) {
+      throw new Error('Expected both players to accept the match.')
+    }
+    return { playerOneStatus, playerTwoStatus }
+  }
 
   it('matches compatible players after the fast selection window', async () => {
     const playerOne = await createPlayer()
@@ -1256,23 +1280,23 @@ describe('ranked matchmaking', () => {
 
     const secondJoin = await joinQueue(playerTwo)
     const playerOneStatus = await getQueueStatus(playerOne)
-    const playerTwoMatch = matchmakingStatusSchema.parse(
+    const playerTwoFound = matchmakingStatusSchema.parse(
       await secondJoin.json()
     )
-    const playerOneMatch = matchmakingStatusSchema.parse(
+    const playerOneFound = matchmakingStatusSchema.parse(
       await playerOneStatus.json()
     )
 
-    expect(playerOneMatch.status).toBe('matched')
-    expect(playerTwoMatch.status).toBe('matched')
+    expect(playerOneFound.status).toBe('match-found')
+    expect(playerTwoFound.status).toBe('match-found')
     if (
-      playerOneMatch.status !== 'matched' ||
-      playerTwoMatch.status !== 'matched'
+      playerOneFound.status !== 'match-found' ||
+      playerTwoFound.status !== 'match-found'
     ) {
-      throw new Error('Expected both players to be matched.')
+      throw new Error('Expected both players to receive a ready check.')
     }
-    expect(playerOneMatch.match).toEqual(playerTwoMatch.match)
-    expect(playerOneMatch.match).toMatchObject({
+    expect(playerOneFound.match).toEqual(playerTwoFound.match)
+    expect(playerOneFound.match).toMatchObject({
       queueKey: 'classic:bo1',
       ratingPool: 'classic',
       format: 'bo1',
@@ -1282,6 +1306,18 @@ describe('ranked matchmaking', () => {
       playerTwoRating: 1200,
       expiresAt: expect.any(Number)
     })
+
+    const duplicateJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerOne)).json()
+    )
+    expect(duplicateJoin).toEqual(playerOneFound)
+
+    const { playerOneStatus: playerOneMatch, playerTwoStatus: playerTwoMatch } =
+      await acceptReadyCheck(playerOne, playerTwo)
+    expect(playerOneMatch.match).toEqual(playerTwoMatch.match)
+    expect(playerOneMatch.match.expiresAt).toBeGreaterThan(
+      playerOneFound.match.expiresAt
+    )
 
     const environment = await server.getWorker().getEnv()
     const activeMatch = await environment.PLAYERS_DB.prepare(
@@ -1297,11 +1333,6 @@ describe('ranked matchmaking', () => {
       player_two_id: playerTwo.playerId,
       state: 'assigned'
     })
-
-    const duplicateJoin = matchmakingStatusSchema.parse(
-      await (await joinQueue(playerOne)).json()
-    )
-    expect(duplicateJoin).toEqual(playerOneMatch)
 
     const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
       playerOneMatch.match.roomKey
@@ -1511,12 +1542,16 @@ describe('ranked matchmaking', () => {
 
     await joinQueue(playerOne)
     await new Promise((resolve) => setTimeout(resolve, 550))
-    const match = matchmakingStatusSchema.parse(
+    const found = matchmakingStatusSchema.parse(
       await (await joinQueue(playerTwo)).json()
     )
-    if (match.status !== 'matched') {
-      throw new Error('Expected the players to be matched.')
+    if (found.status !== 'match-found') {
+      throw new Error('Expected the players to receive a ready check.')
     }
+    const { playerOneStatus: match } = await acceptReadyCheck(
+      playerOne,
+      playerTwo
+    )
 
     for (const player of [playerOne, playerTwo]) {
       const initialize = await request(
@@ -1592,18 +1627,68 @@ describe('ranked matchmaking', () => {
     )
   })
 
+  it('requeues an accepting player when the opponent misses the ready check', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    const firstJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerOne)).json()
+    )
+    if (firstJoin.status !== 'waiting') {
+      throw new Error('Expected the first player to be waiting.')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 550))
+    const found = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (found.status !== 'match-found') {
+      throw new Error('Expected the players to receive a ready check.')
+    }
+
+    const accepted = matchmakingStatusSchema.parse(
+      await (await acceptMatch(playerOne)).json()
+    )
+    expect(accepted).toMatchObject({
+      status: 'match-found',
+      accepted: true,
+      acceptBy: found.acceptBy
+    })
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, found.acceptBy - Date.now()) + 750)
+    )
+
+    const playerOneStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerOne)).json()
+    )
+    const playerTwoStatus = matchmakingStatusSchema.parse(
+      await (await getQueueStatus(playerTwo)).json()
+    )
+    expect(playerOneStatus).toEqual({
+      status: 'waiting',
+      joinedAt: firstJoin.joinedAt,
+      population: { queuedPlayers: 1, activePlayers: 0 }
+    })
+    expect(playerTwoStatus).toEqual({ status: 'idle' })
+  }, 25_000)
+
   it('rejects initialization after the ranked assignment expires', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
 
     await joinQueue(playerOne)
     await new Promise((resolve) => setTimeout(resolve, 800))
-    const status = matchmakingStatusSchema.parse(
+    const found = matchmakingStatusSchema.parse(
       await (await joinQueue(playerTwo)).json()
     )
-    if (status.status !== 'matched') {
-      throw new Error('Expected both players to be matched.')
+    if (found.status !== 'match-found') {
+      throw new Error('Expected both players to receive a ready check.')
     }
+    const { playerOneStatus: status } = await acceptReadyCheck(
+      playerOne,
+      playerTwo
+    )
 
     const initialize = (player: PlayerCredentials) =>
       request(`/v1/rooms/${status.match.roomKey}/init`, {
@@ -1654,12 +1739,16 @@ describe('ranked matchmaking', () => {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 550))
-    const match = matchmakingStatusSchema.parse(
+    const found = matchmakingStatusSchema.parse(
       await (await joinQueue(playerTwo)).json()
     )
-    if (match.status !== 'matched') {
-      throw new Error('Expected the players to be matched.')
+    if (found.status !== 'match-found') {
+      throw new Error('Expected the players to receive a ready check.')
     }
+    const { playerOneStatus: match } = await acceptReadyCheck(
+      playerOne,
+      playerTwo
+    )
 
     const environment = await server.getWorker().getEnv()
     const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
@@ -1725,9 +1814,9 @@ describe('ranked matchmaking', () => {
     const response = await getQueueStatus(player)
     const match = matchmakingStatusSchema.parse(await response.json())
 
-    expect(match.status).toBe('matched')
-    if (match.status !== 'matched') {
-      throw new Error('Expected the player to be matched.')
+    expect(match.status).toBe('match-found')
+    if (match.status !== 'match-found') {
+      throw new Error('Expected the player to receive a ready check.')
     }
     expect([match.match.playerOneId, match.match.playerTwoId]).toEqual([
       player.playerId,
@@ -1755,7 +1844,7 @@ describe('ranked matchmaking', () => {
     const response = await getQueueStatus(player)
 
     expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(
-      'matched'
+      'match-found'
     )
   })
 })

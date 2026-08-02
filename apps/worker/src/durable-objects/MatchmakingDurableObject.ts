@@ -18,6 +18,7 @@ import { recordOperationalEvent } from '../utils/observability'
 import {
   countActiveRankedPlayers,
   expireRankedAssignment,
+  extendRankedAssignment,
   getActiveRankedMatchForPlayer,
   releaseRankedMatch,
   reserveRankedMatch
@@ -46,6 +47,8 @@ interface MatchmakingState {
     { playerOne: QueueEntry; playerTwo: QueueEntry }
   >
   assignmentPresence: Record<string, string[]>
+  assignmentAcceptances: Record<string, string[]>
+  assignmentAcceptBy: Record<string, number>
 }
 
 export class MatchmakingDurableObject {
@@ -103,6 +106,8 @@ export class MatchmakingDurableObject {
         }
         case 'GET /status':
           return await this.getStatus(parsedPlayerId.data)
+        case 'POST /accept':
+          return await this.accept(parsedPlayerId.data)
         case 'DELETE /queue':
           return await this.leave(parsedPlayerId.data)
         case 'POST /presence': {
@@ -162,8 +167,7 @@ export class MatchmakingDurableObject {
 
     if (assignment !== undefined) {
       await this.persistState(state, now)
-      await this.configureRankedRoom(assignment)
-      return this.statusResponse({ status: 'matched', match: assignment })
+      return await this.getPlayerStatus(state, playerId, now)
     }
 
     const existingEntry = state.waiting.find(
@@ -178,7 +182,9 @@ export class MatchmakingDurableObject {
       )
       if (activeMatch !== undefined) {
         await this.persistState(state, now)
-        await this.configureRankedRoom(activeMatch.assignment)
+        if (activeMatch.state === 'active') {
+          await this.configureRankedRoom(activeMatch.assignment)
+        }
         return this.statusResponse({
           status: 'matched',
           match: activeMatch.assignment
@@ -207,9 +213,8 @@ export class MatchmakingDurableObject {
     const state = await this.getActiveState(now)
     const assignment = state.assignments[playerId]
     if (assignment !== undefined) {
-      await this.configureRankedRoom(assignment)
       await this.persistState(state, now)
-      return this.statusResponse({ status: 'matched', match: assignment })
+      return await this.getPlayerStatus(state, playerId, now)
     }
     const entry = state.waiting.find(
       (candidate) => candidate.playerId === playerId
@@ -229,7 +234,9 @@ export class MatchmakingDurableObject {
     )
     if (activeMatch !== undefined) {
       await this.persistState(state, now)
-      await this.configureRankedRoom(activeMatch.assignment)
+      if (activeMatch.state === 'active') {
+        await this.configureRankedRoom(activeMatch.assignment)
+      }
       return this.statusResponse({
         status: 'matched',
         match: activeMatch.assignment
@@ -240,9 +247,84 @@ export class MatchmakingDurableObject {
     return this.statusResponse({ status: 'idle' })
   }
 
+  private async accept(playerId: string): Promise<Response> {
+    const now = Date.now()
+    const state = await this.getActiveState(now)
+    const assignment = state.assignments[playerId]
+    if (assignment === undefined) {
+      await this.persistState(state, now)
+      return await this.getPlayerStatus(state, playerId, now)
+    }
+    if (this.isAssignmentReady(state, assignment.matchId)) {
+      await this.persistState(state, now)
+      return await this.getPlayerStatus(state, playerId, now)
+    }
+
+    const acceptedPlayerIds = new Set(
+      state.assignmentAcceptances[assignment.matchId] ?? []
+    )
+    acceptedPlayerIds.add(playerId)
+    state.assignmentAcceptances[assignment.matchId] = [...acceptedPlayerIds]
+
+    if (acceptedPlayerIds.size === 2) {
+      const extendedAssignment = await extendRankedAssignment(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        assignment,
+        Math.max(now + MATCH_ASSIGNMENT_TTL_MS, assignment.expiresAt + 1)
+      )
+      state.assignments[assignment.playerOneId] = extendedAssignment
+      state.assignments[assignment.playerTwoId] = extendedAssignment
+      try {
+        await this.configureRankedRoom(extendedAssignment)
+      } catch (error) {
+        await releaseRankedMatch(
+          this.cloudflareEnvironment.PLAYERS_DB,
+          assignment.matchId
+        )
+        this.requeueAssignmentPlayers(
+          state,
+          assignment,
+          [assignment.playerOneId, assignment.playerTwoId],
+          now
+        )
+        await this.persistState(state, now)
+        throw error
+      }
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'matchmaking.assignment',
+        outcome: 'accepted',
+        queue_key: assignment.queueKey,
+        accept_ms: now - assignment.createdAt
+      })
+    }
+
+    await this.persistState(state, now)
+    return await this.getPlayerStatus(state, playerId, now)
+  }
+
   private async leave(playerId: string): Promise<Response> {
     const now = Date.now()
     const state = await this.getActiveState(now)
+    const assignment = state.assignments[playerId]
+    if (
+      assignment !== undefined &&
+      !this.isAssignmentReady(state, assignment.matchId)
+    ) {
+      await releaseRankedMatch(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        assignment.matchId
+      )
+      const opponentId =
+        assignment.playerOneId === playerId
+          ? assignment.playerTwoId
+          : assignment.playerOneId
+      this.requeueAssignmentPlayers(state, assignment, [opponentId], now)
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'matchmaking.assignment',
+        outcome: 'declined',
+        queue_key: assignment.queueKey
+      })
+    }
     const previousQueueSize = state.waiting.length
     state.waiting = state.waiting.filter((entry) => entry.playerId !== playerId)
     recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
@@ -294,10 +376,24 @@ export class MatchmakingDurableObject {
       waiting: [],
       assignments: {},
       assignmentEntries: {},
-      assignmentPresence: {}
+      assignmentPresence: {},
+      assignmentAcceptances: {},
+      assignmentAcceptBy: {}
     }
+    const needsReadyCheckMigration = state.assignmentAcceptances === undefined
     state.assignmentEntries ??= {}
     state.assignmentPresence ??= {}
+    state.assignmentAcceptances ??= {}
+    state.assignmentAcceptBy ??= {}
+    if (needsReadyCheckMigration) {
+      for (const assignment of Object.values(state.assignments)) {
+        state.assignmentAcceptances[assignment.matchId] = [
+          assignment.playerOneId,
+          assignment.playerTwoId
+        ]
+        state.assignmentAcceptBy[assignment.matchId] = assignment.expiresAt
+      }
+    }
     return state
   }
 
@@ -322,11 +418,18 @@ export class MatchmakingDurableObject {
     }
     const expiredAssignments = new Map(
       Object.values(state.assignments)
-        .filter((match) => match.expiresAt <= now)
+        .filter((match) => {
+          const deadline = this.isAssignmentReady(state, match.matchId)
+            ? match.expiresAt
+            : (state.assignmentAcceptBy[match.matchId] ?? match.expiresAt)
+          return deadline <= now
+        })
         .map((match) => [match.matchId, match])
     )
     for (const match of expiredAssignments.values()) {
+      const ready = this.isAssignmentReady(state, match.matchId)
       const connectedPlayerIds = state.assignmentPresence[match.matchId] ?? []
+      const acceptedPlayerIds = state.assignmentAcceptances[match.matchId] ?? []
       const expired = await expireRankedAssignment(
         this.cloudflareEnvironment.PLAYERS_DB,
         match.matchId,
@@ -337,7 +440,9 @@ export class MatchmakingDurableObject {
         if (entries !== undefined) {
           for (const entry of [entries.playerOne, entries.playerTwo]) {
             if (
-              connectedPlayerIds.includes(entry.playerId) &&
+              (ready ? connectedPlayerIds : acceptedPlayerIds).includes(
+                entry.playerId
+              ) &&
               !state.waiting.some(
                 (waitingEntry) => waitingEntry.playerId === entry.playerId
               )
@@ -346,7 +451,7 @@ export class MatchmakingDurableObject {
             }
           }
         }
-        if (broadcastExpirations && connectedPlayerIds.length > 0) {
+        if (ready && broadcastExpirations && connectedPlayerIds.length > 0) {
           try {
             await this.broadcastAssignmentExpired(match)
           } catch (error) {
@@ -355,16 +460,21 @@ export class MatchmakingDurableObject {
         }
         recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
           event: 'matchmaking.assignment',
-          outcome: 'expired',
+          outcome: ready ? 'expired' : 'acceptance-expired',
           queue_key: match.queueKey,
-          connected_players: connectedPlayerIds.length,
+          connected_players: ready ? connectedPlayerIds.length : 0,
+          accepted_players: acceptedPlayerIds.length,
           requeued_players: state.waiting.filter((entry) =>
-            connectedPlayerIds.includes(entry.playerId)
+            (ready ? connectedPlayerIds : acceptedPlayerIds).includes(
+              entry.playerId
+            )
           ).length
         })
       }
       delete state.assignmentEntries[match.matchId]
       delete state.assignmentPresence[match.matchId]
+      delete state.assignmentAcceptances[match.matchId]
+      delete state.assignmentAcceptBy[match.matchId]
     }
     state.assignments = Object.fromEntries(
       Object.entries(state.assignments).filter(
@@ -460,16 +570,6 @@ export class MatchmakingDurableObject {
     }
 
     await reserveRankedMatch(this.cloudflareEnvironment.PLAYERS_DB, match)
-    try {
-      await this.configureRankedRoom(match)
-    } catch (error) {
-      await releaseRankedMatch(
-        this.cloudflareEnvironment.PLAYERS_DB,
-        match.matchId
-      )
-      throw error
-    }
-
     state.waiting = state.waiting.filter(
       (candidate) =>
         candidate.playerId !== entry.playerId &&
@@ -482,6 +582,8 @@ export class MatchmakingDurableObject {
       playerTwo: opponent
     }
     state.assignmentPresence[match.matchId] = []
+    state.assignmentAcceptances[match.matchId] = []
+    state.assignmentAcceptBy[match.matchId] = match.expiresAt
     const ratingDifference = Math.abs(entry.rating - opponent.rating)
     recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
       event: 'matchmaking.assignment',
@@ -538,7 +640,11 @@ export class MatchmakingDurableObject {
   ): number | undefined {
     const deadlines = [
       ...state.waiting.map((entry) => entry.lastSeenAt + QUEUE_ENTRY_TTL_MS),
-      ...Object.values(state.assignments).map((match) => match.expiresAt)
+      ...Object.values(state.assignments).map((match) =>
+        this.isAssignmentReady(state, match.matchId)
+          ? match.expiresAt
+          : (state.assignmentAcceptBy[match.matchId] ?? match.expiresAt)
+      )
     ]
 
     for (const entry of state.waiting) {
@@ -603,6 +709,15 @@ export class MatchmakingDurableObject {
   ): Promise<Response> {
     const match = state.assignments[playerId]
     if (match !== undefined) {
+      const acceptedPlayerIds = state.assignmentAcceptances[match.matchId] ?? []
+      if (!this.isAssignmentReady(state, match.matchId)) {
+        return this.statusResponse({
+          status: 'match-found',
+          match,
+          acceptBy: state.assignmentAcceptBy[match.matchId] ?? match.expiresAt,
+          accepted: acceptedPlayerIds.includes(playerId)
+        })
+      }
       return this.statusResponse({ status: 'matched', match })
     }
 
@@ -618,6 +733,38 @@ export class MatchmakingDurableObject {
     }
 
     return this.statusResponse({ status: 'idle' })
+  }
+
+  private isAssignmentReady(state: MatchmakingState, matchId: string): boolean {
+    return (state.assignmentAcceptances[matchId]?.length ?? 0) === 2
+  }
+
+  private requeueAssignmentPlayers(
+    state: MatchmakingState,
+    assignment: RankedMatchAssignment,
+    playerIds: string[],
+    now: number
+  ): void {
+    const entries = state.assignmentEntries[assignment.matchId]
+    if (entries !== undefined) {
+      for (const entry of [entries.playerOne, entries.playerTwo]) {
+        if (
+          playerIds.includes(entry.playerId) &&
+          !state.waiting.some(
+            (waitingEntry) => waitingEntry.playerId === entry.playerId
+          )
+        ) {
+          state.waiting.push({ ...entry, lastSeenAt: now })
+        }
+      }
+    }
+
+    delete state.assignments[assignment.playerOneId]
+    delete state.assignments[assignment.playerTwoId]
+    delete state.assignmentEntries[assignment.matchId]
+    delete state.assignmentPresence[assignment.matchId]
+    delete state.assignmentAcceptances[assignment.matchId]
+    delete state.assignmentAcceptBy[assignment.matchId]
   }
 
   private async getPopulation(

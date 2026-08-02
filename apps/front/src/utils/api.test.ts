@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  acceptMatchmaking,
   createWebSocketTicket,
   getMatchmakingStatus,
   getRankedAvailability,
@@ -175,6 +176,7 @@ describe('mutation requests', () => {
       )
       .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
       .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
+      .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
 
     await expect(getRankedAvailability()).resolves.toEqual({ enabled: true })
@@ -187,6 +189,10 @@ describe('mutation requests', () => {
       status: 'waiting',
       joinedAt
     })
+    await expect(acceptMatchmaking()).resolves.toEqual({
+      status: 'waiting',
+      joinedAt
+    })
     await leaveMatchmaking({ keepalive: true })
 
     expect(
@@ -196,6 +202,7 @@ describe('mutation requests', () => {
       [expect.stringContaining('/v1/ranked/profile'), 'GET'],
       [expect.stringContaining('/v1/matchmaking/join'), 'POST'],
       [expect.stringContaining('/v1/matchmaking/status'), 'GET'],
+      [expect.stringContaining('/v1/matchmaking/accept'), 'POST'],
       [expect.stringContaining('/v1/matchmaking/queue'), 'DELETE']
     ])
     expect(fetchMock.mock.calls.at(-1)?.[1]?.keepalive).toBe(true)

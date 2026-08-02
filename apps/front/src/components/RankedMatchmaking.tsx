@@ -8,12 +8,14 @@ import {
 } from '@knucklebones/common'
 import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import {
+  acceptMatchmaking,
   getMatchmakingStatus,
   getRankedProfile,
   joinMatchmaking,
   leaveMatchmaking
 } from '../utils/api'
 import { storeRankedMatchAssignment } from '../utils/rankedMatchStorage'
+import { Button } from './Button'
 import { LoadingDots } from './Loading'
 
 const MATCHMAKING_POLL_MS = 500
@@ -45,9 +47,13 @@ export function RankedMatchmaking() {
   const [profile, setProfile] = React.useState<RankedProfile>()
   const [joinedAt, setJoinedAt] = React.useState<number>()
   const [population, setPopulation] = React.useState<MatchmakingPopulation>()
+  const [readyCheck, setReadyCheck] =
+    React.useState<Extract<MatchmakingStatus, { status: 'match-found' }>>()
   const [now, setNow] = React.useState(Date.now)
   const [errorMessage, setErrorMessage] = React.useState<string>()
+  const [isAccepting, setIsAccepting] = React.useState(false)
   const shouldLeaveQueue = React.useRef(true)
+  const hasSeenReadyCheck = React.useRef(false)
   const exitCancellationTimeout = React.useRef<
     ReturnType<typeof setTimeout> | undefined
   >(undefined)
@@ -72,12 +78,8 @@ export function RankedMatchmaking() {
     }
   }, [])
 
-  React.useEffect(() => {
-    let disposed = false
-    let pollTimeout: ReturnType<typeof setTimeout> | undefined
-    const clockInterval = setInterval(() => setNow(Date.now()), 1_000)
-
-    const handleStatus = (status: MatchmakingStatus): boolean => {
+  const handleStatus = React.useCallback(
+    (status: MatchmakingStatus): boolean => {
       if (status.status === 'matched') {
         shouldLeaveQueue.current = false
         storeRankedMatchAssignment(status.match)
@@ -87,13 +89,27 @@ export function RankedMatchmaking() {
         })
         return true
       }
+      if (status.status === 'match-found') {
+        hasSeenReadyCheck.current = true
+        setReadyCheck(status)
+        setErrorMessage(undefined)
+      }
       if (status.status === 'waiting') {
+        hasSeenReadyCheck.current = false
+        setReadyCheck(undefined)
         setJoinedAt(status.joinedAt)
         setPopulation(status.population)
         setErrorMessage(undefined)
       }
       return false
-    }
+    },
+    [localizedPath, navigate]
+  )
+
+  React.useEffect(() => {
+    let disposed = false
+    let pollTimeout: ReturnType<typeof setTimeout> | undefined
+    const clockInterval = setInterval(() => setNow(Date.now()), 1_000)
 
     const schedulePoll = (delay: number) => {
       pollTimeout = setTimeout(() => void poll(), delay)
@@ -106,6 +122,10 @@ export function RankedMatchmaking() {
       try {
         let status = await getMatchmakingStatus()
         if (status.status === 'idle') {
+          if (hasSeenReadyCheck.current) {
+            navigate(localizedPath('/'), { replace: true })
+            return
+          }
           status = await joinMatchmaking()
         }
         if (!disposed && !handleStatus(status)) {
@@ -146,13 +166,45 @@ export function RankedMatchmaking() {
       clearInterval(clockInterval)
       clearTimeout(pollTimeout)
     }
-  }, [localizedPath, navigate, t])
+  }, [handleStatus, localizedPath, navigate, t])
 
   const elapsedSeconds =
     joinedAt === undefined
       ? 0
       : Math.max(0, Math.floor((now - joinedAt) / 1000))
   const delayMessage = getMatchmakingDelayMessage(elapsedSeconds)
+  const readyCheckSeconds =
+    readyCheck === undefined
+      ? 0
+      : Math.max(0, Math.ceil((readyCheck.acceptBy - now) / 1_000))
+  const readyCheckDuration =
+    readyCheck === undefined
+      ? 15
+      : Math.max(
+          1,
+          Math.ceil((readyCheck.acceptBy - readyCheck.match.createdAt) / 1_000)
+        )
+
+  React.useEffect(() => {
+    if (
+      readyCheck !== undefined &&
+      !readyCheck.accepted &&
+      now >= readyCheck.acceptBy
+    ) {
+      navigate(localizedPath('/'), { replace: true })
+    }
+  }, [localizedPath, navigate, now, readyCheck])
+
+  async function acceptMatch() {
+    setIsAccepting(true)
+    try {
+      handleStatus(await acceptMatchmaking())
+    } catch {
+      setErrorMessage(t('ranked.queue.accept-error'))
+    } finally {
+      setIsAccepting(false)
+    }
+  }
 
   return (
     <main className='mx-auto flex w-full max-w-xl flex-col items-center justify-center gap-6 p-6 text-center'>
@@ -166,7 +218,40 @@ export function RankedMatchmaking() {
             ? t('ranked.rating-loading')
             : t('ranked.rating', { rating: profile.rating })}
         </p>
-        {joinedAt === undefined ? (
+        {readyCheck !== undefined ? (
+          <div className='flex flex-col items-center gap-4'>
+            <p className='text-2xl font-semibold'>
+              {t('ranked.queue.match-found')}
+            </p>
+            <p className='font-mono text-xl font-semibold tabular-nums'>
+              {t('ranked.queue.accept-countdown', {
+                seconds: readyCheckSeconds
+              })}
+            </p>
+            <progress
+              className='h-3 w-full accent-green-600'
+              max={readyCheckDuration}
+              value={readyCheckSeconds}
+              aria-label={t('ranked.queue.accept-progress')}
+            />
+            {readyCheck.accepted ? (
+              <p className='text-lg'>
+                {t('ranked.queue.waiting-for-accept')}
+                <LoadingDots dotsShown={readyCheckSeconds % 4} />
+              </p>
+            ) : (
+              <Button
+                size='medium'
+                disabled={isAccepting || readyCheckSeconds === 0}
+                onClick={() => void acceptMatch()}
+              >
+                {t(
+                  isAccepting ? 'ranked.queue.accepting' : 'ranked.queue.accept'
+                )}
+              </Button>
+            )}
+          </div>
+        ) : joinedAt === undefined ? (
           <p className='text-lg'>{t('ranked.queue.joining')}</p>
         ) : (
           <div className='flex flex-col items-center gap-1'>

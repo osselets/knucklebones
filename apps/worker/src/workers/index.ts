@@ -2,6 +2,7 @@ import { withDurables } from 'itty-durable'
 import { Router, cors, withParams } from 'itty-router'
 import { Toucan } from 'toucan-js'
 import {
+  acceptMatchmaking,
   createPlayer,
   createWebSocketTicket,
   deleteRoomDisplayName,
@@ -76,6 +77,7 @@ router
   .all('/v1/matchmaking/*', authenticatePlayerRequest)
   .post('/v1/matchmaking/join', joinMatchmaking)
   .get('/v1/matchmaking/status', getMatchmakingStatus)
+  .post('/v1/matchmaking/accept', acceptMatchmaking)
   .delete('/v1/matchmaking/queue', leaveMatchmaking)
   .all('/players/:playerId/*', authenticatePlayerRequest)
   .post('/players/:playerId/verify', verifyPlayer)
@@ -83,6 +85,7 @@ router
   .all('/matchmaking/:playerId/*', authenticatePlayerRequest)
   .post('/matchmaking/:playerId/join', joinMatchmaking)
   .get('/matchmaking/:playerId/status', getMatchmakingStatus)
+  .post('/matchmaking/:playerId/accept', acceptMatchmaking)
   .delete('/matchmaking/:playerId/queue', leaveMatchmaking)
   .all(
     '/v1/rooms/:roomKey/*',

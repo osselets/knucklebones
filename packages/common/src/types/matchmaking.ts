@@ -38,6 +38,12 @@ export type MatchmakingStatus =
       joinedAt: number
       population?: MatchmakingPopulation
     }
+  | {
+      status: 'match-found'
+      match: RankedMatchAssignment
+      acceptBy: number
+      accepted: boolean
+    }
   | { status: 'matched'; match: RankedMatchAssignment }
 
 export type RankedMatchResult = EloMatchResult | 'no-contest'

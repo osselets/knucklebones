@@ -39,6 +39,13 @@
       "slow": "Cela prend plus de temps que nous le souhaiterions.",
       "scarce": "Il n'y a peut-être pas assez de joueurs disponibles pour le matchmaking en ce moment.",
       "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",
+      "match-found": "Partie trouvée !",
+      "accept-countdown": "{{seconds}} s",
+      "accept-progress": "Temps restant pour accepter",
+      "accept": "Accepter",
+      "accepting": "Acceptation…",
+      "waiting-for-accept": "En attente de l'acceptation de votre adversaire",
+      "accept-error": "Impossible d'accepter la partie. Réessayez.",
       "join-error": "Impossible de rejoindre la file classée. Nouvelle tentative…",
       "connection-error": "La connexion à la file a été interrompue. Reconnexion…"
     }

@@ -39,6 +39,13 @@
       "slow": "這次配對花費的時間比預期更久。",
       "scarce": "目前可能沒有足夠的玩家可以進行配對。",
       "best-effort": "系統會優先配對評分相近的玩家，同時盡量縮短等待時間。",
+      "match-found": "找到對手！",
+      "accept-countdown": "{{seconds}} 秒",
+      "accept-progress": "接受配對的剩餘時間",
+      "accept": "接受",
+      "accepting": "正在接受…",
+      "waiting-for-accept": "正在等待對手接受",
+      "accept-error": "無法接受配對，請再試一次。",
       "join-error": "無法加入排名配對，正在重試…",
       "connection-error": "配對連線中斷，正在重新連線…"
     }

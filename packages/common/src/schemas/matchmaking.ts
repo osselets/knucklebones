@@ -37,6 +37,12 @@ export const matchmakingStatusSchema = z.union([
     )
   }),
   z.object({
+    status: z.literal('match-found'),
+    match: rankedMatchAssignmentSchema,
+    acceptBy: z.int().check(z.minimum(0)),
+    accepted: z.boolean()
+  }),
+  z.object({
     status: z.literal('matched'),
     match: rankedMatchAssignmentSchema
   })

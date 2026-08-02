@@ -39,6 +39,13 @@
       "slow": "This is taking longer than we'd like.",
       "scarce": "There might not be enough players available for matchmaking right now.",
       "best-effort": "Close ratings are preferred, but finding a match quickly comes first.",
+      "match-found": "Match found!",
+      "accept-countdown": "{{seconds}}s",
+      "accept-progress": "Time left to accept",
+      "accept": "Accept",
+      "accepting": "Accepting…",
+      "waiting-for-accept": "Waiting for your opponent to accept",
+      "accept-error": "We couldn't accept the match. Try again.",
       "join-error": "We couldn't join ranked matchmaking. Retrying…",
       "connection-error": "The matchmaking connection was interrupted. Reconnecting…"
     }

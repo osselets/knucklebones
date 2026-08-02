@@ -163,6 +163,10 @@ export async function getMatchmakingStatus(): Promise<MatchmakingStatus> {
   return await getMatchmakingResponse('/v1/matchmaking/status', 'GET')
 }
 
+export async function acceptMatchmaking(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/accept', 'POST')
+}
+
 export async function leaveMatchmaking({
   keepalive = false
 }: { keepalive?: boolean } = {}): Promise<void> {

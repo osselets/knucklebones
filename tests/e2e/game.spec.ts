@@ -257,6 +257,10 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
       firstPlayer.getByRole('link', { name: 'Play ranked' }).click(),
       secondPlayer.getByRole('link', { name: 'Play ranked' }).click()
     ])
+    await Promise.all([
+      firstPlayer.getByRole('button', { name: 'Accept' }).click(),
+      secondPlayer.getByRole('button', { name: 'Accept' }).click()
+    ])
 
     await Promise.all([
       firstPlayer.waitForURL(/\/room\/[0-9a-f-]+$/),
@@ -307,7 +311,7 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
   }
 })
 
-test('returns a connected ranked player to the queue when the opponent never connects', async ({
+test('returns an accepting player to the queue when the opponent misses the ready check', async ({
   browser
 }) => {
   const playerContext = await browser.newContext()
@@ -345,14 +349,23 @@ test('returns a connected ranked player to the queue when the opponent never con
     )
     expect(opponentJoinStatus).toBe(200)
 
-    await player.waitForURL(/\/room\/[0-9a-f-]+$/)
-    await player.waitForURL((url) => url.pathname === '/en/ranked', {
+    await player.getByRole('button', { name: 'Accept' }).click()
+    await expect(player.getByText(/Waiting for your opponent/)).toBeVisible()
+    await expect(player.getByText(/Looking for an opponent/)).toBeVisible({
       timeout: 20_000
     })
-    await expect(
-      player.getByRole('heading', { name: 'Ranked matchmaking' })
-    ).toBeVisible()
-    await expect(player.getByText(/Looking for an opponent/)).toBeVisible()
+
+    const opponentStatus = await opponent.evaluate(
+      async ({ credential }) => {
+        const response = await fetch(
+          'http://localhost:8787/v1/matchmaking/status',
+          { headers: { Authorization: `Bearer ${credential}` } }
+        )
+        return (await response.json()) as { status: string }
+      },
+      { credential: opponentIdentity.playerCredential }
+    )
+    expect(opponentStatus.status).toBe('idle')
   } finally {
     await playerContext.close()
     await opponentContext.close()
