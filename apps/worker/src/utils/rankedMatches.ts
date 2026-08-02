@@ -43,6 +43,10 @@ interface RatedMatchRow {
   settled_at: number
 }
 
+interface CountRow {
+  count: number
+}
+
 type CompletedRankedMatchSettlementResult = Extract<
   RankedMatchSettlementResult,
   { settlement: RankedMatchSettlement }
@@ -56,6 +60,26 @@ export interface ActiveRankedMatch {
 
 export type RankedMatchActivationStatus =
   'activated' | 'already-active' | 'expired'
+
+export async function countActiveRankedPlayers(
+  database: D1Database,
+  queueKey: string
+): Promise<number> {
+  const row = await database
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM active_ranked_matches
+       WHERE queue_key = ? AND state = 'active'`
+    )
+    .bind(queueKey)
+    .first<CountRow>()
+
+  if (row === null || !Number.isSafeInteger(row.count) || row.count < 0) {
+    throw new Error('The active ranked match count is invalid.')
+  }
+
+  return row.count * 2
+}
 
 export async function getActiveRankedMatchForPlayer(
   database: D1Database,

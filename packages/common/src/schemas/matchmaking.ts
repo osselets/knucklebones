@@ -28,7 +28,13 @@ export const matchmakingStatusSchema = z.union([
   z.object({ status: z.literal('idle') }),
   z.object({
     status: z.literal('waiting'),
-    joinedAt: z.int().check(z.minimum(0))
+    joinedAt: z.int().check(z.minimum(0)),
+    population: z.optional(
+      z.object({
+        queuedPlayers: z.int().check(z.minimum(0)),
+        activePlayers: z.int().check(z.minimum(0))
+      })
+    )
   }),
   z.object({
     status: z.literal('matched'),

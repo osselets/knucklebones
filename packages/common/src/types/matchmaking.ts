@@ -26,9 +26,18 @@ export interface RankedMatchAssignment {
   expiresAt: number
 }
 
+export interface MatchmakingPopulation {
+  queuedPlayers: number
+  activePlayers: number
+}
+
 export type MatchmakingStatus =
   | { status: 'idle' }
-  | { status: 'waiting'; joinedAt: number }
+  | {
+      status: 'waiting'
+      joinedAt: number
+      population?: MatchmakingPopulation
+    }
   | { status: 'matched'; match: RankedMatchAssignment }
 
 export type RankedMatchResult = EloMatchResult | 'no-contest'

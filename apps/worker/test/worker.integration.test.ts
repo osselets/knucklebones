@@ -1199,7 +1199,47 @@ describe('ranked matchmaking', () => {
     )
 
     expect(first.status).toBe('waiting')
+    expect(first).toMatchObject({
+      population: { queuedPlayers: 1, activePlayers: 0 }
+    })
     expect(duplicate).toEqual(first)
+  })
+
+  it('reports queued and actively playing populations', async () => {
+    const activePlayerOne = await createPlayer()
+    const activePlayerTwo = await createPlayer()
+    const waitingPlayer = await createPlayer()
+    const environment = await server.getWorker().getEnv()
+    const now = Date.now()
+
+    const inserted = await environment.PLAYERS_DB.prepare(
+      `INSERT INTO active_ranked_matches (
+         match_id, room_key, queue_key, rating_pool, format,
+         player_one_id, player_two_id,
+         player_one_rating, player_two_rating,
+         state, created_at, expires_at, activated_at
+       ) VALUES (?, ?, 'classic:bo1', 'classic', 'bo1', ?, ?, 1200, 1200,
+                 'active', ?, ?, ?)`
+    )
+      .bind(
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+        activePlayerOne.playerId,
+        activePlayerTwo.playerId,
+        now - 1,
+        now + 15_000,
+        now
+      )
+      .run()
+    expect(inserted.meta.changes).toBe(1)
+
+    const status = matchmakingStatusSchema.parse(
+      await (await joinQueue(waitingPlayer)).json()
+    )
+    expect(status).toMatchObject({
+      status: 'waiting',
+      population: { queuedPlayers: 1, activePlayers: 2 }
+    })
   })
 
   it('assigns two waiting players to the same BO1 room', async () => {
@@ -1649,7 +1689,8 @@ describe('ranked matchmaking', () => {
     )
     expect(playerOneStatus).toEqual({
       status: 'waiting',
-      joinedAt: firstJoin.joinedAt
+      joinedAt: firstJoin.joinedAt,
+      population: { queuedPlayers: 1, activePlayers: 0 }
     })
     expect(playerTwoStatus).toEqual({ status: 'idle' })
     await expect(

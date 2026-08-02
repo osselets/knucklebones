@@ -1,6 +1,7 @@
 import { Toucan } from 'toucan-js'
 import {
   DEFAULT_RATING_POOL,
+  type MatchmakingPopulation,
   type MatchmakingStatus,
   matchmakingStatusSchema,
   matchIdSchema,
@@ -15,6 +16,7 @@ import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { apiError } from '../utils/http'
 import { recordOperationalEvent } from '../utils/observability'
 import {
+  countActiveRankedPlayers,
   expireRankedAssignment,
   getActiveRankedMatchForPlayer,
   releaseRankedMatch,
@@ -27,6 +29,7 @@ const PREFERRED_RATING_DIFFERENCE = 100
 const DISTANT_OPPONENT_WAIT_MS = 3_000
 const QUEUE_ENTRY_TTL_MS = 15_000
 const MATCH_ASSIGNMENT_TTL_MS = 15_000
+const POPULATION_CACHE_TTL_MS = 5_000
 
 interface QueueEntry {
   playerId: string
@@ -49,6 +52,7 @@ export class MatchmakingDurableObject {
   state: DurableObjectState
   cloudflareEnvironment: CloudflareEnvironment
   sentry: Toucan
+  activePlayerCountCache?: { value: number; expiresAt: number }
 
   constructor(
     state: DurableObjectState,
@@ -195,7 +199,7 @@ export class MatchmakingDurableObject {
     await this.matchEligiblePlayers(state, now)
     await this.persistState(state, now)
 
-    return this.getPlayerStatus(state, playerId)
+    return await this.getPlayerStatus(state, playerId, now)
   }
 
   private async getStatus(playerId: string): Promise<Response> {
@@ -215,7 +219,7 @@ export class MatchmakingDurableObject {
       entry.lastSeenAt = now
       await this.matchEligiblePlayers(state, now)
       await this.persistState(state, now)
-      return this.getPlayerStatus(state, playerId)
+      return await this.getPlayerStatus(state, playerId, now)
     }
 
     const activeMatch = await getActiveRankedMatchForPlayer(
@@ -592,7 +596,11 @@ export class MatchmakingDurableObject {
     }
   }
 
-  private getPlayerStatus(state: MatchmakingState, playerId: string): Response {
+  private async getPlayerStatus(
+    state: MatchmakingState,
+    playerId: string,
+    now: number
+  ): Promise<Response> {
     const match = state.assignments[playerId]
     if (match !== undefined) {
       return this.statusResponse({ status: 'matched', match })
@@ -604,11 +612,35 @@ export class MatchmakingDurableObject {
     if (entry !== undefined) {
       return this.statusResponse({
         status: 'waiting',
-        joinedAt: entry.joinedAt
+        joinedAt: entry.joinedAt,
+        population: await this.getPopulation(state, now)
       })
     }
 
     return this.statusResponse({ status: 'idle' })
+  }
+
+  private async getPopulation(
+    state: MatchmakingState,
+    now: number
+  ): Promise<MatchmakingPopulation> {
+    if (
+      this.activePlayerCountCache === undefined ||
+      this.activePlayerCountCache.expiresAt <= now
+    ) {
+      this.activePlayerCountCache = {
+        value: await countActiveRankedPlayers(
+          this.cloudflareEnvironment.PLAYERS_DB,
+          RANKED_QUEUE_KEY
+        ),
+        expiresAt: now + POPULATION_CACHE_TTL_MS
+      }
+    }
+
+    return {
+      queuedPlayers: state.waiting.length,
+      activePlayers: this.activePlayerCountCache.value
+    }
   }
 
   private statusResponse(status: MatchmakingStatus): Response {

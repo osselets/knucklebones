@@ -87,7 +87,8 @@ describe('RankedMatchmaking', () => {
     })
     vi.mocked(getMatchmakingStatus).mockResolvedValue({
       status: 'waiting',
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      population: { queuedPlayers: 3, activePlayers: 8 }
     })
     vi.mocked(leaveMatchmaking).mockResolvedValue()
   })
@@ -107,12 +108,17 @@ describe('RankedMatchmaking', () => {
   it('shows the rating and cancels a waiting ticket', async () => {
     vi.mocked(joinMatchmaking).mockResolvedValue({
       status: 'waiting',
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      population: { queuedPlayers: 3, activePlayers: 8 }
     })
 
     renderMatchmaking()
 
     expect(await screen.findByText('ranked.rating')).toBeInTheDocument()
+    expect(screen.getByText('ranked.queue.in-queue')).toBeInTheDocument()
+    expect(screen.getByText('ranked.queue.playing')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
     await userEvent.click(
       screen.getByRole('button', { name: 'ranked.queue.cancel' })
     )

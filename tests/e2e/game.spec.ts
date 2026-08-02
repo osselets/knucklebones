@@ -323,6 +323,12 @@ test('returns a connected ranked player to the queue when the opponent never con
     await expect(
       player.getByRole('heading', { name: 'Ranked matchmaking' })
     ).toBeVisible()
+    await expect(
+      player.getByText('In queue').locator('..').getByText('1')
+    ).toBeVisible()
+    await expect(
+      player.getByText('Playing now').locator('..').getByRole('definition')
+    ).toHaveText(/^\d+$/)
 
     const opponentJoinStatus = await opponent.evaluate(
       async ({ credential }) => {

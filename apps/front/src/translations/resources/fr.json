@@ -34,6 +34,8 @@
       "joining": "Connexion à la file…",
       "looking": "Recherche d'un adversaire",
       "elapsed": "Temps d'attente : {{duration}}",
+      "in-queue": "Dans la file",
+      "playing": "En jeu actuellement",
       "slow": "Cela prend plus de temps que nous le souhaiterions.",
       "scarce": "Il n'y a peut-être pas assez de joueurs disponibles pour le matchmaking en ce moment.",
       "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",

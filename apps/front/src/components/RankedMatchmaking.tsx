@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
+  type MatchmakingPopulation,
   type MatchmakingStatus,
   type RankedProfile
 } from '@knucklebones/common'
@@ -44,6 +45,7 @@ export function RankedMatchmaking() {
   const localizedPath = useLocalizedPath()
   const [profile, setProfile] = React.useState<RankedProfile>()
   const [joinedAt, setJoinedAt] = React.useState<number>()
+  const [population, setPopulation] = React.useState<MatchmakingPopulation>()
   const [now, setNow] = React.useState(Date.now)
   const [errorMessage, setErrorMessage] = React.useState<string>()
   const [isCancelling, setIsCancelling] = React.useState(false)
@@ -64,6 +66,7 @@ export function RankedMatchmaking() {
       }
       if (status.status === 'waiting') {
         setJoinedAt(status.joinedAt)
+        setPopulation(status.population)
         setErrorMessage(undefined)
       }
       return false
@@ -164,6 +167,26 @@ export function RankedMatchmaking() {
                 duration: formatMatchmakingDuration(elapsedSeconds)
               })}
             </p>
+            {population !== undefined && (
+              <dl className='mt-2 grid grid-cols-2 gap-6'>
+                <div className='flex flex-col-reverse'>
+                  <dt className='text-sm text-slate-600 dark:text-slate-300'>
+                    {t('ranked.queue.in-queue')}
+                  </dt>
+                  <dd className='text-xl font-semibold tabular-nums'>
+                    {population.queuedPlayers}
+                  </dd>
+                </div>
+                <div className='flex flex-col-reverse'>
+                  <dt className='text-sm text-slate-600 dark:text-slate-300'>
+                    {t('ranked.queue.playing')}
+                  </dt>
+                  <dd className='text-xl font-semibold tabular-nums'>
+                    {population.activePlayers}
+                  </dd>
+                </div>
+              </dl>
+            )}
             {delayMessage !== undefined && (
               <p aria-live='polite' className='mt-2 text-sm font-medium'>
                 {t(delayMessage)}

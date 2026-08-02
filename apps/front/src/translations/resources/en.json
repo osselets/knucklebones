@@ -34,6 +34,8 @@
       "joining": "Joining the queue…",
       "looking": "Looking for an opponent",
       "elapsed": "Waiting time: {{duration}}",
+      "in-queue": "In queue",
+      "playing": "Playing now",
       "slow": "This is taking longer than we'd like.",
       "scarce": "There might not be enough players available for matchmaking right now.",
       "best-effort": "Close ratings are preferred, but finding a match quickly comes first.",
