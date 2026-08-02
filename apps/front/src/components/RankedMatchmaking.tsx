@@ -110,10 +110,36 @@ export function RankedMatchmaking() {
   React.useEffect(() => {
     let disposed = false
     let pollTimeout: ReturnType<typeof setTimeout> | undefined
+    let profileRetryTimeout: ReturnType<typeof setTimeout> | undefined
+    let consecutiveMatchmakingFailures = 0
     const clockInterval = setInterval(() => setNow(Date.now()), 1_000)
 
     const schedulePoll = (delay: number) => {
       pollTimeout = setTimeout(() => void poll(), delay)
+    }
+
+    const handleMatchmakingFailure = (message: string) => {
+      consecutiveMatchmakingFailures += 1
+      if (consecutiveMatchmakingFailures >= 2) {
+        setErrorMessage(message)
+      }
+      schedulePoll(MATCHMAKING_RETRY_MS)
+    }
+
+    const loadProfile = async () => {
+      try {
+        const nextProfile = await getRankedProfile()
+        if (!disposed) {
+          setProfile(nextProfile)
+        }
+      } catch {
+        if (!disposed) {
+          profileRetryTimeout = setTimeout(
+            () => void loadProfile(),
+            MATCHMAKING_RETRY_MS
+          )
+        }
+      }
     }
 
     const poll = async () => {
@@ -129,34 +155,31 @@ export function RankedMatchmaking() {
           }
           status = await joinMatchmaking()
         }
+        consecutiveMatchmakingFailures = 0
         if (!disposed && !handleStatus(status)) {
           schedulePoll(MATCHMAKING_POLL_MS)
         }
       } catch {
         if (!disposed) {
-          setErrorMessage(t('ranked.queue.connection-error'))
-          schedulePoll(MATCHMAKING_RETRY_MS)
+          handleMatchmakingFailure(t('ranked.queue.connection-error'))
         }
       }
     }
 
     const start = async () => {
+      void loadProfile()
       try {
-        const [nextProfile, status] = await Promise.all([
-          getRankedProfile(),
-          joinMatchmaking()
-        ])
+        const status = await joinMatchmaking()
         if (disposed) {
           return
         }
-        setProfile(nextProfile)
+        consecutiveMatchmakingFailures = 0
         if (!handleStatus(status)) {
           schedulePoll(MATCHMAKING_POLL_MS)
         }
       } catch {
         if (!disposed) {
-          setErrorMessage(t('ranked.queue.join-error'))
-          schedulePoll(MATCHMAKING_RETRY_MS)
+          handleMatchmakingFailure(t('ranked.queue.join-error'))
         }
       }
     }
@@ -166,6 +189,7 @@ export function RankedMatchmaking() {
       disposed = true
       clearInterval(clockInterval)
       clearTimeout(pollTimeout)
+      clearTimeout(profileRetryTimeout)
     }
   }, [handleStatus, localizedPath, navigate, t])
 
@@ -185,6 +209,7 @@ export function RankedMatchmaking() {
           1,
           Math.ceil((readyCheck.acceptBy - readyCheck.match.createdAt) / 1_000)
         )
+  const readyCheckProgress = (readyCheckSeconds / readyCheckDuration) * 100
 
   React.useEffect(() => {
     if (
@@ -241,12 +266,19 @@ export function RankedMatchmaking() {
                 seconds: readyCheckSeconds
               })}
             </p>
-            <progress
-              className='h-3 w-full accent-green-600'
-              max={readyCheckDuration}
-              value={readyCheckSeconds}
+            <div
+              className='h-3 w-full overflow-hidden rounded-full border border-[#372fa2] bg-[#372fa2]/15'
+              role='progressbar'
+              aria-valuemin={0}
+              aria-valuemax={readyCheckDuration}
+              aria-valuenow={readyCheckSeconds}
               aria-label={t('ranked.queue.accept-progress')}
-            />
+            >
+              <div
+                className='h-full rounded-full bg-[#372fa2] transition-[width] duration-1000 ease-linear'
+                style={{ width: `${readyCheckProgress}%` }}
+              />
+            </div>
             {readyCheck.accepted ? (
               <p className='text-lg'>
                 {t('ranked.queue.waiting-for-accept')}

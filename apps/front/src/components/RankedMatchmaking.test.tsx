@@ -124,6 +124,21 @@ describe('RankedMatchmaking', () => {
     expect(acceptMatchmaking).toHaveBeenCalledOnce()
   })
 
+  it('does not report a profile failure as a matchmaking failure', async () => {
+    vi.mocked(getRankedProfile).mockRejectedValue(new Error('profile offline'))
+    vi.mocked(joinMatchmaking).mockResolvedValue({
+      status: 'match-found',
+      match: assignment,
+      acceptBy: Date.now() + 15_000,
+      accepted: false
+    })
+
+    renderMatchmaking()
+
+    expect(await screen.findByText('ranked.queue.match-found')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('declines a ready check and returns home', async () => {
     vi.mocked(joinMatchmaking).mockResolvedValue({
       status: 'match-found',
@@ -138,7 +153,7 @@ describe('RankedMatchmaking', () => {
     )
 
     expect(await screen.findByText('Home')).toBeInTheDocument()
-    expect(leaveMatchmaking).toHaveBeenCalledOnce()
+    expect(leaveMatchmaking).toHaveBeenCalledWith()
   })
 
   it('stores an assignment and navigates to its ranked room', async () => {
