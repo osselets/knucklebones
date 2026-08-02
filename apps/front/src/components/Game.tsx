@@ -32,10 +32,10 @@ export function Game() {
   return (
     <>
       <SideBarActions>
-        <RankedMatchInfo />
         <HowToPlayModal />
         <QRCodeModal />
         <OutcomeHistory />
+        <RankedMatchInfo />
         <ResignGame />
         {isOnMobile && gameOutcome}
       </SideBarActions>
