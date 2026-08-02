@@ -207,6 +207,57 @@ test('synchronizes a human game across independent browser identities', async ({
   }
 })
 
+test('matches two ranked identities and starts their assigned BO1 room', async ({
+  browser
+}) => {
+  const firstContext = await browser.newContext()
+  const secondContext = await browser.newContext()
+  const firstPlayer = await firstContext.newPage()
+  const secondPlayer = await secondContext.newPage()
+
+  try {
+    await Promise.all([waitForHome(firstPlayer), waitForHome(secondPlayer)])
+    await Promise.all([
+      firstPlayer.getByRole('link', { name: 'Play ranked' }).click(),
+      secondPlayer.getByRole('link', { name: 'Play ranked' }).click()
+    ])
+
+    await Promise.all([
+      firstPlayer.waitForURL(/\/room\/[0-9a-f-]+$/),
+      secondPlayer.waitForURL(/\/room\/[0-9a-f-]+$/)
+    ])
+    expect(new URL(firstPlayer.url()).pathname).toBe(
+      new URL(secondPlayer.url()).pathname
+    )
+
+    for (const player of [firstPlayer, secondPlayer]) {
+      await expect(player.getByText('Round 1 of 1')).toBeVisible()
+      await expect(
+        player.getByText('Waiting for game to start...')
+      ).toHaveCount(0)
+    }
+
+    const firstColumns = firstPlayer.locator('div[role="button"]')
+    const secondColumns = secondPlayer.locator('div[role="button"]')
+    await expect
+      .poll(
+        async () => (await firstColumns.count()) + (await secondColumns.count())
+      )
+      .toBe(3)
+
+    const currentPlayer =
+      (await firstColumns.count()) === 3 ? firstPlayer : secondPlayer
+    const nextPlayer =
+      currentPlayer === firstPlayer ? secondPlayer : firstPlayer
+    await currentPlayer.locator('div[role="button"]').first().click()
+    await expect(currentPlayer.locator('div[role="button"]')).toHaveCount(0)
+    await expect(nextPlayer.locator('div[role="button"]')).toHaveCount(3)
+  } finally {
+    await firstContext.close()
+    await secondContext.close()
+  }
+})
+
 test('keeps a spectator read-only while synchronizing a human move', async ({
   browser
 }) => {

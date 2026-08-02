@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createWebSocketTicket,
+  getMatchmakingStatus,
+  getRankedProfile,
   initGame,
+  joinMatchmaking,
+  leaveMatchmaking,
   play,
   updateDisplayName,
   voteRematch
@@ -146,5 +150,44 @@ describe('mutation requests', () => {
       'There was an error while doing a network call.'
     )
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses authenticated ranked profile and matchmaking endpoints', async () => {
+    const joinedAt = Date.now()
+    fetchMock
+      .mockResolvedValueOnce(
+        Response.json({
+          playerId: room.playerId,
+          ratingPool: 'classic',
+          rating: 1200,
+          gamesPlayed: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
+      .mockResolvedValueOnce(Response.json({ status: 'waiting', joinedAt }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    await expect(getRankedProfile()).resolves.toMatchObject({ rating: 1200 })
+    await expect(joinMatchmaking()).resolves.toEqual({
+      status: 'waiting',
+      joinedAt
+    })
+    await expect(getMatchmakingStatus()).resolves.toEqual({
+      status: 'waiting',
+      joinedAt
+    })
+    await leaveMatchmaking()
+
+    expect(
+      fetchMock.mock.calls.map(([url, init]) => [url, init?.method])
+    ).toEqual([
+      [expect.stringContaining('/v1/ranked/profile'), 'GET'],
+      [expect.stringContaining('/v1/matchmaking/join'), 'POST'],
+      [expect.stringContaining('/v1/matchmaking/status'), 'GET'],
+      [expect.stringContaining('/v1/matchmaking/queue'), 'DELETE']
+    ])
   })
 })

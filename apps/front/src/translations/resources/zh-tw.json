@@ -2,10 +2,32 @@
   "language": "正體中文（臺灣）",
   "home": {
     "play": {
+      "ranked": "進行排名對戰",
       "friend": "與他人對戰",
       "ai": "與 AI 對戰"
     },
     "footer": "《進擊羔羊傳說》中的原版 Knucklebones 遊戲由 Massive Monster 創作。\n這是一個粉絲網站，並非 Massive Monster 的官方實現。\n您可以在 <0>《進擊羔羊傳說》</0> 網站上找到原版遊戲。"
+  },
+  "ranked": {
+    "identity-warning": "排名進度綁定於此瀏覽器的玩家身分。清除瀏覽器資料前，請先保存復原短語。",
+    "rating": "評分：{{rating}}",
+    "rating-loading": "正在載入評分…",
+    "result": {
+      "rating-change": "評分：{{before}} → {{after}}（{{change}}）",
+      "rating-error": "無法載入您的新評分。",
+      "play-again": "尋找另一場排名對戰"
+    },
+    "queue": {
+      "title": "排名配對",
+      "joining": "正在加入配對佇列…",
+      "waiting": "正在尋找對手… {{seconds}} 秒",
+      "best-effort": "系統會優先配對評分相近的玩家，同時盡量縮短等待時間。",
+      "cancel": "取消配對",
+      "cancelling": "正在取消…",
+      "join-error": "無法加入排名配對，正在重試…",
+      "connection-error": "配對連線中斷，正在重新連線…",
+      "cancel-error": "無法取消配對，請再試一次。"
+    }
   },
   "guide": {
     "label": "遊戲說明",

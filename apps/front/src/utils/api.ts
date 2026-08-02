@@ -8,10 +8,14 @@ import {
   identityRecoverySchema,
   type IdentityTransfer,
   identityTransferSchema,
+  type MatchmakingStatus,
+  matchmakingStatusSchema,
   type PlayerCredentials,
   playerCredentialsSchema,
   type PlayerIdentityBootstrap,
   playerIdentityBootstrapSchema,
+  type RankedProfile,
+  rankedProfileSchema,
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
@@ -121,6 +125,43 @@ export async function createWebSocketTicket({
 
   if (!result.success) {
     throw new Error('The server returned an invalid WebSocket ticket.')
+  }
+
+  return result.data
+}
+
+export async function getRankedProfile(): Promise<RankedProfile> {
+  const response = await sendApiRequest('/v1/ranked/profile', 'GET')
+  const result = rankedProfileSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid ranked profile.')
+  }
+
+  return result.data
+}
+
+export async function joinMatchmaking(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/join', 'POST')
+}
+
+export async function getMatchmakingStatus(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/status', 'GET')
+}
+
+export async function leaveMatchmaking(): Promise<void> {
+  await sendApiRequest('/v1/matchmaking/queue', 'DELETE')
+}
+
+async function getMatchmakingResponse(
+  path: string,
+  method: 'GET' | 'POST'
+): Promise<MatchmakingStatus> {
+  const response = await sendApiRequest(path, method)
+  const result = matchmakingStatusSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid matchmaking status.')
   }
 
   return result.data

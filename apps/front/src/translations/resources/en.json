@@ -2,10 +2,32 @@
   "language": "English",
   "home": {
     "play": {
+      "ranked": "Play ranked",
       "friend": "Play against someone",
       "ai": "Play against an AI"
     },
     "footer": "The original Knucklebones game in Cult of the Lamb was created by Massive Monster.\nThis is a fan-site and not an official implementation by Massive Monster.\nYou can find the original game on the <0>Cult of the Lamb</0> website."
+  },
+  "ranked": {
+    "identity-warning": "Ranked progress belongs to this browser identity. Save your recovery phrase before clearing browser data.",
+    "rating": "Rating: {{rating}}",
+    "rating-loading": "Loading rating…",
+    "result": {
+      "rating-change": "Rating: {{before}} → {{after}} ({{change}})",
+      "rating-error": "Your new rating couldn't be loaded.",
+      "play-again": "Find another ranked match"
+    },
+    "queue": {
+      "title": "Ranked matchmaking",
+      "joining": "Joining the queue…",
+      "waiting": "Looking for an opponent… {{seconds}}s",
+      "best-effort": "Close ratings are preferred, but finding a match quickly comes first.",
+      "cancel": "Cancel matchmaking",
+      "cancelling": "Cancelling…",
+      "join-error": "We couldn't join ranked matchmaking. Retrying…",
+      "connection-error": "The matchmaking connection was interrupted. Reconnecting…",
+      "cancel-error": "We couldn't cancel matchmaking. Try again."
+    }
   },
   "guide": {
     "label": "How to play",

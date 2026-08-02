@@ -31,6 +31,9 @@ export function HomePage() {
           </h1>
         </div>
         <div className='flex flex-col gap-4 md:gap-8'>
+          <Button as={Link} size='large' to='/ranked'>
+            {t('home.play.ranked')}
+          </Button>
           <Button
             size='large'
             onClick={() => {

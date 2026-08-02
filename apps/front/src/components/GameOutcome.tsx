@@ -1,7 +1,13 @@
+import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { PlayIcon } from '@heroicons/react/24/outline'
 import { t } from 'i18next'
 import { useIsOnDesktop } from '../hooks/detectDevice'
+import { useRoomKey } from '../hooks/useRoomKey'
+import { getRankedProfile } from '../utils/api'
+import { getStoredPlayerId } from '../utils/identityStorage'
+import { getStoredRankedMatchAssignment } from '../utils/rankedMatchStorage'
 import { Button } from './Button'
 import { useGame, type InGameContext } from './GameContext'
 import { ShortcutModal } from './ShortcutModal'
@@ -84,6 +90,34 @@ export function GameOutcome() {
   const hasVoted = rematchVote === playerOne.id
   const isOnDesktop = useIsOnDesktop()
   const { t } = useTranslation()
+  const roomKey = useRoomKey()
+  const rankedAssignment = React.useMemo(
+    () => getStoredRankedMatchAssignment(roomKey),
+    [roomKey]
+  )
+  const [rankedRating, setRankedRating] = React.useState<number>()
+  const [rankedRatingError, setRankedRatingError] = React.useState(false)
+
+  React.useEffect(() => {
+    let cancelled = false
+    if (outcome === 'game-ended' && rankedAssignment !== undefined) {
+      void getRankedProfile()
+        .then((profile) => {
+          if (!cancelled) {
+            setRankedRating(profile.rating)
+            setRankedRatingError(false)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRankedRatingError(true)
+          }
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [outcome, rankedAssignment])
 
   if (outcome === 'ongoing') {
     // On peut mettre un VS semi-transparent dans le fond de la partie
@@ -95,7 +129,13 @@ export function GameOutcome() {
   const content = (
     <div className='grid justify-items-center gap-2 font-semibold'>
       <p>{getWinMessage({ outcome, winner })}</p>
-      {!isSpectator && (
+      {!isSpectator && rankedAssignment !== undefined ? (
+        <RankedResultRating
+          assignment={rankedAssignment}
+          rating={rankedRating}
+          hasError={rankedRatingError}
+        />
+      ) : !isSpectator ? (
         <VoteButtons
           boType={boType}
           hasVoted={hasVoted}
@@ -110,9 +150,10 @@ export function GameOutcome() {
             void voteRematch()
           }}
         />
-      )}
+      ) : null}
 
       {!isSpectator &&
+        rankedAssignment === undefined &&
         (hasVoted ? (
           <p>{t('game.waiting-rematch', { player: playerTwo.inGameName })}</p>
         ) : (
@@ -137,5 +178,42 @@ export function GameOutcome() {
     >
       {content}
     </ShortcutModal>
+  )
+}
+
+function RankedResultRating({
+  assignment,
+  hasError,
+  rating
+}: {
+  assignment: NonNullable<ReturnType<typeof getStoredRankedMatchAssignment>>
+  hasError: boolean
+  rating?: number
+}) {
+  const { t } = useTranslation()
+  const playerId = getStoredPlayerId()
+  const previousRating =
+    playerId === assignment.playerOneId
+      ? assignment.playerOneRating
+      : assignment.playerTwoRating
+  const change = rating === undefined ? undefined : rating - previousRating
+
+  return (
+    <div className='flex flex-col items-center gap-2'>
+      <p>
+        {hasError
+          ? t('ranked.result.rating-error')
+          : rating === undefined || change === undefined
+            ? t('ranked.rating-loading')
+            : t('ranked.result.rating-change', {
+                before: previousRating,
+                after: rating,
+                change: change > 0 ? `+${change}` : String(change)
+              })}
+      </p>
+      <Button as={Link} to='/ranked'>
+        {t('ranked.result.play-again')}
+      </Button>
+    </div>
   )
 }

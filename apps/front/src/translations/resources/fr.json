@@ -2,10 +2,32 @@
   "language": "Français",
   "home": {
     "play": {
+      "ranked": "Jouer en classé",
       "friend": "Jouer contre quelqu'un",
       "ai": "Jouer contre une IA"
     },
     "footer": "Le jeu Knucklebones est une création originale de l'entité Massive Monster.\nLe présent site est une réalisation de fans et ne constitue en aucun cas une implémentation officielle de la part de Massive Monster.\nPour accéder au jeu original, nous vous invitons à consulter le site internet officiel de <0>Cult of the Lamb</0>."
+  },
+  "ranked": {
+    "identity-warning": "Votre progression classée appartient à l'identité de ce navigateur. Sauvegardez votre phrase de récupération avant d'effacer ses données.",
+    "rating": "Classement : {{rating}}",
+    "rating-loading": "Chargement du classement…",
+    "result": {
+      "rating-change": "Classement : {{before}} → {{after}} ({{change}})",
+      "rating-error": "Impossible de charger votre nouveau classement.",
+      "play-again": "Rechercher une autre partie classée"
+    },
+    "queue": {
+      "title": "Recherche de partie classée",
+      "joining": "Connexion à la file…",
+      "waiting": "Recherche d'un adversaire… {{seconds}} s",
+      "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",
+      "cancel": "Annuler la recherche",
+      "cancelling": "Annulation…",
+      "join-error": "Impossible de rejoindre la file classée. Nouvelle tentative…",
+      "connection-error": "La connexion à la file a été interrompue. Reconnexion…",
+      "cancel-error": "Impossible d'annuler la recherche. Réessayez."
+    }
   },
   "guide": {
     "label": "Comment jouer",
