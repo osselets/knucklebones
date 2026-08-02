@@ -17,6 +17,14 @@
       "rating-error": "Impossible de charger votre nouveau classement.",
       "play-again": "Rechercher une autre partie classée"
     },
+    "resign": {
+      "action": "Abandonner",
+      "title": "Abandonner cette partie classée ?",
+      "warning": "L'abandon termine immédiatement la partie et compte comme une défaite classée.",
+      "confirm": "Confirmer l'abandon",
+      "resigning": "Abandon en cours…",
+      "error": "Impossible d'abandonner cette partie. Réessayez."
+    },
     "queue": {
       "title": "Recherche de partie classée",
       "joining": "Connexion à la file…",

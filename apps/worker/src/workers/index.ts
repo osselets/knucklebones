@@ -20,6 +20,7 @@ import {
   reportClientProtocolDiagnostic,
   rematch,
   rematchRoom,
+  resignRoom,
   redeemIdentityTransfer,
   redeemIdentityRecovery,
   revokeDeviceCredential,
@@ -90,6 +91,7 @@ router
   .post('/v1/rooms/:roomKey/init', withAuthenticatedMutationId, initializeRoom)
   .post('/v1/rooms/:roomKey/play', withAuthenticatedMutationId, playIntent)
   .post('/v1/rooms/:roomKey/rematch', withAuthenticatedMutationId, rematchRoom)
+  .post('/v1/rooms/:roomKey/resign', withAuthenticatedMutationId, resignRoom)
   .post(
     '/v1/rooms/:roomKey/display-name',
     withAuthenticatedMutationId,

@@ -17,6 +17,14 @@
       "rating-error": "無法載入您的新評分。",
       "play-again": "尋找另一場排名對戰"
     },
+    "resign": {
+      "action": "認輸",
+      "title": "要在這場排名對戰中認輸嗎？",
+      "warning": "認輸會立即結束對局，並計為一場排名敗局。",
+      "confirm": "確認認輸",
+      "resigning": "正在認輸…",
+      "error": "無法在這場對局中認輸，請再試一次。"
+    },
     "queue": {
       "title": "排名配對",
       "joining": "正在加入配對佇列…",

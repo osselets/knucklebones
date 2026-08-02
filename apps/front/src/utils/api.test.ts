@@ -7,6 +7,7 @@ import {
   joinMatchmaking,
   leaveMatchmaking,
   play,
+  resignGame,
   updateDisplayName,
   voteRematch
 } from './api'
@@ -67,6 +68,7 @@ describe('mutation requests', () => {
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(
         Response.json({
           ticket: 'a'.repeat(64),
@@ -78,12 +80,14 @@ describe('mutation requests', () => {
     await initGame(room, { playerType: 'human', boType: 1 })
     await voteRematch(room, { boType: 3 })
     await updateDisplayName(room, { displayName: 'A/B ? Player' })
+    await resignGame(room)
     await createWebSocketTicket(room)
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       expect.stringContaining(`/v1/rooms/${room.roomKey}/init`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/rematch`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/display-name`),
+      expect.stringContaining(`/v1/rooms/${room.roomKey}/resign`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/websocket-ticket`)
     ])
     expect(
@@ -98,6 +102,7 @@ describe('mutation requests', () => {
     expect(fetchMock.mock.calls[2][1]?.body).toBe(
       '{"displayName":"A/B ? Player"}'
     )
+    expect(fetchMock.mock.calls[3][1]?.body).toBeUndefined()
   })
 
   it('reports a validated API error code and message', async () => {

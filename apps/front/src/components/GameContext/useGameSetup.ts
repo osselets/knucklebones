@@ -21,6 +21,7 @@ import {
   initGame,
   play,
   reportClientProtocolDiagnostic,
+  resignGame,
   voteRematch
 } from '../../utils/api'
 import { getStoredPlayerId } from '../../utils/identityStorage'
@@ -261,6 +262,18 @@ export function useGameSetup() {
     })
   }
 
+  async function resign(): Promise<boolean> {
+    try {
+      await resignGame({ roomKey })
+      return true
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : t('ranked.resign.error')
+      )
+      return false
+    }
+  }
+
   async function voteContinueBo() {
     await voteRematch({ roomKey, playerId }).catch((error) => {
       setErrorMessage(error.message)
@@ -311,6 +324,7 @@ export function useGameSetup() {
     voteContinueBo,
     voteContinueIndefinitely,
     voteRematch: _voteRematch,
+    resign,
     updateDisplayName: _updateDisplayName
   }
 }

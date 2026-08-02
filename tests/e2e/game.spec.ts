@@ -252,6 +252,17 @@ test('matches two ranked identities and starts their assigned BO1 room', async (
     await currentPlayer.locator('div[role="button"]').first().click()
     await expect(currentPlayer.locator('div[role="button"]')).toHaveCount(0)
     await expect(nextPlayer.locator('div[role="button"]')).toHaveCount(3)
+
+    await firstPlayer.getByRole('button', { name: 'Resign' }).click()
+    await firstPlayer
+      .getByRole('button', { name: 'Confirm resignation' })
+      .click()
+    for (const player of [firstPlayer, secondPlayer]) {
+      await expect(
+        player.getByRole('link', { name: 'Find another ranked match' })
+      ).toBeVisible()
+      await expect(player.getByText(/Rating: 1200 →/)).toBeVisible()
+    }
   } finally {
     await firstContext.close()
     await secondContext.close()

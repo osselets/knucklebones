@@ -210,6 +210,13 @@ export async function play(
   const path = `/v1/rooms/${roomKey}/play`
   await sendMutationRequest(path, 'POST', { column })
 }
+
+export async function resignGame({
+  roomKey
+}: Pick<IdentificationParams, 'roomKey'>): Promise<void> {
+  await sendMutationRequest(`/v1/rooms/${roomKey}/resign`, 'POST')
+}
+
 interface UpdateDisplayNameRequestParams {
   displayName: string
 }

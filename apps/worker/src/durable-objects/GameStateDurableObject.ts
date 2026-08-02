@@ -23,6 +23,10 @@ import {
   type RematchGameResult,
   rematchGameCommandSchema,
   rematchGameResultSchema,
+  type ResignGameCommand,
+  type ResignGameResult,
+  resignGameCommandSchema,
+  resignGameResultSchema,
   type RankedMatchAssignment,
   type RankedMatchSettlement,
   type RankedMatchSettlementResult,
@@ -516,6 +520,44 @@ export class GameStateDurableObject extends createDurable({
     }
 
     return { status: 'unchanged' }
+  }
+
+  resign(
+    command: ResignGameCommand
+  ): IdempotentMutationResult<ResignGameResult> {
+    const parsedCommand = resignGameCommandSchema.parse(command)
+
+    return this.runIdempotently(
+      parsedCommand.mutationId,
+      'resign',
+      { playerId: parsedCommand.playerId },
+      resignGameResultSchema,
+      () => this.applyResign(parsedCommand.playerId)
+    )
+  }
+
+  private applyResign(playerId: string): ResignGameResult {
+    if (this.gameState === undefined) {
+      return { status: 'game-not-initialized' }
+    }
+
+    const gameState = GameState.fromJson(gameStateSchema.parse(this.gameState))
+    if (gameState.outcome !== 'ongoing') {
+      return { status: 'game-ended' }
+    }
+    if (
+      playerId !== gameState.playerOne.id &&
+      playerId !== gameState.playerTwo.id
+    ) {
+      return { status: 'unknown-player' }
+    }
+    if (this.rankedMatch === undefined) {
+      return { status: 'not-ranked' }
+    }
+
+    gameState.finishByForfeit(playerId)
+    this.reconnectDeadlines = {}
+    return { status: 'updated', gameState: this.commitGameState(gameState) }
   }
 
   updateDisplayName(

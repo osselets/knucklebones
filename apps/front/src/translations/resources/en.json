@@ -17,6 +17,14 @@
       "rating-error": "Your new rating couldn't be loaded.",
       "play-again": "Find another ranked match"
     },
+    "resign": {
+      "action": "Resign",
+      "title": "Resign this ranked match?",
+      "warning": "Resigning ends the game immediately and counts as a rated loss.",
+      "confirm": "Confirm resignation",
+      "resigning": "Resigning…",
+      "error": "We couldn't resign from this match. Try again."
+    },
     "queue": {
       "title": "Ranked matchmaking",
       "joining": "Joining the queue…",

@@ -1460,6 +1460,73 @@ describe('ranked matchmaking', () => {
     })
   })
 
+  it('settles an authenticated ranked resignation exactly once', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    await joinQueue(playerOne)
+    await new Promise((resolve) => setTimeout(resolve, 550))
+    const match = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (match.status !== 'matched') {
+      throw new Error('Expected the players to be matched.')
+    }
+
+    for (const player of [playerOne, playerTwo]) {
+      const initialize = await request(
+        `/v1/rooms/${match.match.roomKey}/init`,
+        {
+          method: 'POST',
+          headers: {
+            ...authorization(player),
+            'Content-Type': 'application/json',
+            'Idempotency-Key': crypto.randomUUID()
+          },
+          body: JSON.stringify({ playerType: 'human', boType: 1 })
+        }
+      )
+      expect(initialize.status).toBe(200)
+    }
+
+    const mutationId = crypto.randomUUID()
+    const resign = () =>
+      request(`/v1/rooms/${match.match.roomKey}/resign`, {
+        method: 'POST',
+        headers: {
+          ...authorization(playerOne),
+          'Idempotency-Key': mutationId
+        }
+      })
+    expect((await resign()).status).toBe(200)
+    expect((await resign()).status).toBe(200)
+
+    const environment = await server.getWorker().getEnv()
+    const settlement = await environment.PLAYERS_DB.prepare(
+      `SELECT result, finish_reason,
+              player_one_rating_before, player_one_rating_after,
+              player_two_rating_before, player_two_rating_after
+       FROM rated_matches
+       WHERE match_id = ?`
+    )
+      .bind(match.match.matchId)
+      .first()
+    expect(settlement).toEqual({
+      result: 'player-two-win',
+      finish_reason: 'forfeit',
+      player_one_rating_before: 1200,
+      player_one_rating_after: 1184,
+      player_two_rating_before: 1200,
+      player_two_rating_after: 1216
+    })
+    const settledMatches = await environment.PLAYERS_DB.prepare(
+      'SELECT COUNT(*) AS count FROM rated_matches WHERE match_id = ?'
+    )
+      .bind(match.match.matchId)
+      .first<{ count: number }>()
+    expect(settledMatches?.count).toBe(1)
+  })
+
   it('removes a waiting player from the queue', async () => {
     const player = await createPlayer()
 
