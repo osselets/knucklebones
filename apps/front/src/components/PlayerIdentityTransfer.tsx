@@ -184,6 +184,9 @@ export function PlayerIdentityTransfer() {
     <ShortcutModal
       icon={<IdentificationIcon />}
       label={t('identity.transfer.label')}
+      onOpen={() => {
+        if (transferCode === '') void issueTransferCode()
+      }}
     >
       <div className='flex max-w-lg flex-col gap-6'>
         <Modal.Title>{t('identity.transfer.title')}</Modal.Title>

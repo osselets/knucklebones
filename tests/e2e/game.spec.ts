@@ -464,6 +464,9 @@ test('transfers an identity between independent browsers', async ({
     await waitForHome(source)
     const sourceIdentity = await readIdentity(source)
     await source.getByRole('button', { name: 'Transfer identity' }).click()
+    await expect(
+      source.getByLabel('Player identity transfer code')
+    ).toHaveValue(/^knucklebones-transfer-v1\./)
     await source.getByRole('button', { name: 'Show code' }).click()
     await expect(
       source.getByLabel('Player identity transfer code')
