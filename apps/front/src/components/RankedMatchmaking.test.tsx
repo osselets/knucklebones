@@ -1,7 +1,6 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import {
   getMatchmakingStatus,
   getRankedProfile,
@@ -103,9 +102,36 @@ describe('RankedMatchmaking', () => {
 
     expect(await screen.findByText('Ranked room')).toBeInTheDocument()
     expect(getStoredRankedMatchAssignment(roomKey)).toEqual(assignment)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(leaveMatchmaking).not.toHaveBeenCalled()
   })
 
-  it('shows the rating and cancels a waiting ticket', async () => {
+  it('shows the queue population and leaves when navigating away', async () => {
+    vi.mocked(joinMatchmaking).mockResolvedValue({
+      status: 'waiting',
+      joinedAt: Date.now(),
+      population: { queuedPlayers: 3, activePlayers: 8 }
+    })
+
+    const view = renderMatchmaking()
+
+    expect(await screen.findByText('ranked.rating')).toBeInTheDocument()
+    expect(screen.getByText('ranked.queue.in-queue')).toBeInTheDocument()
+    expect(screen.getByText('ranked.queue.playing')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'ranked.queue.cancel' })
+    ).not.toBeInTheDocument()
+
+    view.unmount()
+
+    await waitFor(() =>
+      expect(leaveMatchmaking).toHaveBeenCalledWith({ keepalive: false })
+    )
+  })
+
+  it('uses a keepalive request when the page is closed', async () => {
     vi.mocked(joinMatchmaking).mockResolvedValue({
       status: 'waiting',
       joinedAt: Date.now(),
@@ -113,17 +139,12 @@ describe('RankedMatchmaking', () => {
     })
 
     renderMatchmaking()
-
     expect(await screen.findByText('ranked.rating')).toBeInTheDocument()
-    expect(screen.getByText('ranked.queue.in-queue')).toBeInTheDocument()
-    expect(screen.getByText('ranked.queue.playing')).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('8')).toBeInTheDocument()
-    await userEvent.click(
-      screen.getByRole('button', { name: 'ranked.queue.cancel' })
-    )
 
-    await waitFor(() => expect(leaveMatchmaking).toHaveBeenCalledOnce())
-    expect(await screen.findByText('Home')).toBeInTheDocument()
+    window.dispatchEvent(new Event('pagehide'))
+
+    await waitFor(() =>
+      expect(leaveMatchmaking).toHaveBeenCalledWith({ keepalive: true })
+    )
   })
 })

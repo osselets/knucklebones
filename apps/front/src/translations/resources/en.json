@@ -39,11 +39,8 @@
       "slow": "This is taking longer than we'd like.",
       "scarce": "There might not be enough players available for matchmaking right now.",
       "best-effort": "Close ratings are preferred, but finding a match quickly comes first.",
-      "cancel": "Cancel matchmaking",
-      "cancelling": "Cancelling…",
       "join-error": "We couldn't join ranked matchmaking. Retrying…",
-      "connection-error": "The matchmaking connection was interrupted. Reconnecting…",
-      "cancel-error": "We couldn't cancel matchmaking. Try again."
+      "connection-error": "The matchmaking connection was interrupted. Reconnecting…"
     }
   },
   "guide": {

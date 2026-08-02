@@ -163,8 +163,17 @@ export async function getMatchmakingStatus(): Promise<MatchmakingStatus> {
   return await getMatchmakingResponse('/v1/matchmaking/status', 'GET')
 }
 
-export async function leaveMatchmaking(): Promise<void> {
-  await sendApiRequest('/v1/matchmaking/queue', 'DELETE')
+export async function leaveMatchmaking({
+  keepalive = false
+}: { keepalive?: boolean } = {}): Promise<void> {
+  await sendApiRequest(
+    '/v1/matchmaking/queue',
+    'DELETE',
+    undefined,
+    undefined,
+    undefined,
+    keepalive
+  )
 }
 
 async function getMatchmakingResponse(
@@ -261,7 +270,8 @@ async function sendApiRequest(
   method: Method,
   body?: unknown,
   credential?: string | null,
-  mutationId?: string
+  mutationId?: string,
+  keepalive = false
 ) {
   if (credential === undefined) {
     credential = getStoredDeviceCredential()
@@ -289,6 +299,7 @@ async function sendApiRequest(
       response = await fetch(`${import.meta.env.VITE_WORKER_URL}${path}`, {
         method,
         headers,
+        ...(keepalive && { keepalive: true }),
         ...(body !== undefined && { body: JSON.stringify(body) })
       })
     } catch (error) {

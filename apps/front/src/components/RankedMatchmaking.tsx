@@ -14,7 +14,6 @@ import {
   leaveMatchmaking
 } from '../utils/api'
 import { storeRankedMatchAssignment } from '../utils/rankedMatchStorage'
-import { Button } from './Button'
 import { LoadingDots } from './Loading'
 
 const MATCHMAKING_POLL_MS = 500
@@ -48,7 +47,30 @@ export function RankedMatchmaking() {
   const [population, setPopulation] = React.useState<MatchmakingPopulation>()
   const [now, setNow] = React.useState(Date.now)
   const [errorMessage, setErrorMessage] = React.useState<string>()
-  const [isCancelling, setIsCancelling] = React.useState(false)
+  const shouldLeaveQueue = React.useRef(true)
+  const exitCancellationTimeout = React.useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined)
+
+  React.useEffect(() => {
+    clearTimeout(exitCancellationTimeout.current)
+
+    const leaveQueue = (keepalive: boolean) => {
+      if (!shouldLeaveQueue.current) {
+        return
+      }
+
+      shouldLeaveQueue.current = false
+      void leaveMatchmaking({ keepalive }).catch(() => undefined)
+    }
+    const handlePageHide = () => leaveQueue(true)
+
+    window.addEventListener('pagehide', handlePageHide)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      exitCancellationTimeout.current = setTimeout(() => leaveQueue(false), 0)
+    }
+  }, [])
 
   React.useEffect(() => {
     let disposed = false
@@ -57,6 +79,7 @@ export function RankedMatchmaking() {
 
     const handleStatus = (status: MatchmakingStatus): boolean => {
       if (status.status === 'matched') {
+        shouldLeaveQueue.current = false
         storeRankedMatchAssignment(status.match)
         navigate(localizedPath(`/room/${status.match.roomKey}`), {
           replace: true,
@@ -131,17 +154,6 @@ export function RankedMatchmaking() {
       : Math.max(0, Math.floor((now - joinedAt) / 1000))
   const delayMessage = getMatchmakingDelayMessage(elapsedSeconds)
 
-  async function cancelMatchmaking() {
-    setIsCancelling(true)
-    try {
-      await leaveMatchmaking()
-      navigate(localizedPath('/'), { replace: true })
-    } catch {
-      setErrorMessage(t('ranked.queue.cancel-error'))
-      setIsCancelling(false)
-    }
-  }
-
   return (
     <main className='mx-auto flex w-full max-w-xl flex-col items-center justify-center gap-6 p-6 text-center'>
       <h1 className='font-mona text-4xl font-bold'>
@@ -203,14 +215,6 @@ export function RankedMatchmaking() {
           {errorMessage}
         </p>
       )}
-      <Button
-        size='medium'
-        variant='secondary'
-        disabled={isCancelling}
-        onClick={() => void cancelMatchmaking()}
-      >
-        {t(isCancelling ? 'ranked.queue.cancelling' : 'ranked.queue.cancel')}
-      </Button>
     </main>
   )
 }

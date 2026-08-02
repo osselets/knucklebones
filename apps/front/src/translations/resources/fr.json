@@ -39,11 +39,8 @@
       "slow": "Cela prend plus de temps que nous le souhaiterions.",
       "scarce": "Il n'y a peut-être pas assez de joueurs disponibles pour le matchmaking en ce moment.",
       "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",
-      "cancel": "Annuler la recherche",
-      "cancelling": "Annulation…",
       "join-error": "Impossible de rejoindre la file classée. Nouvelle tentative…",
-      "connection-error": "La connexion à la file a été interrompue. Reconnexion…",
-      "cancel-error": "Impossible d'annuler la recherche. Réessayez."
+      "connection-error": "La connexion à la file a été interrompue. Reconnexion…"
     }
   },
   "guide": {

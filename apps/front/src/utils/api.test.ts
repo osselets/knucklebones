@@ -187,7 +187,7 @@ describe('mutation requests', () => {
       status: 'waiting',
       joinedAt
     })
-    await leaveMatchmaking()
+    await leaveMatchmaking({ keepalive: true })
 
     expect(
       fetchMock.mock.calls.map(([url, init]) => [url, init?.method])
@@ -198,5 +198,6 @@ describe('mutation requests', () => {
       [expect.stringContaining('/v1/matchmaking/status'), 'GET'],
       [expect.stringContaining('/v1/matchmaking/queue'), 'DELETE']
     ])
+    expect(fetchMock.mock.calls.at(-1)?.[1]?.keepalive).toBe(true)
   })
 })

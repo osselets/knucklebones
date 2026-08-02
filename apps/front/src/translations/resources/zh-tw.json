@@ -39,11 +39,8 @@
       "slow": "這次配對花費的時間比預期更久。",
       "scarce": "目前可能沒有足夠的玩家可以進行配對。",
       "best-effort": "系統會優先配對評分相近的玩家，同時盡量縮短等待時間。",
-      "cancel": "取消配對",
-      "cancelling": "正在取消…",
       "join-error": "無法加入排名配對，正在重試…",
-      "connection-error": "配對連線中斷，正在重新連線…",
-      "cancel-error": "無法取消配對，請再試一次。"
+      "connection-error": "配對連線中斷，正在重新連線…"
     }
   },
   "guide": {
