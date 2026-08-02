@@ -225,7 +225,7 @@ export function GameOutcome() {
     </div>
   )
 
-  if (isOnDesktop) {
+  if (isOnDesktop || isSpectator) {
     return content
   }
 
