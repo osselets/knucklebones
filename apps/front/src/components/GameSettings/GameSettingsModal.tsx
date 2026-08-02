@@ -59,12 +59,6 @@ export function GameSettingsModal({
   const [difficulty, setDifficulty] = React.useState<Difficulty>('medium')
   const [boType, setBoType] = React.useState<StringBoType>('indefinite')
   const { t } = useTranslation()
-  const roomKey = uuidv4()
-  const gameSettingsSearch = new URLSearchParams({
-    playerType: playerType!,
-    boType: String(convertToBoType(boType)),
-    ...(playerType === 'ai' ? { difficulty } : {})
-  }).toString()
 
   return (
     <Modal {...modalProps}>
@@ -87,7 +81,7 @@ export function GameSettingsModal({
         <Button
           as={Link}
           size='medium'
-          to={{ pathname: `/room/${roomKey}`, search: gameSettingsSearch }}
+          to={`/room/${uuidv4()}`}
           // Sauvegarder les paramètres dans le local storage pour les
           // prochaines parties
           state={
