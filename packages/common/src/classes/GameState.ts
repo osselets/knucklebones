@@ -37,6 +37,7 @@ export class GameState implements IGameState {
   forfeitReason?: GameForfeitReason
   outcomeHistory: OutcomeHistory
   rematchVote?: string
+  rankedTurn?: IGameState['rankedTurn']
 
   constructor({
     playerOne,
@@ -46,6 +47,7 @@ export class GameState implements IGameState {
     finishReason,
     forfeitReason,
     rematchVote,
+    rankedTurn,
     winnerId,
     boType = 'indefinite',
     revision = 0,
@@ -59,6 +61,7 @@ export class GameState implements IGameState {
     this.logs = logs
     this.spectators = spectators
     this.rematchVote = rematchVote
+    this.rankedTurn = rankedTurn === undefined ? undefined : { ...rankedTurn }
     this.outcomeHistory = outcomeHistory
     this.boType = boType
     this.winnerId = winnerId
@@ -273,6 +276,7 @@ export class GameState implements IGameState {
     this.outcome = 'game-ended'
     this.finishReason = 'forfeit'
     this.forfeitReason = forfeitReason
+    this.rankedTurn = undefined
     this.outcomeHistory.push({
       playerOne: {
         id: this.playerOne.id,
@@ -284,7 +288,11 @@ export class GameState implements IGameState {
       }
     })
     const forfeitAction =
-      forfeitReason === 'resignation' ? 'resigned' : 'disconnected'
+      forfeitReason === 'resignation'
+        ? 'resigned'
+        : forfeitReason === 'timeout'
+          ? 'timed out three times'
+          : 'disconnected'
     this.addToLogs(
       `${winner.getName()} wins because ${forfeitingPlayer.getName()} ${forfeitAction}.`
     )
@@ -300,6 +308,7 @@ export class GameState implements IGameState {
     this.outcome = 'game-ended'
     this.finishReason = 'no-contest'
     this.forfeitReason = undefined
+    this.rankedTurn = undefined
     this.addToLogs(
       'The game ended with no contest because both players disconnected.'
     )
@@ -434,7 +443,9 @@ export class GameState implements IGameState {
       spectators: this.spectators,
       outcomeHistory: this.outcomeHistory,
       boType: this.boType,
-      winnerId: this.winnerId
+      winnerId: this.winnerId,
+      rankedTurn:
+        this.rankedTurn === undefined ? undefined : { ...this.rankedTurn }
     }
   }
 }

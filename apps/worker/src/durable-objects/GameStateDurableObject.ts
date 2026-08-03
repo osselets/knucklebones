@@ -31,6 +31,8 @@ import {
   type RankedRematchStatus,
   type RankedMatchSettlement,
   type RankedMatchSettlementResult,
+  RANKED_TIMEOUT_FORFEIT_COUNT,
+  RANKED_TURN_DURATION_MS,
   rankedMatchAssignmentSchema,
   roomKeySchema,
   toGameStateMessage,
@@ -76,6 +78,9 @@ interface DisconnectPolicy {
   roomKey: string
   gracePeriodMs: number
 }
+
+type RankedTurnTimeoutResult =
+  { status: 'unchanged' } | { status: 'adjudicated'; gameState: IGameState }
 
 export class GameStateDurableObject extends createDurable({
   autoPersist: true
@@ -197,7 +202,7 @@ export class GameStateDurableObject extends createDurable({
       delete this.reconnectDeadlines[parsedPlayerId]
 
       const adjudication = this.adjudicateDisconnects(observedAt)
-      await this.scheduleDisconnectAlarm()
+      await this.scheduleGameAlarm()
       if (adjudication.status === 'adjudicated') {
         return adjudication
       }
@@ -222,7 +227,7 @@ export class GameStateDurableObject extends createDurable({
     this.connectedPlayers[parsedPlayerId] = false
     const reconnectDeadline = observedAt + this.disconnectPolicy.gracePeriodMs
     this.reconnectDeadlines[parsedPlayerId] = reconnectDeadline
-    await this.scheduleDisconnectAlarm()
+    await this.scheduleGameAlarm()
 
     return {
       status: 'updated',
@@ -263,6 +268,7 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'unchanged' }
     }
 
+    gameState.rankedTurn = undefined
     this.reconnectDeadlines = {}
     return {
       status: 'adjudicated',
@@ -272,15 +278,22 @@ export class GameStateDurableObject extends createDurable({
 
   async alarm(): Promise<void> {
     await this.loadFromStorage()
-    const result = this.adjudicateDisconnects()
-    if (result.status === 'adjudicated') {
-      this.pendingDisconnectBroadcast = result.gameState
+    const disconnectResult = this.adjudicateDisconnects()
+    if (disconnectResult.status === 'adjudicated') {
+      this.pendingDisconnectBroadcast = disconnectResult.gameState
+    } else {
+      const turnResult = this.adjudicateRankedTurnTimeout()
+      if (turnResult.status === 'adjudicated') {
+        this.pendingDisconnectBroadcast = turnResult.gameState
+      }
     }
-    await this.scheduleDisconnectAlarm()
+    await this.scheduleGameAlarm()
     await this.persist()
 
     if (this.pendingDisconnectBroadcast !== undefined) {
-      await this.settleRankedResult()
+      if (this.pendingDisconnectBroadcast.outcome === 'game-ended') {
+        await this.settleRankedResult()
+      }
       await this.persist()
       await this.broadcastAlarmResult(this.pendingDisconnectBroadcast)
       this.pendingDisconnectBroadcast = undefined
@@ -444,14 +457,19 @@ export class GameStateDurableObject extends createDurable({
       boType: 1
     })
     gameState.initialize()
+    this.resetRankedTurn(gameState)
     this.rankedPlayerClaims = {}
-    return { status: 'created', gameState: this.commitGameState(gameState) }
+    const serializedGameState = this.commitGameState(gameState)
+    await this.scheduleGameAlarm()
+    return { status: 'created', gameState: serializedGameState }
   }
 
-  play(command: PlayGameCommand): IdempotentMutationResult<PlayGameResult> {
+  async play(
+    command: PlayGameCommand
+  ): Promise<IdempotentMutationResult<PlayGameResult>> {
     const parsedCommand = playGameCommandSchema.parse(command)
 
-    return this.runIdempotently(
+    return await this.runIdempotentlyAsync(
       parsedCommand.mutationId,
       'play',
       {
@@ -460,19 +478,24 @@ export class GameStateDurableObject extends createDurable({
         expectedRevision: parsedCommand.expectedRevision
       },
       playGameResultSchema,
-      () => this.applyPlayIntent(parsedCommand)
+      async () => await this.applyPlayIntent(parsedCommand)
     )
   }
 
-  private applyPlayIntent(command: PlayGameCommand): PlayGameResult {
+  private async applyPlayIntent(
+    command: PlayGameCommand
+  ): Promise<PlayGameResult> {
     const result = applyPlayCommand(this.gameState, command)
     if (result.status === 'rejected') {
       return result
     }
 
+    this.resetRankedTurn(result.gameState)
+    const gameState = this.commitGameState(result.gameState)
+    await this.scheduleGameAlarm()
     return {
       status: 'updated',
-      gameState: this.commitGameState(result.gameState)
+      gameState
     }
   }
 
@@ -799,8 +822,90 @@ export class GameStateDurableObject extends createDurable({
     return gameState
   }
 
-  private async scheduleDisconnectAlarm(): Promise<void> {
+  adjudicateRankedTurnTimeout(
+    now = Date.now(),
+    randomValue = Math.random()
+  ): RankedTurnTimeoutResult {
+    if (this.rankedMatch === undefined || this.gameState === undefined) {
+      return { status: 'unchanged' }
+    }
+
+    const gameState = GameState.fromJson(gameStateSchema.parse(this.gameState))
+    const rankedTurn = gameState.rankedTurn
+    if (
+      gameState.outcome !== 'ongoing' ||
+      rankedTurn === undefined ||
+      rankedTurn.expiresAt > now
+    ) {
+      return { status: 'unchanged' }
+    }
+
+    const timedOutPlayer = gameState.nextPlayer
+    const isPlayerOne = timedOutPlayer.id === gameState.playerOne.id
+    const timeoutCount =
+      (isPlayerOne
+        ? rankedTurn.playerOneTimeouts
+        : rankedTurn.playerTwoTimeouts) + 1
+
+    gameState.rankedTurn = {
+      ...rankedTurn,
+      ...(isPlayerOne
+        ? { playerOneTimeouts: timeoutCount }
+        : { playerTwoTimeouts: timeoutCount })
+    }
+
+    if (timeoutCount >= RANKED_TIMEOUT_FORFEIT_COUNT) {
+      gameState.finishByForfeit(timedOutPlayer.id, 'timeout')
+      gameState.rankedTurn = undefined
+    } else {
+      const playableColumns = timedOutPlayer.columns.flatMap((column, index) =>
+        column.length < 3 ? [index] : []
+      )
+      if (playableColumns.length === 0) {
+        throw new Error('The timed-out ranked player has no legal move.')
+      }
+      const boundedRandomValue = Math.min(Math.max(randomValue, 0), 1)
+      const randomIndex = Math.min(
+        Math.floor(boundedRandomValue * playableColumns.length),
+        playableColumns.length - 1
+      )
+      const rejectionReason = gameState.applyPlayIntent(
+        timedOutPlayer.id,
+        playableColumns[randomIndex]
+      )
+      if (rejectionReason !== undefined) {
+        throw new Error(
+          `The automatic ranked move was rejected: ${rejectionReason}.`
+        )
+      }
+      this.resetRankedTurn(gameState, now)
+    }
+
+    return {
+      status: 'adjudicated',
+      gameState: this.commitGameState(gameState)
+    }
+  }
+
+  private resetRankedTurn(gameState: GameState, now = Date.now()): void {
+    if (this.rankedMatch === undefined || gameState.outcome !== 'ongoing') {
+      gameState.rankedTurn = undefined
+      return
+    }
+
+    gameState.rankedTurn = {
+      expiresAt: now + RANKED_TURN_DURATION_MS,
+      playerOneTimeouts: gameState.rankedTurn?.playerOneTimeouts ?? 0,
+      playerTwoTimeouts: gameState.rankedTurn?.playerTwoTimeouts ?? 0
+    }
+  }
+
+  private async scheduleGameAlarm(): Promise<void> {
     const deadlines = Object.values(this.reconnectDeadlines)
+    const rankedTurnDeadline = this.gameState?.rankedTurn?.expiresAt
+    if (rankedTurnDeadline !== undefined) {
+      deadlines.push(rankedTurnDeadline)
+    }
     if (deadlines.length === 0) {
       await this.deleteAlarm()
       return

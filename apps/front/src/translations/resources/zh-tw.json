@@ -16,6 +16,11 @@
       "label": "排名對戰 · 一局定勝負",
       "opponent-rating": "對手評分：{{rating}}"
     },
+    "turn": {
+      "player": "{{player}} 的回合",
+      "time-left": "剩餘出手時間",
+      "timeouts": "逾時次數：{{count}} / {{maximum}}"
+    },
     "result": {
       "rating-change": "評分：{{before}} → {{after}}（{{change}}）",
       "rating-error": "無法載入您的新評分。",
@@ -140,6 +145,11 @@
         "you-win": "對手已斷線，你獲勝了！",
         "opponent-win": "你已斷線，{{player}} 獲勝。",
         "spectator": "{{loser}} 已斷線，{{winner}} 獲勝。"
+      },
+      "timeout": {
+        "you-win": "對手已逾時三次，你獲勝了！",
+        "opponent-win": "你已逾時三次，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已逾時三次，{{winner}} 獲勝。"
       }
     }
   },

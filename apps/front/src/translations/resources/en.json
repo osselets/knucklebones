@@ -16,6 +16,11 @@
       "label": "Ranked · Best of 1",
       "opponent-rating": "Opponent rating: {{rating}}"
     },
+    "turn": {
+      "player": "{{player}}'s turn",
+      "time-left": "Time left to play",
+      "timeouts": "Timeouts: {{count}} / {{maximum}}"
+    },
     "result": {
       "rating-change": "Rating: {{before}} → {{after}} ({{change}})",
       "rating-error": "Your new rating couldn't be loaded.",
@@ -140,6 +145,11 @@
         "you-win": "Your opponent disconnected. You win!",
         "opponent-win": "You disconnected. {{player}} wins.",
         "spectator": "{{loser}} disconnected. {{winner}} wins."
+      },
+      "timeout": {
+        "you-win": "Your opponent timed out three times. You win!",
+        "opponent-win": "You timed out three times. {{player}} wins.",
+        "spectator": "{{loser}} timed out three times. {{winner}} wins."
       }
     }
   },

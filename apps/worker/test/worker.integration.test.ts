@@ -3,6 +3,7 @@ import { createTestHarness, type TestHarness } from 'wrangler'
 import {
   apiErrorBodySchema,
   deviceCredentialListSchema,
+  gameStateSchema,
   identityRecoverySchema,
   identityTransferSchema,
   idempotentInitializeGameResultSchema,
@@ -1841,6 +1842,162 @@ describe('ranked matchmaking', () => {
         .first()
     ).resolves.toBeNull()
   }, 25_000)
+
+  it('plays automatically on two timeouts and forfeits the third', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+    const readJson = async (response: Response, label: string) => {
+      const body = await response.text()
+      expect(body, `${label} returned an empty response`).not.toBe('')
+      return JSON.parse(body) as unknown
+    }
+
+    await joinQueue(playerOne)
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const found = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (found.status !== 'match-found') {
+      throw new Error('Expected the players to receive a ready check.')
+    }
+
+    const { playerOneStatus: match } = await acceptReadyCheck(
+      playerOne,
+      playerTwo
+    )
+    const initialize = (player: PlayerCredentials) =>
+      request(`/v1/rooms/${match.match.roomKey}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID()
+        },
+        body: JSON.stringify({ playerType: 'human', boType: 1 })
+      })
+
+    expect((await initialize(playerOne)).status).toBe(200)
+    const initializedResponse = await initialize(playerTwo)
+    expect(initializedResponse.status).toBe(200)
+
+    const environment = await server.getWorker().getEnv()
+    const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      match.match.roomKey
+    )
+    const room = environment.GAME_STATE_DURABLE_OBJECT.get(roomId)
+    const currentStateResponse = await room.fetch(
+      'https://itty-durable/do/call/initializeGame',
+      {
+        headers: {
+          'do-name': match.match.roomKey,
+          'do-content': JSON.stringify([
+            {
+              mutationId: crypto.randomUUID(),
+              playerId: playerOne.playerId,
+              displayName: 'Player One',
+              boType: 1
+            }
+          ])
+        }
+      }
+    )
+    const initialized = idempotentInitializeGameResultSchema.parse(
+      await readJson(currentStateResponse, 'ranked initialization')
+    )
+    if (
+      initialized.idempotencyStatus === 'conflict' ||
+      initialized.value.status !== 'existing'
+    ) {
+      throw new Error('Expected the initialized ranked game state.')
+    }
+
+    let gameState = initialized.value.gameState
+    const firstTimedOutPlayerId = gameState.nextPlayer.id
+    expect(gameState.rankedTurn).toMatchObject({
+      playerOneTimeouts: 0,
+      playerTwoTimeouts: 0
+    })
+
+    const adjudicateTimeout = async () => {
+      const deadline = gameState.rankedTurn?.expiresAt
+      if (deadline === undefined) {
+        throw new Error('Expected an active ranked turn deadline.')
+      }
+      const response = await room.fetch(
+        'https://itty-durable/do/call/adjudicateRankedTurnTimeout',
+        {
+          headers: {
+            'do-name': match.match.roomKey,
+            'do-content': JSON.stringify([deadline, 0])
+          }
+        }
+      )
+      expect(response.ok).toBe(true)
+      const result = (await readJson(response, 'timeout adjudication')) as {
+        status: string
+        gameState: unknown
+      }
+      expect(result.status).toBe('adjudicated')
+      gameState = gameStateSchema.parse(result.gameState)
+    }
+
+    for (let timeoutIndex = 0; timeoutIndex < 4; timeoutIndex += 1) {
+      const previousRevision = gameState.revision
+      await adjudicateTimeout()
+      expect(gameState.outcome).toBe('ongoing')
+      expect(gameState.revision).toBe(previousRevision + 1)
+    }
+
+    await adjudicateTimeout()
+    const winnerId =
+      firstTimedOutPlayerId === playerOne.playerId
+        ? playerTwo.playerId
+        : playerOne.playerId
+    expect(gameState).toMatchObject({
+      outcome: 'game-ended',
+      finishReason: 'forfeit',
+      forfeitReason: 'timeout',
+      winnerId
+    })
+    expect(gameState.rankedTurn).toBeUndefined()
+
+    const settlement = rankedMatchSettlementResultSchema.parse(
+      await readJson(
+        await room.fetch('https://itty-durable/do/call/settleRankedResult', {
+          headers: {
+            'do-name': match.match.roomKey,
+            'do-content': '[]'
+          }
+        }),
+        'ranked settlement'
+      )
+    )
+    expect(settlement.status).toBe('settled')
+    if (settlement.status !== 'settled') {
+      throw new Error('Expected the timeout result to settle.')
+    }
+    const timedOutRating =
+      firstTimedOutPlayerId === settlement.settlement.playerOneId
+        ? settlement.settlement.playerOne
+        : settlement.settlement.playerTwo
+    expect(timedOutRating).toEqual({
+      before: 1200,
+      after: 1184,
+      change: -16
+    })
+
+    const timedOutPlayer =
+      firstTimedOutPlayerId === playerOne.playerId ? playerOne : playerTwo
+    const profile = rankedProfileSchema.parse(
+      await readJson(
+        await request('/v1/ranked/profile', {
+          headers: authorization(timedOutPlayer)
+        }),
+        'ranked profile'
+      )
+    )
+    expect(profile).toMatchObject({ rating: 1184, gamesPlayed: 1, losses: 1 })
+  })
 
   it('chooses the closest rating after the selection window', async () => {
     const player = await createPlayer()

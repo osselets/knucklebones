@@ -1,6 +1,6 @@
 export type Outcome = 'ongoing' | 'round-ended' | 'game-ended'
 export type GameFinishReason = 'completed' | 'forfeit' | 'no-contest'
-export type GameForfeitReason = 'resignation' | 'disconnect'
+export type GameForfeitReason = 'resignation' | 'disconnect' | 'timeout'
 
 export interface PlayerOutcome {
   id: string

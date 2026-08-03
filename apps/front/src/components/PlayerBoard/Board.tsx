@@ -6,6 +6,7 @@ import {
   type Outcome
 } from '@knucklebones/common'
 import { Dice } from '../Dice'
+import { RankedTurnTimer } from '../RankedTurnTimer'
 import { Cell } from './Cell'
 import { Column } from './Column'
 import { ColumnScoreTooltip } from './ColumnScore'
@@ -126,11 +127,12 @@ export function PlayerBoard({
           'items-start': !isPlayerOne
         })}
       >
-        <div className='my-4'>
+        <div className='my-4 flex items-center gap-2'>
           <Dice
             value={outcome === 'ongoing' ? dice : undefined}
             showUndefined={isNextPlayer}
           />
+          <RankedTurnTimer playerId={id} />
         </div>
         <div
           className={clsx('flex items-center gap-1 md:gap-4', {

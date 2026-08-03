@@ -172,6 +172,7 @@ export function GameOutcome() {
   }, [isLoading, outcome, rankedAssignment])
 
   if (outcome === 'ongoing') {
+    if (rankedAssignment !== undefined) return null
     // On peut mettre un VS semi-transparent dans le fond de la partie
     // pour rappeler cet élément sans pour autant que ça prenne de l'espace dans
     // le layout.

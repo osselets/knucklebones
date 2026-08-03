@@ -16,6 +16,11 @@
       "label": "Classé · Une manche gagnante",
       "opponent-rating": "Classement adverse : {{rating}}"
     },
+    "turn": {
+      "player": "Au tour de {{player}}",
+      "time-left": "Temps restant pour jouer",
+      "timeouts": "Délais dépassés : {{count}} / {{maximum}}"
+    },
     "result": {
       "rating-change": "Classement : {{before}} → {{after}} ({{change}})",
       "rating-error": "Impossible de charger votre nouveau classement.",
@@ -141,6 +146,11 @@
         "you-win": "Votre adversaire s'est déconnecté. Vous gagnez !",
         "opponent-win": "Vous vous êtes déconnecté. {{player}} gagne.",
         "spectator": "{{loser}} s'est déconnecté. {{winner}} gagne."
+      },
+      "timeout": {
+        "you-win": "Votre adversaire a dépassé le délai trois fois. Vous gagnez !",
+        "opponent-win": "Vous avez dépassé le délai trois fois. {{player}} gagne.",
+        "spectator": "{{loser}} a dépassé le délai trois fois. {{winner}} gagne."
       }
     }
   },

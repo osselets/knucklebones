@@ -8,9 +8,17 @@ import {
 
 export const RANKED_MATCH_FORMAT = 'bo1'
 export const RANKED_QUEUE_KEY = `${DEFAULT_RATING_POOL}:${RANKED_MATCH_FORMAT}`
+export const RANKED_TURN_DURATION_MS = 30_000
+export const RANKED_TIMEOUT_FORFEIT_COUNT = 3
 
 export type RankedMatchFormat = typeof RANKED_MATCH_FORMAT
 export type RankedQueueKey = typeof RANKED_QUEUE_KEY
+
+export interface RankedTurnState {
+  expiresAt: number
+  playerOneTimeouts: number
+  playerTwoTimeouts: number
+}
 
 export interface RankedMatchAssignment {
   matchId: string
