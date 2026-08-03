@@ -10,7 +10,8 @@
   },
   "scripts": {
     "db:migrate:local": "pnpm --filter @knucklebones/worker db:migrate:local",
-    "dev": "turbo run dev",
+    "db:reset:local": "pnpm --filter @knucklebones/worker db:reset:local",
+    "dev": "pnpm db:reset:local && turbo run dev",
     "build": "NODE_ENV=production turbo run build",
     "lint": "prettier \"*.ts\" \"{apps,packages,tests}/**/*.ts?(x)\" --check && eslint \"*.ts\" \"{apps,packages,tests}/**/*.ts?(x)\"",
     "lint:fix": "prettier \"*.ts\" \"{apps,packages,tests}/**/*.ts?(x)\" --write && eslint \"*.ts\" \"{apps,packages,tests}/**/*.ts?(x)\" --fix",

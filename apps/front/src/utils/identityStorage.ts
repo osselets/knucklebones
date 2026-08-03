@@ -32,6 +32,15 @@ export function storeIdentity(playerId: string, credential: string): void {
   localStorage.removeItem(LEGACY_PLAYER_CREDENTIAL_KEY)
 }
 
+export function clearStoredIdentity(): void {
+  localStorage.removeItem(PLAYER_ID_KEY)
+  localStorage.removeItem(PLAYER_CREDENTIAL_KEY)
+  localStorage.removeItem(PENDING_RECOVERY_PHRASE_KEY)
+  localStorage.removeItem(RECOVERY_CONFIRMED_KEY)
+  localStorage.removeItem(LEGACY_PLAYER_ID_KEY)
+  localStorage.removeItem(LEGACY_PLAYER_CREDENTIAL_KEY)
+}
+
 export function getStoredDisplayName(): string | null {
   migrateLegacyIdentityStorage()
   return localStorage.getItem(DISPLAY_NAME_KEY)

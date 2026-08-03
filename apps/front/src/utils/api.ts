@@ -31,6 +31,16 @@ import { ensurePlayerIdentity } from './playerIdentity'
 
 type Method = 'GET' | 'POST' | 'DELETE'
 
+export class ApiRequestError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+  }
+}
+
 interface IdentificationParams {
   roomKey: string
   playerId: string
@@ -364,7 +374,8 @@ async function sendApiRequest(
         ? `${result.data.error.code}: ${result.data.error.message}`
         : `${response.status}:${response.statusText}`
 
-      throw new Error(
+      throw new ApiRequestError(
+        response.status,
         `[${details}] There was an error while doing a network call. Please try again.`
       )
     }

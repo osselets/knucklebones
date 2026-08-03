@@ -5,6 +5,7 @@ import { type PlayerType } from '@knucklebones/common'
 import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../svgs/logo.svg'
 import { getRankedAvailability } from '../utils/api'
+import { ensurePlayerIdentity } from '../utils/playerIdentity'
 import { Button } from './Button'
 import { Footer } from './Footer'
 import { GameSettingsModal } from './GameSettings'
@@ -18,7 +19,8 @@ export function HomePage() {
 
   React.useEffect(() => {
     let disposed = false
-    void getRankedAvailability()
+    void ensurePlayerIdentity()
+      .then(() => getRankedAvailability())
       .then(({ enabled }) => {
         if (!disposed) setIsRankedEnabled(enabled)
       })
