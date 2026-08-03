@@ -25,9 +25,9 @@ export function useGameWhileLoading() {
 export function useGame() {
   const context = useGameWhileLoading()
 
-  if (context === null) {
+  if (context === null || context.status === 'identity-error') {
     throw new Error(
-      '`GameContext` should not be used while the game is still loading'
+      '`GameContext` should not be used while the game is loading or its identity is unresolved'
     )
   }
 

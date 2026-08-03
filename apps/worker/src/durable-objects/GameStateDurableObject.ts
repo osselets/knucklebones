@@ -46,6 +46,8 @@ import { applyPlayCommand } from '../utils/authoritativeGame'
 import { recordOperationalEvent } from '../utils/observability'
 import {
   activateRankedMatch,
+  expireRankedAssignment,
+  getActiveRankedMatchRow,
   releaseRankedMatch,
   reserveRankedMatch,
   settleRankedMatch as settleRankedMatchInDatabase
@@ -63,6 +65,8 @@ const PROCESSED_MUTATION_TTL_MS = 15 * 60 * 1000
 const MAX_PROCESSED_MUTATIONS = 200
 const DEFAULT_DISCONNECT_GRACE_MS = 60_000
 const RANKED_REMATCH_ASSIGNMENT_TTL_MS = 15_000
+const RANKED_SETTLEMENT_RETRY_DELAY_MS = 15_000
+const RANKED_SETTLEMENT_RETRY_ALERT_AFTER = 5
 
 type RankedRematchRequestResult =
   | RankedRematchStatus
@@ -96,6 +100,9 @@ export class GameStateDurableObject extends createDurable({
   rankedMatch?: RankedMatchAssignment
   rankedRematch?: RankedMatchAssignment
   rankedSettlement?: RankedMatchSettlement
+  rankedSettlementPending = false
+  rankedRematchRoom = false
+  rankedSettlementRetryCount = 0
   rankedPlayerClaims: Record<string, IPlayer>
 
   constructor(
@@ -109,6 +116,9 @@ export class GameStateDurableObject extends createDurable({
     this.connectedPlayers = {}
     this.reconnectDeadlines = {}
     this.rankedPlayerClaims = {}
+    this.rankedSettlementPending = false
+    this.rankedRematchRoom = false
+    this.rankedSettlementRetryCount = 0
   }
 
   getPersistable(): Record<string, unknown> {
@@ -117,7 +127,10 @@ export class GameStateDurableObject extends createDurable({
     return persistable
   }
 
-  configureRankedMatch(assignment: RankedMatchAssignment): void {
+  async configureRankedMatch(
+    assignment: RankedMatchAssignment,
+    options?: { rematch?: boolean }
+  ): Promise<void> {
     const parsedAssignment = rankedMatchAssignmentSchema.parse(assignment)
     if (this.rankedMatch !== undefined) {
       if (
@@ -133,8 +146,10 @@ export class GameStateDurableObject extends createDurable({
     }
 
     this.rankedMatch = parsedAssignment
+    this.rankedRematchRoom = options?.rematch === true
     this.rankedPlayerClaims = {}
     this.configureDisconnectPolicy(parsedAssignment.roomKey)
+    await this.scheduleGameAlarm()
   }
 
   configureDisconnectPolicy(
@@ -278,40 +293,82 @@ export class GameStateDurableObject extends createDurable({
 
   async alarm(): Promise<void> {
     await this.loadFromStorage()
-    const disconnectResult = this.adjudicateDisconnects()
-    if (disconnectResult.status === 'adjudicated') {
-      this.pendingDisconnectBroadcast = disconnectResult.gameState
-    } else {
-      const turnResult = this.adjudicateRankedTurnTimeout()
-      if (turnResult.status === 'adjudicated') {
-        this.pendingDisconnectBroadcast = turnResult.gameState
+    const now = Date.now()
+
+    await this.releaseExpiredRematchAssignment(now)
+    await this.settlePendingRankedResult()
+
+    const pendingBroadcast = this.pendingDisconnectBroadcast
+    if (pendingBroadcast === undefined) {
+      const disconnectResult = this.adjudicateDisconnects(now)
+      let adjudicatedGameState: IGameState | undefined
+      if (disconnectResult.status === 'adjudicated') {
+        adjudicatedGameState = disconnectResult.gameState
+      } else {
+        const turnResult = this.adjudicateRankedTurnTimeout(now)
+        if (turnResult.status === 'adjudicated') {
+          adjudicatedGameState = turnResult.gameState
+        }
+      }
+
+      if (adjudicatedGameState !== undefined) {
+        this.pendingDisconnectBroadcast = adjudicatedGameState
+        if (adjudicatedGameState.outcome === 'game-ended') {
+          await this.settlePendingRankedResult()
+        }
+        await this.persist()
       }
     }
+
     await this.scheduleGameAlarm()
     await this.persist()
 
-    if (this.pendingDisconnectBroadcast !== undefined) {
-      if (this.pendingDisconnectBroadcast.outcome === 'game-ended') {
-        await this.settleRankedResult()
-      }
-      await this.persist()
-      await this.broadcastAlarmResult(this.pendingDisconnectBroadcast)
+    const broadcast = this.pendingDisconnectBroadcast
+    if (broadcast !== undefined) {
+      await this.broadcastAlarmResult(broadcast)
       if (
-        this.pendingDisconnectBroadcast.finishReason === 'forfeit' &&
-        this.pendingDisconnectBroadcast.forfeitReason === 'timeout'
+        broadcast.finishReason === 'forfeit' &&
+        broadcast.forfeitReason === 'timeout'
       ) {
         const timedOutPlayerId = [
-          this.pendingDisconnectBroadcast.playerOne.id,
-          this.pendingDisconnectBroadcast.playerTwo.id
-        ].find(
-          (playerId) => playerId !== this.pendingDisconnectBroadcast?.winnerId
-        )
+          broadcast.playerOne.id,
+          broadcast.playerTwo.id
+        ].find((playerId) => playerId !== broadcast.winnerId)
         if (timedOutPlayerId !== undefined) {
           await this.disconnectRoomPlayer(timedOutPlayerId)
         }
       }
       this.pendingDisconnectBroadcast = undefined
       await this.persist()
+    }
+
+    if (this.rankedSettlementPending) {
+      await this.scheduleGameAlarm()
+      await this.persist()
+    }
+  }
+
+  private async releaseExpiredRematchAssignment(now: number): Promise<void> {
+    if (
+      !this.rankedRematchRoom ||
+      this.rankedMatch === undefined ||
+      this.gameState !== undefined ||
+      this.rankedMatch.expiresAt > now
+    ) {
+      return
+    }
+
+    const released = await expireRankedAssignment(
+      this.cloudflareEnvironment.PLAYERS_DB,
+      this.rankedMatch.matchId,
+      now
+    )
+    if (released) {
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'ranked.rematch',
+        outcome: 'expired',
+        queue_key: this.rankedMatch.queueKey
+      })
     }
   }
 
@@ -363,21 +420,67 @@ export class GameStateDurableObject extends createDurable({
       return { status: 'not-finished' }
     }
 
-    const result = await settleRankedMatchInDatabase(
-      this.cloudflareEnvironment.PLAYERS_DB,
-      this.rankedMatch,
-      this.gameState
-    )
-    this.rankedSettlement = result.settlement
-    recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
-      event: 'ranked.settlement',
-      outcome: result.status,
-      queue_key: result.settlement.queueKey,
-      result: result.settlement.result,
-      finish_reason: result.settlement.finishReason,
-      absolute_rating_change: Math.abs(result.settlement.playerOne.change)
-    })
-    return result
+    try {
+      const result = await settleRankedMatchInDatabase(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        this.rankedMatch,
+        this.gameState
+      )
+      this.rankedSettlement = result.settlement
+      this.rankedSettlementPending = false
+      this.rankedSettlementRetryCount = 0
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'ranked.settlement',
+        outcome: result.status,
+        queue_key: result.settlement.queueKey,
+        result: result.settlement.result,
+        finish_reason: result.settlement.finishReason,
+        absolute_rating_change: Math.abs(result.settlement.playerOne.change)
+      })
+      return result
+    } catch (error) {
+      const activeRow = await getActiveRankedMatchRow(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        this.rankedMatch.matchId
+      )
+      if (activeRow === undefined) {
+        // The active row was already removed without a recorded settlement, so
+        // there is nothing left to settle and the players are free to queue.
+        this.rankedSettlementPending = false
+        this.rankedSettlementRetryCount = 0
+        return { status: 'not-finished' }
+      }
+
+      this.rankedSettlementPending = true
+      this.rankedSettlementRetryCount += 1
+      recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+        event: 'ranked.settlement.failed',
+        queue_key: this.rankedMatch.queueKey,
+        state: activeRow.state,
+        attempts: this.rankedSettlementRetryCount,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      if (
+        this.rankedSettlementRetryCount >= RANKED_SETTLEMENT_RETRY_ALERT_AFTER
+      ) {
+        recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+          event: 'ranked.settlement.stuck',
+          queue_key: this.rankedMatch.queueKey,
+          match_id: this.rankedMatch.matchId,
+          attempts: this.rankedSettlementRetryCount
+        })
+      }
+      await this.scheduleGameAlarm()
+      await this.persist()
+      // The match stays active so a later alarm retries the settlement.
+      return { status: 'not-finished' }
+    }
+  }
+
+  private async settlePendingRankedResult(): Promise<void> {
+    if (this.rankedSettlementPending && this.rankedMatch !== undefined) {
+      await this.settleRankedResult()
+    }
   }
 
   private async applyInitializeGame({
@@ -747,7 +850,7 @@ export class GameStateDurableObject extends createDurable({
       {
         headers: {
           'do-name': assignment.roomKey,
-          'do-content': JSON.stringify([assignment])
+          'do-content': JSON.stringify([assignment, { rematch: true }])
         }
       }
     )
@@ -890,7 +993,16 @@ export class GameStateDurableObject extends createDurable({
         column.length < 3 ? [index] : []
       )
       if (playableColumns.length === 0) {
-        throw new Error('The timed-out ranked player has no legal move.')
+        // A timed-out player with no legal move cannot keep playing, so the
+        // game ends in a timeout forfeit instead of hanging the alarm.
+        gameState.finishByForfeit(timedOutPlayer.id, 'timeout')
+        gameState.rankedTurn = undefined
+        recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+          event: 'ranked.turn',
+          outcome: 'no-legal-move-forfeit',
+          queue_key: this.rankedMatch.queueKey
+        })
+        return this.adjudicatedTimeoutResult(gameState)
       }
       const boundedRandomValue = Math.min(Math.max(randomValue, 0), 1)
       const randomIndex = Math.min(
@@ -902,13 +1014,28 @@ export class GameStateDurableObject extends createDurable({
         playableColumns[randomIndex]
       )
       if (rejectionReason !== undefined) {
-        throw new Error(
-          `The automatic ranked move was rejected: ${rejectionReason}.`
-        )
+        // The automatic move cannot be applied, so the timed-out player is
+        // forfeited instead of leaving the game frozen on a rejected move.
+        gameState.finishByForfeit(timedOutPlayer.id, 'timeout')
+        gameState.rankedTurn = undefined
+        recordOperationalEvent(this.cloudflareEnvironment.ENVIRONMENT, {
+          event: 'ranked.turn',
+          outcome: 'auto-move-rejected-forfeit',
+          queue_key: this.rankedMatch.queueKey,
+          reason: rejectionReason
+        })
+        return this.adjudicatedTimeoutResult(gameState)
       }
       this.resetRankedTurn(gameState, now)
     }
 
+    return this.adjudicatedTimeoutResult(gameState)
+  }
+
+  private adjudicatedTimeoutResult(gameState: GameState): {
+    status: 'adjudicated'
+    gameState: IGameState
+  } {
     return {
       status: 'adjudicated',
       gameState: this.commitGameState(gameState)
@@ -929,17 +1056,29 @@ export class GameStateDurableObject extends createDurable({
   }
 
   private async scheduleGameAlarm(): Promise<void> {
+    const now = Date.now()
     const deadlines = Object.values(this.reconnectDeadlines)
     const rankedTurnDeadline = this.gameState?.rankedTurn?.expiresAt
     if (rankedTurnDeadline !== undefined) {
       deadlines.push(rankedTurnDeadline)
     }
-    if (deadlines.length === 0) {
+    if (
+      this.rankedRematchRoom &&
+      this.rankedMatch !== undefined &&
+      this.gameState === undefined
+    ) {
+      deadlines.push(this.rankedMatch.expiresAt)
+    }
+    if (this.rankedSettlementPending) {
+      deadlines.push(now + RANKED_SETTLEMENT_RETRY_DELAY_MS)
+    }
+    const futureDeadlines = deadlines.filter((deadline) => deadline > now)
+    if (futureDeadlines.length === 0) {
       await this.deleteAlarm()
       return
     }
 
-    await this.setAlarm(Math.min(...deadlines))
+    await this.setAlarm(Math.min(...futureDeadlines))
   }
 
   private async reportRankedAssignmentPresence(
@@ -1018,7 +1157,15 @@ export class GameStateDurableObject extends createDurable({
 
   private commitGameState(gameState: GameState): IGameState {
     gameState.revision = (this.gameState?.revision ?? 0) + 1
-    this.gameState = gameState.toJson()
+    const serializedGameState = gameState.toJson()
+    if (
+      this.rankedMatch !== undefined &&
+      this.rankedSettlement === undefined &&
+      serializedGameState.outcome === 'game-ended'
+    ) {
+      this.rankedSettlementPending = true
+    }
+    this.gameState = serializedGameState
     return this.gameState
   }
 

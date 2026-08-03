@@ -47,6 +47,8 @@ export function useGameSetup() {
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [identityError, setIdentityError] = React.useState<string | null>(null)
+  const [identityRetryAttempt, setIdentityRetryAttempt] = React.useState(0)
   const [presenceByPlayerId, setPresenceByPlayerId] = React.useState<
     Record<string, boolean>
   >({})
@@ -76,16 +78,17 @@ export function useGameSetup() {
       })
       .catch((error) => {
         if (!disposed) {
-          setErrorMessage(
+          const message =
             error instanceof Error ? error.message : t('identity.error')
-          )
+          setIdentityError(message)
+          setErrorMessage(message)
         }
       })
 
     return () => {
       disposed = true
     }
-  }, [playerId, t])
+  }, [playerId, t, identityRetryAttempt])
   const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
     const { ticket } = await createWebSocketTicket({
       roomKey,
@@ -283,6 +286,7 @@ export function useGameSetup() {
       }
 
       const previousGameState = gameState
+      const previousRevision = previousGameState?.revision
 
       const realGameState = GameState.fromJson(gameState!)
       realGameState.applyPlay(body, false)
@@ -293,7 +297,15 @@ export function useGameSetup() {
       await play({ roomKey, playerId: playerId! }, { column }).catch(
         (error) => {
           setErrorMessage(error.message)
-          setGameState(previousGameState)
+          // Only roll the optimistic move back if no newer authoritative state
+          // was applied while the request was in flight. Otherwise the server
+          // state (or the next broadcast) wins.
+          const isLatest =
+            latestRevision.current.roomKey === roomKey &&
+            latestRevision.current.value === (previousRevision ?? -1)
+          if (isLatest) {
+            setGameState(previousGameState)
+          }
           setIsLoading(false)
         }
       )
@@ -302,6 +314,12 @@ export function useGameSetup() {
 
   function clearErrorMessage() {
     setErrorMessage(null)
+  }
+
+  function retryIdentity() {
+    setIdentityError(null)
+    setErrorMessage(null)
+    setIdentityRetryAttempt((attempt) => attempt + 1)
   }
 
   // Mouais à voir comment on peut repenser les options ici
@@ -357,11 +375,19 @@ export function useGameSetup() {
   }
 
   // Easy way to do a type guard
+  if (identityError !== null) {
+    return {
+      status: 'identity-error' as const,
+      errorMessage: identityError,
+      retryIdentity
+    }
+  }
   if (!isGameStateReady || playerId === undefined) {
     return null
   }
 
   return {
+    status: 'ready' as const,
     ...gameState,
     isLoading,
     playerOne,

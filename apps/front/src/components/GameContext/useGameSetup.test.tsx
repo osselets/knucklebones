@@ -7,7 +7,8 @@ import {
   toGameStateMessage,
   toGamePresenceMessage,
   toGameReconnectDeadlineMessage,
-  type IGameState
+  type IGameState,
+  type PlayerCredentials
 } from '@knucklebones/common'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import {
@@ -16,7 +17,18 @@ import {
   play,
   reportClientProtocolDiagnostic
 } from '../../utils/api'
+import { ensurePlayerIdentity } from '../../utils/playerIdentity'
+import type { GameSetup } from './GameContext'
 import { useGameSetup } from './useGameSetup'
+
+function readyState(
+  current: GameSetup
+): Exclude<GameSetup, null | { status: 'identity-error' }> | undefined {
+  if (current === null || current.status === 'identity-error') {
+    return undefined
+  }
+  return current
+}
 
 const socket = vi.hoisted(() => ({
   lastJsonMessage: null as unknown,
@@ -43,6 +55,10 @@ vi.mock('../../utils/api', () => ({
   reportClientProtocolDiagnostic: vi.fn(),
   updateDisplayName: vi.fn(),
   voteRematch: vi.fn()
+}))
+vi.mock('../../utils/playerIdentity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../utils/playerIdentity')>()),
+  ensurePlayerIdentity: vi.fn()
 }))
 
 const playerId = '22222222-2222-4222-8222-222222222222'
@@ -89,6 +105,7 @@ describe('useGameSetup', () => {
     vi.mocked(reportClientProtocolDiagnostic)
       .mockReset()
       .mockResolvedValue(undefined)
+    vi.mocked(ensurePlayerIdentity).mockReset()
   })
 
   it('ignores stale, foreign-room, and malformed state messages', async () => {
@@ -96,23 +113,25 @@ describe('useGameSetup', () => {
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
 
     emitMessage(toGameStateMessage(createGameState(3), roomKey), rerender)
-    await waitFor(() => expect(result.current?.revision).toBe(3))
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(3))
 
     emitMessage(
       toGameStateMessage(createGameState(2, 'Stale Name'), roomKey),
       rerender
     )
-    expect(result.current?.revision).toBe(3)
-    expect(result.current?.playerOne.displayName).toBe('Current Name')
+    expect(readyState(result.current)?.revision).toBe(3)
+    expect(readyState(result.current)?.playerOne.displayName).toBe(
+      'Current Name'
+    )
 
     emitMessage(
       toGameStateMessage(createGameState(4, 'Foreign Name'), foreignRoomKey),
       rerender
     )
-    expect(result.current?.revision).toBe(3)
+    expect(readyState(result.current)?.revision).toBe(3)
 
     emitMessage({ type: 'game.state', version: 1 }, rerender)
-    expect(result.current?.revision).toBe(3)
+    expect(readyState(result.current)?.revision).toBe(3)
     expect(consoleError).toHaveBeenCalledWith(
       'Ignored an invalid game-state message.'
     )
@@ -127,7 +146,7 @@ describe('useGameSetup', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
     emitMessage(toGameStateMessage(createGameState(3), roomKey), rerender)
-    await waitFor(() => expect(result.current?.revision).toBe(3))
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(3))
 
     emitMessage(
       {
@@ -137,8 +156,10 @@ describe('useGameSetup', () => {
       rerender
     )
 
-    expect(result.current?.revision).toBe(3)
-    expect(result.current?.errorMessage).toBe('errors.unsupported-protocol')
+    expect(readyState(result.current)?.revision).toBe(3)
+    expect(readyState(result.current)?.errorMessage).toBe(
+      'errors.unsupported-protocol'
+    )
     expect(consoleError).toHaveBeenCalledWith(
       'Ignored a message using an unsupported protocol version.'
     )
@@ -169,9 +190,9 @@ describe('useGameSetup', () => {
 
     emitMessage(toGameStateMessage(gameState, roomKey), rerender)
 
-    await waitFor(() => expect(result.current?.revision).toBe(1))
-    expect(result.current?.playerOne.id).toBe(playerId)
-    expect(result.current?.rankedTurn).toMatchObject({
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(1))
+    expect(readyState(result.current)?.playerOne.id).toBe(playerId)
+    expect(readyState(result.current)?.rankedTurn).toMatchObject({
       playerOneTimeouts: 2,
       playerTwoTimeouts: 0
     })
@@ -224,39 +245,43 @@ describe('useGameSetup', () => {
   it('tracks valid room presence without replacing game state', async () => {
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
     emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
-    await waitFor(() => expect(result.current?.revision).toBe(1))
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(1))
 
     emitMessage(toGamePresenceMessage(roomKey, playerId, true), rerender)
     await waitFor(() =>
-      expect(result.current?.presenceByPlayerId[playerId]).toBe(true)
+      expect(readyState(result.current)?.presenceByPlayerId[playerId]).toBe(
+        true
+      )
     )
-    expect(result.current?.revision).toBe(1)
+    expect(readyState(result.current)?.revision).toBe(1)
 
     emitMessage(toGamePresenceMessage(roomKey, playerId, false), rerender)
     await waitFor(() =>
-      expect(result.current?.presenceByPlayerId[playerId]).toBe(false)
+      expect(readyState(result.current)?.presenceByPlayerId[playerId]).toBe(
+        false
+      )
     )
   })
 
   it('tracks and clears reconnect deadlines', async () => {
     const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
     emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
-    await waitFor(() => expect(result.current?.revision).toBe(1))
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(1))
 
     emitMessage(
       toGameReconnectDeadlineMessage(roomKey, playerId, 123_456),
       rerender
     )
     await waitFor(() =>
-      expect(result.current?.reconnectDeadlineByPlayerId[playerId]).toBe(
-        123_456
-      )
+      expect(
+        readyState(result.current)?.reconnectDeadlineByPlayerId[playerId]
+      ).toBe(123_456)
     )
 
     emitMessage(toGameReconnectDeadlineMessage(roomKey, playerId, 0), rerender)
     await waitFor(() =>
       expect(
-        result.current?.reconnectDeadlineByPlayerId[playerId]
+        readyState(result.current)?.reconnectDeadlineByPlayerId[playerId]
       ).toBeUndefined()
     )
   })
@@ -269,9 +294,9 @@ describe('useGameSetup', () => {
       rerender
     )
     await waitFor(() =>
-      expect(result.current?.reconnectDeadlineByPlayerId[playerId]).toBe(
-        123_456
-      )
+      expect(
+        readyState(result.current)?.reconnectDeadlineByPlayerId[playerId]
+      ).toBe(123_456)
     )
 
     emitMessage(
@@ -286,7 +311,9 @@ describe('useGameSetup', () => {
       rerender
     )
     await waitFor(() =>
-      expect(result.current?.reconnectDeadlineByPlayerId).toEqual({})
+      expect(readyState(result.current)?.reconnectDeadlineByPlayerId).toEqual(
+        {}
+      )
     )
   })
 
@@ -297,11 +324,68 @@ describe('useGameSetup', () => {
     await waitFor(() => expect(result.current).not.toBeNull())
 
     await act(async () => {
-      await result.current?.sendPlay(0)
+      await readyState(result.current)?.sendPlay(0)
     })
 
-    expect(result.current?.playerOne.columns).toEqual([[], [], []])
-    expect(result.current?.errorMessage).toBe('network unavailable')
-    expect(result.current?.isLoading).toBe(false)
+    expect(readyState(result.current)?.playerOne.columns).toEqual([[], [], []])
+    expect(readyState(result.current)?.errorMessage).toBe('network unavailable')
+    expect(readyState(result.current)?.isLoading).toBe(false)
+  })
+
+  it('keeps a newer authoritative state instead of rolling back', async () => {
+    let rejectPlay: (error: Error) => void = () => {}
+    vi.mocked(play).mockImplementationOnce(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectPlay = reject
+        })
+    )
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+    emitMessage(toGameStateMessage(createGameState(1), roomKey), rerender)
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(1))
+
+    let pendingSend: Promise<void> = Promise.resolve()
+    await act(async () => {
+      pendingSend = readyState(result.current)?.sendPlay(0) ?? Promise.resolve()
+    })
+
+    emitMessage(toGameStateMessage(createGameState(2), roomKey), rerender)
+    await waitFor(() => expect(readyState(result.current)?.revision).toBe(2))
+
+    await act(async () => {
+      rejectPlay(new Error('network unavailable'))
+      await pendingSend
+    })
+
+    expect(readyState(result.current)?.revision).toBe(2)
+    expect(readyState(result.current)?.errorMessage).toBe('network unavailable')
+    expect(readyState(result.current)?.isLoading).toBe(false)
+  })
+
+  it('surfaces an identity failure and retries after a reset', async () => {
+    localStorage.removeItem('playerId')
+    vi.mocked(ensurePlayerIdentity)
+      .mockReset()
+      .mockRejectedValueOnce(new Error('identity unavailable'))
+
+    const { result } = renderHook(() => useGameSetup(), { wrapper })
+
+    await waitFor(() => expect(result.current).not.toBeNull())
+    if (result.current === null || result.current.status !== 'identity-error') {
+      throw new Error('Expected the hook to surface the identity error.')
+    }
+    const errorState = result.current
+    expect(errorState.errorMessage).toBe('identity unavailable')
+
+    vi.mocked(ensurePlayerIdentity).mockResolvedValueOnce({
+      playerId,
+      credential: 'new-credential',
+      recoveryPhrase: 'a-phrase'
+    } as PlayerCredentials)
+    await act(async () => {
+      errorState.retryIdentity()
+    })
+
+    await waitFor(() => expect(result.current).toBeNull())
   })
 })

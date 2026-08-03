@@ -277,16 +277,18 @@ export class MatchmakingDurableObject {
       try {
         await this.configureRankedRoom(extendedAssignment)
       } catch (error) {
-        await releaseRankedMatch(
+        const released = await releaseRankedMatch(
           this.cloudflareEnvironment.PLAYERS_DB,
           assignment.matchId
         )
-        this.requeueAssignmentPlayers(
-          state,
-          assignment,
-          [assignment.playerOneId, assignment.playerTwoId],
-          now
-        )
+        if (released) {
+          this.requeueAssignmentPlayers(
+            state,
+            assignment,
+            [assignment.playerOneId, assignment.playerTwoId],
+            now
+          )
+        }
         await this.persistState(state, now)
         throw error
       }
@@ -569,7 +571,14 @@ export class MatchmakingDurableObject {
       expiresAt: now + MATCH_ASSIGNMENT_TTL_MS
     }
 
-    await reserveRankedMatch(this.cloudflareEnvironment.PLAYERS_DB, match)
+    const reservation = await this.reserveMatchOrSkip(match, now)
+    if (!reservation.reserved) {
+      state.waiting = state.waiting.filter(
+        (candidate) =>
+          !reservation.blockedPlayerIds.includes(candidate.playerId)
+      )
+      return
+    }
     state.waiting = state.waiting.filter(
       (candidate) =>
         candidate.playerId !== entry.playerId &&
@@ -594,6 +603,65 @@ export class MatchmakingDurableObject {
       preferred: ratingDifference <= PREFERRED_RATING_DIFFERENCE,
       queue_size: state.waiting.length
     })
+  }
+
+  private async reserveMatchOrSkip(
+    match: RankedMatchAssignment,
+    now: number
+  ): Promise<
+    { reserved: true } | { reserved: false; blockedPlayerIds: string[] }
+  > {
+    let lastError: unknown
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await reserveRankedMatch(this.cloudflareEnvironment.PLAYERS_DB, match)
+        return { reserved: true }
+      } catch (error) {
+        lastError = error
+      }
+
+      // A player may still hold a pending assignment outside the matchmaker's
+      // state (for example an expired ranked rematch reservation).
+      // getActiveRankedMatchForPlayer also removes expired 'assigned' rows, so
+      // this both cleans the stale reservation and reports the blocked players.
+      const playerOneBlocked = await this.playerHasActiveRankedMatch(
+        match.playerOneId,
+        now
+      )
+      const playerTwoBlocked = await this.playerHasActiveRankedMatch(
+        match.playerTwoId,
+        now
+      )
+      if (playerOneBlocked || playerTwoBlocked) {
+        this.sentry.captureException(lastError)
+        return {
+          reserved: false,
+          blockedPlayerIds: [
+            ...(playerOneBlocked ? [match.playerOneId] : []),
+            ...(playerTwoBlocked ? [match.playerTwoId] : [])
+          ]
+        }
+      }
+    }
+
+    this.sentry.captureException(lastError)
+    return {
+      reserved: false,
+      blockedPlayerIds: [match.playerOneId, match.playerTwoId]
+    }
+  }
+
+  private async playerHasActiveRankedMatch(
+    playerId: string,
+    now: number
+  ): Promise<boolean> {
+    return (
+      (await getActiveRankedMatchForPlayer(
+        this.cloudflareEnvironment.PLAYERS_DB,
+        playerId,
+        now
+      )) !== undefined
+    )
   }
 
   private async broadcastAssignmentExpired(

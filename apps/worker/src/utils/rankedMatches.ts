@@ -431,11 +431,26 @@ export async function settleRankedMatch(
 export async function releaseRankedMatch(
   database: D1Database,
   matchId: string
-): Promise<void> {
-  await database
-    .prepare('DELETE FROM active_ranked_matches WHERE match_id = ?')
+): Promise<boolean> {
+  const result = await database
+    .prepare(
+      `DELETE FROM active_ranked_matches
+       WHERE match_id = ? AND state = 'assigned'`
+    )
     .bind(matchId)
     .run()
+  return result.meta.changes === 1
+}
+
+export async function getActiveRankedMatchRow(
+  database: D1Database,
+  matchId: string
+): Promise<{ state: 'assigned' | 'active' } | undefined> {
+  const row = await database
+    .prepare('SELECT state FROM active_ranked_matches WHERE match_id = ?')
+    .bind(matchId)
+    .first<{ state: 'assigned' | 'active' }>()
+  return row ?? undefined
 }
 
 export async function expireRankedAssignment(

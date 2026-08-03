@@ -20,6 +20,10 @@ import {
   createDeviceCredential,
   hashCredential
 } from '../src/utils/credentials'
+import {
+  expireRankedAssignment,
+  releaseRankedMatch
+} from '../src/utils/rankedMatches'
 
 const workerConfigPath = new URL('../wrangler.toml', import.meta.url).pathname
 
@@ -1135,6 +1139,134 @@ describe('ranked match persistence', () => {
       /INVALID_RANKED_MATCH_SETTLEMENT/
     )
   })
+
+  it('releases only pending assignments, never active matches', async () => {
+    const environment = await server.getWorker().getEnv()
+
+    const activePlayerOne = await createPlayer()
+    const activePlayerTwo = await createPlayer()
+    const activeMatchId = crypto.randomUUID()
+    await insertActiveMatch({
+      matchId: activeMatchId,
+      roomKey: crypto.randomUUID(),
+      playerOne: activePlayerOne,
+      playerTwo: activePlayerTwo,
+      state: 'active'
+    })
+    expect(
+      await releaseRankedMatch(environment.PLAYERS_DB, activeMatchId)
+    ).toBe(false)
+    expect(
+      (
+        await environment.PLAYERS_DB.prepare(
+          'SELECT state FROM active_ranked_matches WHERE match_id = ?'
+        )
+          .bind(activeMatchId)
+          .first()
+      )?.state
+    ).toBe('active')
+
+    const pendingPlayerOne = await createPlayer()
+    const pendingPlayerTwo = await createPlayer()
+    const assignedMatchId = crypto.randomUUID()
+    await insertActiveMatch({
+      matchId: assignedMatchId,
+      roomKey: crypto.randomUUID(),
+      playerOne: pendingPlayerOne,
+      playerTwo: pendingPlayerTwo
+    })
+    expect(
+      await releaseRankedMatch(environment.PLAYERS_DB, assignedMatchId)
+    ).toBe(true)
+    expect(
+      await environment.PLAYERS_DB.prepare(
+        'SELECT match_id FROM active_ranked_matches WHERE match_id = ?'
+      )
+        .bind(assignedMatchId)
+        .first()
+    ).toBeNull()
+  })
+
+  it('expires only pending assignments whose deadline has passed', async () => {
+    const environment = await server.getWorker().getEnv()
+
+    const futurePlayerOne = await createPlayer()
+    const futurePlayerTwo = await createPlayer()
+    const futureMatchId = crypto.randomUUID()
+    const { createdAt: futureCreatedAt } = await insertActiveMatch({
+      matchId: futureMatchId,
+      roomKey: crypto.randomUUID(),
+      playerOne: futurePlayerOne,
+      playerTwo: futurePlayerTwo
+    })
+    expect(
+      await expireRankedAssignment(
+        environment.PLAYERS_DB,
+        futureMatchId,
+        futureCreatedAt
+      )
+    ).toBe(false)
+    expect(
+      (
+        await environment.PLAYERS_DB.prepare(
+          'SELECT state FROM active_ranked_matches WHERE match_id = ?'
+        )
+          .bind(futureMatchId)
+          .first()
+      )?.state
+    ).toBe('assigned')
+
+    const expiredPlayerOne = await createPlayer()
+    const expiredPlayerTwo = await createPlayer()
+    const expiredMatchId = crypto.randomUUID()
+    const { createdAt: expiredCreatedAt } = await insertActiveMatch({
+      matchId: expiredMatchId,
+      roomKey: crypto.randomUUID(),
+      playerOne: expiredPlayerOne,
+      playerTwo: expiredPlayerTwo
+    })
+    expect(
+      await expireRankedAssignment(
+        environment.PLAYERS_DB,
+        expiredMatchId,
+        expiredCreatedAt + 15_001
+      )
+    ).toBe(true)
+    expect(
+      await environment.PLAYERS_DB.prepare(
+        'SELECT match_id FROM active_ranked_matches WHERE match_id = ?'
+      )
+        .bind(expiredMatchId)
+        .first()
+    ).toBeNull()
+
+    const activePlayerOne = await createPlayer()
+    const activePlayerTwo = await createPlayer()
+    const activeMatchId = crypto.randomUUID()
+    await insertActiveMatch({
+      matchId: activeMatchId,
+      roomKey: crypto.randomUUID(),
+      playerOne: activePlayerOne,
+      playerTwo: activePlayerTwo,
+      state: 'active'
+    })
+    expect(
+      await expireRankedAssignment(
+        environment.PLAYERS_DB,
+        activeMatchId,
+        Date.now() + 60_000
+      )
+    ).toBe(false)
+    expect(
+      (
+        await environment.PLAYERS_DB.prepare(
+          'SELECT state FROM active_ranked_matches WHERE match_id = ?'
+        )
+          .bind(activeMatchId)
+          .first()
+      )?.state
+    ).toBe('active')
+  })
 })
 
 describe('ranked matchmaking', () => {
@@ -2014,6 +2146,116 @@ describe('ranked matchmaking', () => {
     expect(profile).toMatchObject({ rating: 1184, gamesPlayed: 1, losses: 1 })
   })
 
+  it('settles on a retry after a transient settlement failure', async () => {
+    const playerOne = await createPlayer()
+    const playerTwo = await createPlayer()
+
+    await joinQueue(playerOne)
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    const found = matchmakingStatusSchema.parse(
+      await (await joinQueue(playerTwo)).json()
+    )
+    if (found.status !== 'match-found') {
+      throw new Error('Expected the players to receive a ready check.')
+    }
+
+    const { playerOneStatus: match } = await acceptReadyCheck(
+      playerOne,
+      playerTwo
+    )
+    const initialize = (player: PlayerCredentials) =>
+      request(`/v1/rooms/${match.match.roomKey}/init`, {
+        method: 'POST',
+        headers: {
+          ...authorization(player),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID()
+        },
+        body: JSON.stringify({ playerType: 'human', boType: 1 })
+      })
+    expect((await initialize(playerOne)).status).toBe(200)
+    expect((await initialize(playerTwo)).status).toBe(200)
+
+    const environment = await server.getWorker().getEnv()
+    const roomId = environment.GAME_STATE_DURABLE_OBJECT.idFromName(
+      match.match.roomKey
+    )
+    const room = environment.GAME_STATE_DURABLE_OBJECT.get(roomId)
+    const callRoom = async <T>(method: string, args: unknown[]): Promise<T> => {
+      const response = await room.fetch(
+        `https://itty-durable/do/call/${method}`,
+        {
+          headers: {
+            'do-name': match.match.roomKey,
+            'do-content': JSON.stringify(args)
+          }
+        }
+      )
+      expect(response.ok).toBe(true)
+      return (response.status === 204 ? undefined : await response.json()) as T
+    }
+
+    const now = Date.now() + 60_000
+    await callRoom('updatePresence', [playerTwo.playerId, true, now])
+    const disconnected = await callRoom<PresenceUpdateResult>(
+      'updatePresence',
+      [playerOne.playerId, false, now]
+    )
+    if (
+      disconnected.status !== 'updated' ||
+      disconnected.reconnectDeadline === undefined
+    ) {
+      throw new Error('Expected a ranked reconnect deadline.')
+    }
+    expect(
+      await callRoom<PresenceUpdateResult>('adjudicateDisconnects', [
+        disconnected.reconnectDeadline
+      ])
+    ).toMatchObject({
+      status: 'adjudicated',
+      gameState: {
+        outcome: 'game-ended',
+        finishReason: 'forfeit',
+        forfeitReason: 'disconnect'
+      }
+    })
+
+    await environment.PLAYERS_DB.prepare(
+      `UPDATE active_ranked_matches SET room_key = ?
+       WHERE match_id = ?`
+    )
+      .bind(crypto.randomUUID(), match.match.matchId)
+      .run()
+
+    const failed = await callRoom('settleRankedResult', [])
+    expect(failed).toEqual({ status: 'not-finished' })
+    const activeRow = await environment.PLAYERS_DB.prepare(
+      'SELECT state FROM active_ranked_matches WHERE match_id = ?'
+    )
+      .bind(match.match.matchId)
+      .first<{ state: string }>()
+    expect(activeRow?.state).toBe('active')
+
+    await environment.PLAYERS_DB.prepare(
+      `UPDATE active_ranked_matches SET room_key = ?
+       WHERE match_id = ?`
+    )
+      .bind(match.match.roomKey, match.match.matchId)
+      .run()
+
+    const settled = rankedMatchSettlementResultSchema.parse(
+      await callRoom('settleRankedResult', [])
+    )
+    expect(settled.status).toBe('settled')
+    if (settled.status === 'settled') {
+      expect(settled.settlement).toMatchObject({
+        matchId: match.match.matchId,
+        result: 'player-two-win',
+        finishReason: 'forfeit'
+      })
+    }
+  })
+
   it('chooses the closest rating after the selection window', async () => {
     const player = await createPlayer()
     const distantOpponent = await createPlayer()
@@ -2069,5 +2311,73 @@ describe('ranked matchmaking', () => {
     expect(matchmakingStatusSchema.parse(await response.json()).status).toBe(
       'match-found'
     )
+  })
+
+  it('skips a blocked player instead of failing the match selection', async () => {
+    const blockedPlayer = await createPlayer()
+    const waitingPlayer = await createPlayer()
+    const existingOpponent = await createPlayer()
+
+    expect(
+      matchmakingStatusSchema.parse(
+        await (await joinQueue(blockedPlayer)).json()
+      ).status
+    ).toBe('waiting')
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    const environment = await server.getWorker().getEnv()
+    const now = Date.now()
+    await environment.PLAYERS_DB.prepare(
+      `INSERT INTO active_ranked_matches (
+         match_id, room_key, queue_key, rating_pool, format,
+         player_one_id, player_two_id,
+         player_one_rating, player_two_rating,
+         state, created_at, expires_at, activated_at
+       ) VALUES (?, ?, 'classic:bo1', 'classic', 'bo1', ?, ?, 1200, 1200,
+                 'active', ?, ?, ?)`
+    )
+      .bind(
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+        blockedPlayer.playerId,
+        existingOpponent.playerId,
+        now - 1,
+        now + 15_000,
+        now
+      )
+      .run()
+
+    const waitingJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(waitingPlayer)).json()
+    )
+    expect(waitingJoin.status).toBe('waiting')
+
+    const laterJoin = matchmakingStatusSchema.parse(
+      await (await joinQueue(blockedPlayer)).json()
+    )
+    expect(laterJoin.status).toBe('matched')
+    if (laterJoin.status === 'matched') {
+      expect(laterJoin.match.playerOneId).toBe(blockedPlayer.playerId)
+    }
+
+    const remainingMatches = await environment.PLAYERS_DB.prepare(
+      `SELECT match_id, player_one_id, player_two_id
+       FROM active_ranked_matches
+       WHERE player_one_id IN (?, ?) OR player_two_id IN (?, ?)`
+    )
+      .bind(
+        waitingPlayer.playerId,
+        blockedPlayer.playerId,
+        waitingPlayer.playerId,
+        blockedPlayer.playerId
+      )
+      .all<{ match_id: string; player_one_id: string; player_two_id: string }>()
+    expect(remainingMatches.results).toHaveLength(1)
+    expect(remainingMatches.results[0]).toEqual({
+      match_id: expect.any(String),
+      player_one_id: blockedPlayer.playerId,
+      player_two_id: existingOpponent.playerId
+    })
   })
 })
