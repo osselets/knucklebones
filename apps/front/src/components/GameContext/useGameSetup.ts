@@ -29,7 +29,7 @@ import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
 import { ensurePlayerIdentity } from '../../utils/playerIdentity'
 import { getStoredRankedMatchAssignment } from '../../utils/rankedMatchStorage'
-import { getWebSocketUrl, preparePlayers } from './utils'
+import { getWebSocketUrl, preparePlayers, prepareRankedTurn } from './utils'
 
 // react-use-websocket 4.13 publishes a CommonJS object containing its default
 // export. Vite 8 exposes that object directly when the importer is ESM.
@@ -106,6 +106,9 @@ export function useGameSetup() {
   const [playerOne, playerTwo] = isGameStateReady
     ? preparePlayers(playerSide, gameState)
     : []
+  const rankedTurn = isGameStateReady
+    ? prepareRankedTurn(playerSide, gameState.rankedTurn)
+    : undefined
 
   const winner =
     gameState?.winnerId !== undefined
@@ -205,6 +208,18 @@ export function useGameSetup() {
         }
       }
 
+      const isTimedOutPlayer =
+        nextGameState.outcome === 'game-ended' &&
+        nextGameState.finishReason === 'forfeit' &&
+        nextGameState.forfeitReason === 'timeout' &&
+        nextGameState.winnerId !== playerId &&
+        (nextGameState.playerOne.id === playerId ||
+          nextGameState.playerTwo.id === playerId)
+      if (isTimedOutPlayer) {
+        navigate(localizedPath('/'), { replace: true })
+        return
+      }
+
       setGameState(nextGameState)
       if (nextGameState.outcome !== 'ongoing') {
         setReconnectDeadlineByPlayerId({})
@@ -212,7 +227,7 @@ export function useGameSetup() {
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage, localizedPath, navigate, roomKey, t])
+  }, [lastJsonMessage, localizedPath, navigate, playerId, roomKey, t])
 
   React.useEffect(() => {
     setPresenceByPlayerId({})
@@ -351,6 +366,7 @@ export function useGameSetup() {
     isLoading,
     playerOne,
     playerTwo,
+    rankedTurn,
     playerId,
     playerSide,
     winner,

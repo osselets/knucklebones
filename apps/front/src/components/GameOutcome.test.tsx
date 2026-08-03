@@ -124,4 +124,24 @@ describe('GameOutcome ranked rating', () => {
       await screen.findByText(/ranked.result.rating-change/)
     ).toHaveTextContent('1184')
   })
+
+  it('disables ranked rematches after a timeout forfeit', () => {
+    const game = rankedGame(false)
+    vi.mocked(useGame).mockReturnValue({
+      ...game,
+      winner: game.playerOne,
+      finishReason: 'forfeit',
+      forfeitReason: 'timeout'
+    } as never)
+
+    render(
+      <MemoryRouter>
+        <GameOutcome />
+      </MemoryRouter>
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'ranked.result.rematch' })
+    ).toBeDisabled()
+  })
 })

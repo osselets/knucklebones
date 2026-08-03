@@ -22,10 +22,15 @@ const socket = vi.hoisted(() => ({
   lastJsonMessage: null as unknown,
   readyState: 0
 }))
+const navigate = vi.hoisted(() => vi.fn())
 
 vi.mock('react-use-websocket', () => ({
   default: () => socket,
   ReadyState: { CLOSED: 3, OPEN: 1 }
+}))
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => navigate
 }))
 vi.mock('../../hooks/useRoomKey', () => ({
   useRoomKey: () => '11111111-1111-4111-8111-111111111111'
@@ -76,6 +81,7 @@ describe('useGameSetup', () => {
   beforeEach(() => {
     socket.lastJsonMessage = null
     socket.readyState = 0
+    navigate.mockReset()
     localStorage.setItem('playerId', playerId)
     vi.mocked(createWebSocketTicket).mockReset()
     vi.mocked(initGame).mockReset().mockResolvedValue(undefined)
@@ -140,6 +146,57 @@ describe('useGameSetup', () => {
       expect(reportClientProtocolDiagnostic).toHaveBeenCalledWith(
         'UNSUPPORTED_PROTOCOL_VERSION'
       )
+    )
+  })
+
+  it('keeps ranked timeout counts attached to players after changing perspective', async () => {
+    const serverPlayerOne = new Player('player-one', 'Player One')
+    const serverPlayerTwo = new Player(playerId, 'Player Two', undefined, 4)
+    const gameState = new GameState({
+      revision: 1,
+      playerOne: serverPlayerOne,
+      playerTwo: serverPlayerTwo,
+      nextPlayer: serverPlayerTwo,
+      outcome: 'ongoing',
+      boType: 1,
+      rankedTurn: {
+        expiresAt: Date.now() + 30_000,
+        playerOneTimeouts: 0,
+        playerTwoTimeouts: 2
+      }
+    }).toJson()
+    const { rerender, result } = renderHook(() => useGameSetup(), { wrapper })
+
+    emitMessage(toGameStateMessage(gameState, roomKey), rerender)
+
+    await waitFor(() => expect(result.current?.revision).toBe(1))
+    expect(result.current?.playerOne.id).toBe(playerId)
+    expect(result.current?.rankedTurn).toMatchObject({
+      playerOneTimeouts: 2,
+      playerTwoTimeouts: 0
+    })
+  })
+
+  it('returns a player home after their third ranked timeout', async () => {
+    const timedOutPlayer = new Player(playerId, 'Timed Out Player')
+    const winner = new Player('winner', 'Winner')
+    const gameState = new GameState({
+      revision: 1,
+      playerOne: timedOutPlayer,
+      playerTwo: winner,
+      nextPlayer: timedOutPlayer,
+      outcome: 'game-ended',
+      finishReason: 'forfeit',
+      forfeitReason: 'timeout',
+      winnerId: winner.id,
+      boType: 1
+    }).toJson()
+    const { rerender } = renderHook(() => useGameSetup(), { wrapper })
+
+    emitMessage(toGameStateMessage(gameState, roomKey), rerender)
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith('/en/', { replace: true })
     )
   })
 

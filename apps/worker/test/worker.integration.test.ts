@@ -1961,6 +1961,21 @@ describe('ranked matchmaking', () => {
     })
     expect(gameState.rankedTurn).toBeUndefined()
 
+    const rematchResponse = await request(
+      `/v1/rooms/${match.match.roomKey}/ranked-rematch`,
+      {
+        method: 'POST',
+        headers: {
+          ...authorization(playerOne),
+          'Idempotency-Key': crypto.randomUUID()
+        }
+      }
+    )
+    expect(rematchResponse.status).toBe(200)
+    expect(await readJson(rematchResponse, 'ranked rematch')).toEqual({
+      status: 'opponent-unavailable'
+    })
+
     const settlement = rankedMatchSettlementResultSchema.parse(
       await readJson(
         await room.fetch('https://itty-durable/do/call/settleRankedResult', {

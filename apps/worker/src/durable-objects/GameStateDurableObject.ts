@@ -296,6 +296,20 @@ export class GameStateDurableObject extends createDurable({
       }
       await this.persist()
       await this.broadcastAlarmResult(this.pendingDisconnectBroadcast)
+      if (
+        this.pendingDisconnectBroadcast.finishReason === 'forfeit' &&
+        this.pendingDisconnectBroadcast.forfeitReason === 'timeout'
+      ) {
+        const timedOutPlayerId = [
+          this.pendingDisconnectBroadcast.playerOne.id,
+          this.pendingDisconnectBroadcast.playerTwo.id
+        ].find(
+          (playerId) => playerId !== this.pendingDisconnectBroadcast?.winnerId
+        )
+        if (timedOutPlayerId !== undefined) {
+          await this.disconnectRoomPlayer(timedOutPlayerId)
+        }
+      }
       this.pendingDisconnectBroadcast = undefined
       await this.persist()
     }
@@ -637,7 +651,15 @@ export class GameStateDurableObject extends createDurable({
   private validateRankedRematch(
     gameState: GameState,
     playerId: string
-  ): { status: 'game-ongoing' | 'not-ranked' | 'unknown-player' } | undefined {
+  ):
+    | {
+        status:
+          | 'game-ongoing'
+          | 'not-ranked'
+          | 'unknown-player'
+          | 'opponent-unavailable'
+      }
+    | undefined {
     if (
       playerId !== gameState.playerOne.id &&
       playerId !== gameState.playerTwo.id
@@ -649,6 +671,12 @@ export class GameStateDurableObject extends createDurable({
     }
     if (gameState.outcome === 'ongoing') {
       return { status: 'game-ongoing' }
+    }
+    if (
+      gameState.finishReason === 'forfeit' &&
+      gameState.forfeitReason === 'timeout'
+    ) {
+      return { status: 'opponent-unavailable' }
     }
   }
 
@@ -961,6 +989,30 @@ export class GameStateDurableObject extends createDurable({
 
     if (!response.ok) {
       throw new Error('The WebSocket room rejected a disconnect outcome.')
+    }
+  }
+
+  private async disconnectRoomPlayer(playerId: string): Promise<void> {
+    const roomKey = this.disconnectPolicy?.roomKey
+    if (roomKey === undefined) {
+      return
+    }
+
+    const environment = (
+      this.state as DurableObjectState & { env: CloudflareEnvironment }
+    ).env
+    const id = environment.WEB_SOCKET_DURABLE_OBJECT.idFromName(roomKey)
+    const webSocketStore = environment.WEB_SOCKET_DURABLE_OBJECT.get(id)
+    const response = await webSocketStore.fetch(
+      'https://dummy-url/disconnect-player',
+      {
+        method: 'POST',
+        headers: { 'X-Player-Id': playerId }
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('The WebSocket room rejected a player disconnect.')
     }
   }
 

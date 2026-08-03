@@ -197,7 +197,10 @@ export function GameOutcome() {
           assignment={rankedAssignment}
           rating={rankedRating}
           hasError={rankedRatingError}
-          opponentAvailable={presenceByPlayerId[playerTwo.id] !== false}
+          opponentAvailable={
+            forfeitReason !== 'timeout' &&
+            presenceByPlayerId[playerTwo.id] !== false
+          }
           opponentRequested={rematchVote === playerTwo.id}
         />
       ) : !isSpectator ? (
