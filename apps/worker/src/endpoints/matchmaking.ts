@@ -2,7 +2,6 @@ import { DEFAULT_RATING_POOL, RANKED_QUEUE_KEY } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type AuthenticatedRequestWithProps } from '../types/itty'
 import { apiError } from '../utils/http'
-import { isRankedMatchmakingEnabled } from '../utils/rankedFeature'
 
 type MatchmakingRequest = AuthenticatedRequestWithProps
 
@@ -14,15 +13,6 @@ export async function joinMatchmaking(
   request: Request & MatchmakingRequest,
   cloudflareEnvironment: CloudflareEnvironment
 ): Promise<Response> {
-  if (!isRankedMatchmakingEnabled(cloudflareEnvironment)) {
-    return apiError({
-      status: 503,
-      code: 'RANKED_MATCHMAKING_DISABLED',
-      message: 'Ranked matchmaking is not currently available.',
-      requestId: request.requestId
-    })
-  }
-
   const playerId = request.principal.playerId
   const profile = await cloudflareEnvironment.PLAYERS_DB.prepare(
     'SELECT rating FROM player_ratings WHERE player_id = ? AND rating_pool = ?'

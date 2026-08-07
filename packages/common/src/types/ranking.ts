@@ -25,7 +25,3 @@ export interface RankedProfile {
   draws: number
   losses: number
 }
-
-export interface RankedAvailability {
-  enabled: boolean
-}

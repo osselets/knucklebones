@@ -15,8 +15,6 @@ import {
   type PlayerIdentityBootstrap,
   playerIdentityBootstrapSchema,
   type RankedProfile,
-  type RankedAvailability,
-  rankedAvailabilitySchema,
   type RankedRematchStatus,
   rankedRematchStatusSchema,
   rankedProfileSchema,
@@ -151,17 +149,6 @@ export async function getRankedProfile(): Promise<RankedProfile> {
 
   if (!result.success) {
     throw new Error('The server returned an invalid ranked profile.')
-  }
-
-  return result.data
-}
-
-export async function getRankedAvailability(): Promise<RankedAvailability> {
-  const response = await sendApiRequest('/v1/ranked/availability', 'GET')
-  const result = rankedAvailabilitySchema.safeParse(await response.json())
-
-  if (!result.success) {
-    throw new Error('The server returned invalid ranked availability.')
   }
 
   return result.data

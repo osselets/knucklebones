@@ -3,7 +3,7 @@ main = "src/workers/index.ts"
 compatibility_date = "2026-07-31"
 keep_vars = true
 send_metrics = false
-vars = { ENVIRONMENT = "development", RANKED_MATCHMAKING_ENABLED = "true" }
+vars = { ENVIRONMENT = "development" }
 
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
@@ -36,7 +36,7 @@ new_sqlite_classes = ["MatchmakingDurableObject"]
 [env.staging]
 name = "knucklebones-worker-staging"
 route = { pattern = "staging.api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
-vars = { ENVIRONMENT = "staging", RANKED_MATCHMAKING_ENABLED = "true" }
+vars = { ENVIRONMENT = "staging" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
   { name = "MATCHMAKING_DURABLE_OBJECT", class_name = "MatchmakingDurableObject" },
@@ -52,7 +52,7 @@ migrations_dir = "migrations"
 [env.production]
 name = "knucklebones-worker-production"
 route = { pattern = "api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
-vars = { ENVIRONMENT = "production", RANKED_MATCHMAKING_ENABLED = "false" }
+vars = { ENVIRONMENT = "production" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
   { name = "MATCHMAKING_DURABLE_OBJECT", class_name = "MatchmakingDurableObject" },

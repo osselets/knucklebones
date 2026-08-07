@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { type PlayerType } from '@knucklebones/common'
 import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../svgs/logo.svg'
-import { getRankedAvailability } from '../utils/api'
 import { ensurePlayerIdentity } from '../utils/playerIdentity'
 import { Button } from './Button'
 import { Footer } from './Footer'
@@ -13,21 +12,11 @@ import { GameSettingsModal } from './GameSettings'
 export function HomePage() {
   const [playerType, setPlayerType] = React.useState<PlayerType>()
   const [isEditingGameSettings, setEditingGameSettings] = React.useState(false)
-  const [isRankedEnabled, setIsRankedEnabled] = React.useState(false)
   const { t } = useTranslation()
   const localizedPath = useLocalizedPath()
 
   React.useEffect(() => {
-    let disposed = false
     void ensurePlayerIdentity()
-      .then(() => getRankedAvailability())
-      .then(({ enabled }) => {
-        if (!disposed) setIsRankedEnabled(enabled)
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-    }
   }, [])
 
   function openGameSettings(playerType: PlayerType) {
@@ -49,16 +38,7 @@ export function HomePage() {
           </h1>
         </div>
         <div className='flex flex-col gap-4 md:gap-8'>
-          <Button
-            as={Link}
-            size='large'
-            to={localizedPath('/ranked')}
-            aria-hidden={!isRankedEnabled}
-            tabIndex={isRankedEnabled ? undefined : -1}
-            className={
-              isRankedEnabled ? undefined : 'pointer-events-none invisible'
-            }
-          >
+          <Button as={Link} size='large' to={localizedPath('/ranked')}>
             {t('home.play.ranked')}
           </Button>
           <Button
