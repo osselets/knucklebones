@@ -31,11 +31,13 @@ type Method = 'GET' | 'POST' | 'DELETE'
 
 export class ApiRequestError extends Error {
   status: number
+  code?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'ApiRequestError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -363,7 +365,8 @@ async function sendApiRequest(
 
       throw new ApiRequestError(
         response.status,
-        `[${details}] There was an error while doing a network call. Please try again.`
+        `[${details}] There was an error while doing a network call. Please try again.`,
+        result.success ? result.data.error.code : undefined
       )
     }
   }

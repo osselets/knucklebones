@@ -16,6 +16,7 @@ import {
 import { useLocalizedPath } from '../../hooks/useLocalizedPath'
 import { useRoomKey } from '../../hooks/useRoomKey'
 import {
+  ApiRequestError,
   createWebSocketTicket,
   deleteDisplayName,
   updateDisplayName,
@@ -28,7 +29,6 @@ import {
 import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
 import { ensurePlayerIdentity } from '../../utils/playerIdentity'
-import { getStoredRankedMatchAssignment } from '../../utils/rankedMatchStorage'
 import { getWebSocketUrl, preparePlayers, prepareRankedTurn } from './utils'
 
 // react-use-websocket 4.13 publishes a CommonJS object containing its default
@@ -55,10 +55,6 @@ export function useGameSetup() {
   const [reconnectDeadlineByPlayerId, setReconnectDeadlineByPlayerId] =
     React.useState<Record<string, number>>({})
   const roomKey = useRoomKey()
-  const rankedAssignment = React.useMemo(
-    () => getStoredRankedMatchAssignment(roomKey),
-    [roomKey]
-  )
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
   const [playerId, setPlayerId] = React.useState(
@@ -97,7 +93,12 @@ export function useGameSetup() {
     return getWebSocketUrl(roomKey, ticket)
   }, [playerId, roomKey])
   const { lastJsonMessage, readyState } = useWebSocket(
-    playerId === undefined ? null : getAuthenticatedWebSocketUrl
+    playerId === undefined ? null : getAuthenticatedWebSocketUrl,
+    {
+      shouldReconnect: () => true,
+      retryOnError: true,
+      reconnectInterval: (attempt) => Math.min(1_000 * 2 ** attempt, 15_000)
+    }
   )
 
   const isGameStateReady = gameState !== null
@@ -238,18 +239,6 @@ export function useGameSetup() {
   }, [roomKey])
 
   React.useEffect(() => {
-    if (gameState !== null || rankedAssignment === undefined) {
-      return
-    }
-
-    const timeout = setTimeout(
-      () => navigate(localizedPath('/ranked'), { replace: true }),
-      Math.max(0, rankedAssignment.expiresAt - Date.now()) + 500
-    )
-    return () => clearTimeout(timeout)
-  }, [gameState, localizedPath, navigate, rankedAssignment])
-
-  React.useEffect(() => {
     if (readyState === ReadyState.OPEN && playerId !== undefined) {
       initGame(
         { roomKey, playerId },
@@ -269,10 +258,18 @@ export function useGameSetup() {
           }
         })
         .catch((error) => {
+          if (
+            error instanceof ApiRequestError &&
+            error.status === 409 &&
+            error.code === 'RANKED_ASSIGNMENT_EXPIRED'
+          ) {
+            navigate(localizedPath('/ranked'), { replace: true })
+            return
+          }
           setErrorMessage(error.message)
         })
     }
-  }, [roomKey, playerId, readyState, state])
+  }, [roomKey, playerId, readyState, state, navigate, localizedPath])
 
   async function sendPlay(column: number) {
     const dice = playerOne?.dice

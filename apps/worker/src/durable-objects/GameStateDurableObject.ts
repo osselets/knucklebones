@@ -35,6 +35,7 @@ import {
   RANKED_TURN_DURATION_MS,
   rankedMatchAssignmentSchema,
   roomKeySchema,
+  toGameReconnectDeadlineMessage,
   toGameStateMessage,
   type UpdateDisplayNameResult,
   updateDisplayNameCommandSchema,
@@ -64,6 +65,7 @@ type ProcessedMutations = Record<string, ProcessedMutation>
 const PROCESSED_MUTATION_TTL_MS = 15 * 60 * 1000
 const MAX_PROCESSED_MUTATIONS = 200
 const DEFAULT_DISCONNECT_GRACE_MS = 60_000
+const DEFAULT_DISCONNECT_NOTIFICATION_DELAY_MS = 5_000
 const RANKED_REMATCH_ASSIGNMENT_TTL_MS = 15_000
 const RANKED_SETTLEMENT_RETRY_DELAY_MS = 15_000
 const RANKED_SETTLEMENT_RETRY_ALERT_AFTER = 5
@@ -81,6 +83,7 @@ interface RatingRow {
 interface DisconnectPolicy {
   roomKey: string
   gracePeriodMs: number
+  notificationDelayMs: number
 }
 
 type RankedTurnTimeoutResult =
@@ -96,6 +99,7 @@ export class GameStateDurableObject extends createDurable({
   disconnectPolicy?: DisconnectPolicy
   connectedPlayers: Record<string, boolean>
   reconnectDeadlines: Record<string, number>
+  pendingDisconnectNotifications: Record<string, number>
   pendingDisconnectBroadcast?: IGameState
   rankedMatch?: RankedMatchAssignment
   rankedRematch?: RankedMatchAssignment
@@ -115,6 +119,7 @@ export class GameStateDurableObject extends createDurable({
     this.processedMutations = {}
     this.connectedPlayers = {}
     this.reconnectDeadlines = {}
+    this.pendingDisconnectNotifications = {}
     this.rankedPlayerClaims = {}
     this.rankedSettlementPending = false
     this.rankedRematchRoom = false
@@ -154,13 +159,17 @@ export class GameStateDurableObject extends createDurable({
 
   configureDisconnectPolicy(
     roomKey: string,
-    gracePeriodMs = DEFAULT_DISCONNECT_GRACE_MS
+    gracePeriodMs = DEFAULT_DISCONNECT_GRACE_MS,
+    notificationDelayMs = DEFAULT_DISCONNECT_NOTIFICATION_DELAY_MS
   ): void {
     this.disconnectPolicy = {
       roomKey: roomKeySchema.parse(roomKey),
       gracePeriodMs: Number.isInteger(gracePeriodMs)
         ? Math.min(Math.max(gracePeriodMs, 1), 5 * 60_000)
-        : DEFAULT_DISCONNECT_GRACE_MS
+        : DEFAULT_DISCONNECT_GRACE_MS,
+      notificationDelayMs: Number.isInteger(notificationDelayMs)
+        ? Math.max(notificationDelayMs, 0)
+        : DEFAULT_DISCONNECT_NOTIFICATION_DELAY_MS
     }
   }
 
@@ -212,9 +221,12 @@ export class GameStateDurableObject extends createDurable({
 
     if (connected) {
       const hadDeadline = this.reconnectDeadlines[parsedPlayerId] !== undefined
+      const notificationPending =
+        this.pendingDisconnectNotifications[parsedPlayerId] !== undefined
       const changed = this.connectedPlayers[parsedPlayerId] !== true
       this.connectedPlayers[parsedPlayerId] = true
       delete this.reconnectDeadlines[parsedPlayerId]
+      delete this.pendingDisconnectNotifications[parsedPlayerId]
 
       const adjudication = this.adjudicateDisconnects(observedAt)
       await this.scheduleGameAlarm()
@@ -227,7 +239,7 @@ export class GameStateDurableObject extends createDurable({
             status: 'updated',
             playerId: parsedPlayerId,
             connected: true,
-            ...(hadDeadline && { reconnectDeadline: 0 })
+            ...(hadDeadline && !notificationPending && { reconnectDeadline: 0 })
           }
         : { status: 'unchanged' }
     }
@@ -242,13 +254,16 @@ export class GameStateDurableObject extends createDurable({
     this.connectedPlayers[parsedPlayerId] = false
     const reconnectDeadline = observedAt + this.disconnectPolicy.gracePeriodMs
     this.reconnectDeadlines[parsedPlayerId] = reconnectDeadline
+    // The reconnect deadline is only broadcast once the notification delay
+    // elapses, so quick reconnects do not spam the opponent.
+    this.pendingDisconnectNotifications[parsedPlayerId] =
+      observedAt + this.disconnectPolicy.notificationDelayMs
     await this.scheduleGameAlarm()
 
     return {
       status: 'updated',
       playerId: parsedPlayerId,
-      connected: false,
-      reconnectDeadline
+      connected: false
     }
   }
 
@@ -260,6 +275,7 @@ export class GameStateDurableObject extends createDurable({
     const gameState = GameState.fromJson(gameStateSchema.parse(this.gameState))
     if (gameState.outcome !== 'ongoing') {
       this.reconnectDeadlines = {}
+      this.pendingDisconnectNotifications = {}
       return { status: 'unchanged' }
     }
 
@@ -285,6 +301,7 @@ export class GameStateDurableObject extends createDurable({
 
     gameState.rankedTurn = undefined
     this.reconnectDeadlines = {}
+    this.pendingDisconnectNotifications = {}
     return {
       status: 'adjudicated',
       gameState: this.commitGameState(gameState)
@@ -319,6 +336,8 @@ export class GameStateDurableObject extends createDurable({
         await this.persist()
       }
     }
+
+    await this.broadcastDueDisconnectNotifications(now)
 
     await this.scheduleGameAlarm()
     await this.persist()
@@ -543,6 +562,10 @@ export class GameStateDurableObject extends createDurable({
       playerId !== assignment.playerTwoId
     ) {
       return { status: 'not-assigned' }
+    }
+
+    if (assignment.expiresAt <= Date.now()) {
+      return { status: 'ranked-assignment-expired' }
     }
 
     if (difficulty !== undefined || (boType !== undefined && boType !== 1)) {
@@ -1055,9 +1078,70 @@ export class GameStateDurableObject extends createDurable({
     }
   }
 
+  private async broadcastDueDisconnectNotifications(
+    now: number
+  ): Promise<void> {
+    if (this.disconnectPolicy === undefined || this.gameState === undefined) {
+      return
+    }
+    if (this.gameState.outcome !== 'ongoing') {
+      this.pendingDisconnectNotifications = {}
+      return
+    }
+
+    for (const [playerId, notifyAt] of Object.entries(
+      this.pendingDisconnectNotifications
+    )) {
+      if (notifyAt > now) {
+        continue
+      }
+      const reconnectDeadline = this.reconnectDeadlines[playerId]
+      if (
+        this.connectedPlayers[playerId] !== true &&
+        reconnectDeadline !== undefined
+      ) {
+        await this.broadcastReconnectDeadline(playerId, reconnectDeadline)
+      }
+      delete this.pendingDisconnectNotifications[playerId]
+    }
+  }
+
+  private async broadcastReconnectDeadline(
+    playerId: string,
+    reconnectDeadline: number
+  ): Promise<void> {
+    const roomKey = this.disconnectPolicy?.roomKey
+    if (roomKey === undefined) {
+      return
+    }
+
+    const id =
+      this.cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.idFromName(roomKey)
+    const webSocketStore =
+      this.cloudflareEnvironment.WEB_SOCKET_DURABLE_OBJECT.get(id)
+    const requestId = crypto.randomUUID()
+    const response = await webSocketStore.fetch('https://dummy-url/broadcast', {
+      method: 'POST',
+      headers: { 'X-Request-Id': requestId },
+      body: JSON.stringify(
+        toGameReconnectDeadlineMessage(
+          roomKey,
+          playerId,
+          reconnectDeadline,
+          requestId
+        )
+      )
+    })
+
+    if (!response.ok) {
+      throw new Error('The WebSocket room rejected a reconnect deadline.')
+    }
+  }
+
   private async scheduleGameAlarm(): Promise<void> {
     const now = Date.now()
     const deadlines = Object.values(this.reconnectDeadlines)
+    deadlines.push(...Object.values(this.pendingDisconnectNotifications))
     const rankedTurnDeadline = this.gameState?.rankedTurn?.expiresAt
     if (rankedTurnDeadline !== undefined) {
       deadlines.push(rankedTurnDeadline)

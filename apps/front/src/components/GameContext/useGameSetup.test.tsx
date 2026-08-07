@@ -12,6 +12,7 @@ import {
 } from '@knucklebones/common'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import {
+  ApiRequestError,
   createWebSocketTicket,
   initGame,
   play,
@@ -30,14 +31,29 @@ function readyState(
   return current
 }
 
+interface CapturedWebSocketOptions {
+  shouldReconnect?(): boolean
+  retryOnError?: boolean
+  reconnectInterval?(attempt: number): number
+}
+
 const socket = vi.hoisted(() => ({
   lastJsonMessage: null as unknown,
   readyState: 0
 }))
 const navigate = vi.hoisted(() => vi.fn())
+const useWebSocketCalls = vi.hoisted(
+  () => [] as Array<[unknown, CapturedWebSocketOptions | undefined]>
+)
+const useWebSocketMock = vi.hoisted(() =>
+  vi.fn((url: unknown, options?: CapturedWebSocketOptions) => {
+    useWebSocketCalls.push([url, options])
+    return socket
+  })
+)
 
 vi.mock('react-use-websocket', () => ({
-  default: () => socket,
+  default: useWebSocketMock,
   ReadyState: { CLOSED: 3, OPEN: 1 }
 }))
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -48,6 +64,16 @@ vi.mock('../../hooks/useRoomKey', () => ({
   useRoomKey: () => '11111111-1111-4111-8111-111111111111'
 }))
 vi.mock('../../utils/api', () => ({
+  ApiRequestError: class extends Error {
+    status: number
+    code?: string
+
+    constructor(status: number, message: string, code?: string) {
+      super(message)
+      this.status = status
+      this.code = code
+    }
+  },
   createWebSocketTicket: vi.fn(),
   deleteDisplayName: vi.fn(),
   initGame: vi.fn(),
@@ -98,6 +124,7 @@ describe('useGameSetup', () => {
     socket.lastJsonMessage = null
     socket.readyState = 0
     navigate.mockReset()
+    useWebSocketMock.mockClear()
     localStorage.setItem('playerId', playerId)
     vi.mocked(createWebSocketTicket).mockReset()
     vi.mocked(initGame).mockReset().mockResolvedValue(undefined)
@@ -240,6 +267,35 @@ describe('useGameSetup', () => {
       rerender()
     })
     await waitFor(() => expect(initGame).toHaveBeenCalledTimes(2))
+  })
+
+  it('configures the websocket to reconnect automatically', () => {
+    renderHook(() => useGameSetup(), { wrapper })
+
+    const options = useWebSocketMock.mock.calls[0]?.[1]
+    expect(options?.shouldReconnect?.()).toBe(true)
+    expect(options?.retryOnError).toBe(true)
+    expect(options?.reconnectInterval).toBeTypeOf('function')
+  })
+
+  it('returns to matchmaking when the ranked assignment has expired', async () => {
+    vi.mocked(initGame).mockRejectedValueOnce(
+      new ApiRequestError(
+        409,
+        'The ranked match assignment has expired.',
+        'RANKED_ASSIGNMENT_EXPIRED'
+      )
+    )
+    const { rerender } = renderHook(() => useGameSetup(), { wrapper })
+
+    act(() => {
+      socket.readyState = 1
+      rerender()
+    })
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith('/en/ranked', { replace: true })
+    )
   })
 
   it('tracks valid room presence without replacing game state', async () => {

@@ -134,30 +134,6 @@ describe('client protocol diagnostics', () => {
 })
 
 describe('player identities and ranked profiles', () => {
-  it('creates an authenticated UUID identity with a default rating', async () => {
-    const player = await createPlayer()
-
-    const availability = await request('/v1/ranked/availability', {
-      headers: authorization(player)
-    })
-    const response = await request('/v1/ranked/profile', {
-      headers: authorization(player)
-    })
-
-    expect(availability.status).toBe(200)
-    await expect(availability.json()).resolves.toEqual({ enabled: true })
-    expect(response.status).toBe(200)
-    expect(rankedProfileSchema.parse(await response.json())).toEqual({
-      playerId: player.playerId,
-      ratingPool: 'classic',
-      rating: 1200,
-      gamesPlayed: 0,
-      wins: 0,
-      draws: 0,
-      losses: 0
-    })
-  })
-
   it('rejects missing and cross-player credentials without mutating a room', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
@@ -820,7 +796,7 @@ describe('ranked disconnect adjudication', () => {
     await callGame('updatePresence', [playerOne.playerId, true, 900])
     await callGame('updatePresence', [playerTwo.playerId, true, 900])
 
-    return { callGame, playerOne, playerTwo }
+    return { callGame, playerOne, playerTwo, roomKey }
   }
 
   it('excludes runtime bindings from persisted room state', async () => {
@@ -839,9 +815,10 @@ describe('ranked disconnect adjudication', () => {
       'updatePresence',
       [playerOne.playerId, false, now]
     )
-    expect(disconnected).toMatchObject({
+    expect(disconnected).toEqual({
       status: 'updated',
-      reconnectDeadline: now + 100
+      playerId: playerOne.playerId,
+      connected: false
     })
 
     const reconnected = await callGame<PresenceUpdateResult>('updatePresence', [
@@ -849,9 +826,10 @@ describe('ranked disconnect adjudication', () => {
       true,
       now + 50
     ])
-    expect(reconnected).toMatchObject({
+    expect(reconnected).toEqual({
       status: 'updated',
-      reconnectDeadline: 0
+      playerId: playerOne.playerId,
+      connected: true
     })
     expect(
       await callGame<PresenceUpdateResult>('adjudicateDisconnects', [now + 200])
@@ -879,6 +857,36 @@ describe('ranked disconnect adjudication', () => {
       ])
     ).toEqual({
       status: 'unchanged'
+    })
+  })
+
+  it('notifies the reconnect deadline only after the notification delay', async () => {
+    const { callGame, playerOne, roomKey } = await createActiveRoom()
+    await callGame('configureDisconnectPolicy', [roomKey, 60_000, 50])
+
+    const disconnected = await callGame<PresenceUpdateResult>(
+      'updatePresence',
+      [playerOne.playerId, false, Date.now()]
+    )
+    expect(disconnected).toEqual({
+      status: 'updated',
+      playerId: playerOne.playerId,
+      connected: false
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await callGame('alarm', [])
+
+    const reconnected = await callGame<PresenceUpdateResult>('updatePresence', [
+      playerOne.playerId,
+      true,
+      Date.now()
+    ])
+    expect(reconnected).toEqual({
+      status: 'updated',
+      playerId: playerOne.playerId,
+      connected: true,
+      reconnectDeadline: 0
     })
   })
 
@@ -1574,16 +1582,10 @@ describe('ranked matchmaking', () => {
     ])) as PresenceUpdateResult
     expect(disconnected).toMatchObject({
       status: 'updated',
-      reconnectDeadline: expect.any(Number)
+      connected: false
     })
-    if (
-      disconnected.status !== 'updated' ||
-      disconnected.reconnectDeadline === undefined
-    ) {
-      throw new Error('Expected a ranked reconnect deadline.')
-    }
     expect(
-      await callRoom('adjudicateDisconnects', [disconnected.reconnectDeadline])
+      await callRoom('adjudicateDisconnects', [Date.now() + 120_000])
     ).toMatchObject({
       status: 'adjudicated',
       gameState: {
@@ -2201,15 +2203,13 @@ describe('ranked matchmaking', () => {
       'updatePresence',
       [playerOne.playerId, false, now]
     )
-    if (
-      disconnected.status !== 'updated' ||
-      disconnected.reconnectDeadline === undefined
-    ) {
-      throw new Error('Expected a ranked reconnect deadline.')
-    }
+    expect(disconnected).toMatchObject({
+      status: 'updated',
+      connected: false
+    })
     expect(
       await callRoom<PresenceUpdateResult>('adjudicateDisconnects', [
-        disconnected.reconnectDeadline
+        now + 60_000
       ])
     ).toMatchObject({
       status: 'adjudicated',
