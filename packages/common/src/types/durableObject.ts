@@ -23,6 +23,11 @@ export interface RematchGameCommand {
   gameSettings?: Partial<Omit<GameSettings, 'playerType'>>
 }
 
+export interface ResignGameCommand {
+  mutationId: string
+  playerId: string
+}
+
 export interface UpdateDisplayNameCommand {
   mutationId: string
   playerId: string
@@ -41,7 +46,11 @@ export type PresenceUpdateResult =
 
 export type InitializeGameResult =
   | {
-      status: 'waiting' | 'not-assigned' | 'invalid-ranked-settings'
+      status:
+        | 'waiting'
+        | 'not-assigned'
+        | 'invalid-ranked-settings'
+        | 'ranked-assignment-expired'
     }
   | { status: 'created' | 'existing'; gameState: IGameState }
 
@@ -55,6 +64,13 @@ export type RematchGameResult =
     }
   | { status: 'updated'; gameState: IGameState }
 
+export type ResignGameResult =
+  | {
+      status:
+        'game-not-initialized' | 'game-ended' | 'unknown-player' | 'not-ranked'
+    }
+  | { status: 'updated'; gameState: IGameState }
+
 export type UpdateDisplayNameResult =
   { status: 'unknown-player' } | { status: 'updated'; gameState: IGameState }
 
@@ -65,6 +81,7 @@ export type PlayGameResult =
 export type GameStateMutationResult =
   | InitializeGameResult
   | RematchGameResult
+  | ResignGameResult
   | UpdateDisplayNameResult
   | PlayGameResult
 

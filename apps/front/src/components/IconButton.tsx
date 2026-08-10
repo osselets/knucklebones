@@ -19,7 +19,7 @@ export function IconButton<
     <Component
       {...props}
       className={clsx(
-        'text-slate-900 transition-all hover:text-slate-900/80 dark:text-slate-200 dark:hover:text-slate-50/80',
+        'cursor-pointer text-slate-900 transition-all hover:text-slate-900/80 disabled:cursor-not-allowed dark:text-slate-200 dark:hover:text-slate-50/80',
         props.className
       )}
     >

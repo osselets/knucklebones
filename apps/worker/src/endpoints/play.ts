@@ -3,7 +3,8 @@ import {
   GameState,
   playIntentSchema,
   playRouteParamsSchema,
-  type PlayIntentRejectionReason
+  type PlayIntentRejectionReason,
+  rankedMatchSettlementResultSchema
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import {
@@ -11,7 +12,10 @@ import {
   type MutationRequestWithProps
 } from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
-import { broadcastGameState } from '../utils/endpoints'
+import {
+  broadcastGameState,
+  getGameStateDurableObject
+} from '../utils/endpoints'
 import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
 import { applyAuthoritativePlay } from '../utils/play'
@@ -91,6 +95,11 @@ async function executePlayIntent(
   }
 
   const gameState = GameState.fromJson(mutation.gameState)
+  if (gameState.outcome === 'game-ended') {
+    rankedMatchSettlementResultSchema.parse(
+      await getGameStateDurableObject(request).settleRankedResult()
+    )
+  }
   await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
 
   if (

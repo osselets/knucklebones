@@ -6,6 +6,7 @@ import {
   type Outcome
 } from '@knucklebones/common'
 import { Dice } from '../Dice'
+import { RankedTurnTimer } from '../RankedTurnTimer'
 import { Cell } from './Cell'
 import { Column } from './Column'
 import { ColumnScoreTooltip } from './ColumnScore'
@@ -126,7 +127,15 @@ export function PlayerBoard({
           'items-start': !isPlayerOne
         })}
       >
-        <div className='my-4'>
+        <div className='relative my-4 w-fit'>
+          <div
+            className={clsx(
+              'absolute left-1/2 -translate-x-1/2 md:top-1/2 md:right-full md:bottom-auto md:left-auto md:mt-0 md:mr-2 md:mb-0 md:translate-x-0 md:-translate-y-10',
+              isPlayerOne ? 'bottom-full mb-2' : 'top-full mt-2'
+            )}
+          >
+            <RankedTurnTimer playerId={id} />
+          </div>
           <Dice
             value={outcome === 'ongoing' ? dice : undefined}
             showUndefined={isNextPlayer}

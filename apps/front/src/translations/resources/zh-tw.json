@@ -2,10 +2,69 @@
   "language": "正體中文（臺灣）",
   "home": {
     "play": {
+      "ranked": "進行排名對戰",
       "friend": "與他人對戰",
       "ai": "與 AI 對戰"
     },
     "footer": "《進擊羔羊傳說》中的原版 Knucklebones 遊戲由 Massive Monster 創作。\n這是一個粉絲網站，並非 Massive Monster 的官方實現。\n您可以在 <0>《進擊羔羊傳說》</0> 網站上找到原版遊戲。"
+  },
+  "ranked": {
+    "identity-warning": "排名進度綁定於此瀏覽器的玩家身分。清除瀏覽器資料前，請先保存復原短語。",
+    "rating": "評分：{{rating}}",
+    "rating-loading": "正在載入評分…",
+    "match": {
+      "label": "排名對戰 · 一局定勝負",
+      "opponent-rating": "對手評分：{{rating}}"
+    },
+    "turn": {
+      "player": "{{player}} 的回合",
+      "time-left": "剩餘出手時間",
+      "timeouts": "逾時次數：{{count}} / {{maximum}}"
+    },
+    "result": {
+      "rating-change": "評分：{{before}} → {{after}}（{{change}}）",
+      "rating-error": "無法載入您的新評分。",
+      "play-again": "尋找另一場排名對戰",
+      "rematch": "再玩一次",
+      "requesting-rematch": "正在請求…",
+      "waiting-rematch": "等待中…",
+      "rematch-pending": "正在等待對手同意再玩一次。",
+      "opponent-rematch": "對手想再玩一次！",
+      "opponent-left": "對手已離開房間。",
+      "rematch-error": "無法請求再玩一次，請重試。"
+    },
+    "resign": {
+      "action": "認輸",
+      "title": "要在這場排名對戰中認輸嗎？",
+      "warning": "認輸會立即結束對局，並計為一場排名敗局。",
+      "confirm": "確認認輸",
+      "resigning": "正在認輸…",
+      "error": "無法在這場對局中認輸，請再試一次。"
+    },
+    "queue": {
+      "title": "排名配對",
+      "joining": "正在加入配對佇列…",
+      "looking": "正在尋找對手",
+      "elapsed": "等待時間：{{duration}}",
+      "in-queue": "佇列中",
+      "playing": "正在遊玩",
+      "slow": "這次配對花費的時間比預期更久。",
+      "scarce": "目前可能沒有足夠的玩家可以進行配對。",
+      "best-effort": "系統會優先配對評分相近的玩家，同時盡量縮短等待時間。",
+      "match-found": "找到對手！",
+      "rating-difference": "評分差距：{{difference}}",
+      "accept-countdown": "{{seconds}} 秒",
+      "accept-progress": "接受配對的剩餘時間",
+      "accept": "接受",
+      "accepting": "正在接受…",
+      "decline": "拒絕",
+      "declining": "正在拒絕…",
+      "waiting-for-accept": "正在等待對手接受",
+      "accept-error": "無法接受配對，請再試一次。",
+      "decline-error": "無法拒絕配對，請再試一次。",
+      "join-error": "無法加入排名配對，正在重試…",
+      "connection-error": "配對連線中斷，正在重新連線…"
+    }
   },
   "guide": {
     "label": "遊戲說明",
@@ -75,6 +134,23 @@
       "tie": "平局！沒有人贏！",
       "you-win": "你以 {{points}} 分贏了遊戲！",
       "opponent-win": "{{player}} 以 {{points}} 分贏了遊戲！"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "對手已投降，你獲勝了！",
+        "opponent-win": "你已投降，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已投降，{{winner}} 獲勝。"
+      },
+      "disconnect": {
+        "you-win": "對手已斷線，你獲勝了！",
+        "opponent-win": "你已斷線，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已斷線，{{winner}} 獲勝。"
+      },
+      "timeout": {
+        "you-win": "對手已逾時三次，你獲勝了！",
+        "opponent-win": "你已逾時三次，{{player}} 獲勝。",
+        "spectator": "{{loser}} 已逾時三次，{{winner}} 獲勝。"
+      }
     }
   },
   "loading": "等待遊戲開始",
@@ -95,6 +171,8 @@
       "secret-warning": "任何取得此代碼的人都能將裝置加入您的身分。請妥善保密。",
       "export-title": "從此裝置複製",
       "code-label": "玩家身分轉移代碼",
+      "qr-label": "玩家身分轉移 QR 碼",
+      "qr-description": "請在另一台裝置上掃描此 QR 碼，然後貼上掃描到的轉移代碼。",
       "copy": "複製轉移代碼",
       "copied": "已複製！",
       "show": "顯示代碼",
@@ -116,9 +194,7 @@
       "copy": "複製復原短語",
       "show": "顯示短語",
       "hide": "隱藏短語",
-      "saved": "我已儲存",
       "generate": "建立復原短語",
-      "regenerate": "更換復原短語",
       "use-title": "復原身分",
       "placeholder": "貼上復原短語",
       "revoke-others": "復原後撤銷所有其他裝置",

@@ -4,6 +4,7 @@ import { ChevronRightIcon } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
 import { useDrag } from '@use-gesture/react'
 import { useIsOnMobile } from '../../hooks/detectDevice'
+import { useLocalizedPath } from '../../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../../svgs/logo.svg'
 import { IconButton } from '../IconButton'
 import { Text } from '../Text'
@@ -19,9 +20,9 @@ export function SideBarContainer({
   actions,
   swipeableAreaRef
 }: SideBarContainerProps) {
-  // Always displayed by default
-  const [showToolbar, setShowToolbar] = React.useState(true)
   const isOnMobile = useIsOnMobile()
+  const [showToolbar, setShowToolbar] = React.useState(!isOnMobile)
+  const localizedPath = useLocalizedPath()
 
   // Makes it appear/disappear on mobile after scrolling left/right
   useDrag(
@@ -42,18 +43,8 @@ export function SideBarContainer({
     }
   )
 
-  // Automatically closes it on mobile after 1,5 second
   React.useEffect(() => {
-    if (isOnMobile) {
-      const timeout = setTimeout(() => {
-        setShowToolbar(false)
-      }, 1500)
-      return () => {
-        clearTimeout(timeout)
-      }
-    } else {
-      setShowToolbar(true)
-    }
+    setShowToolbar(!isOnMobile)
   }, [isOnMobile])
 
   return (
@@ -79,8 +70,8 @@ export function SideBarContainer({
         <div className='flex flex-row items-center gap-2'>
           <div className='flex h-screen w-64 flex-col gap-12 border-r border-slate-300 bg-slate-50 p-2 pt-4 pl-4 shadow-lg transition-colors duration-150 ease-in-out lg:border-0 lg:shadow-none dark:border-slate-600 dark:bg-slate-900'>
             <Link
-              to='/'
-              className='flex flex-row items-center gap-2 underline decoration-transparent decoration-4 underline-offset-2 transition-all duration-100 ease-in-out hover:decoration-slate-900'
+              to={localizedPath('/')}
+              className='flex flex-row items-center gap-2'
             >
               <img
                 src={KnucklebonesLogo}

@@ -7,6 +7,7 @@ import {
   type Difficulty,
   type PlayerType
 } from '@knucklebones/common'
+import { useLocalizedPath } from '../../hooks/useLocalizedPath'
 import { Button } from '../Button'
 import { Modal, type ModalProps } from '../Modal'
 import { type Option, ToggleGroup } from '../ToggleGroup'
@@ -59,6 +60,7 @@ export function GameSettingsModal({
   const [difficulty, setDifficulty] = React.useState<Difficulty>('medium')
   const [boType, setBoType] = React.useState<StringBoType>('indefinite')
   const { t } = useTranslation()
+  const localizedPath = useLocalizedPath()
 
   return (
     <Modal {...modalProps}>
@@ -81,7 +83,7 @@ export function GameSettingsModal({
         <Button
           as={Link}
           size='medium'
-          to={`/room/${uuidv4()}`}
+          to={localizedPath(`/room/${uuidv4()}`)}
           // Sauvegarder les paramètres dans le local storage pour les
           // prochaines parties
           state={

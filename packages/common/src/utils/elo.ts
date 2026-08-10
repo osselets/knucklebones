@@ -11,7 +11,7 @@ export function calculateEloRatings(
 ): EloRatingUpdate {
   const playerOneExpectedScore = expectedScore(playerOneRating, playerTwoRating)
   const playerOneScore = getPlayerOneScore(result)
-  const playerOneChange = Math.round(
+  const playerOneChange = roundEloChange(
     ELO_K_FACTOR * (playerOneScore - playerOneExpectedScore)
   )
   const playerTwoChange = playerOneChange === 0 ? 0 : -playerOneChange
@@ -28,6 +28,11 @@ export function calculateEloRatings(
       change: playerTwoChange
     }
   }
+}
+
+export function roundEloChange(change: number): number {
+  const roundedMagnitude = Math.round(Math.abs(change))
+  return roundedMagnitude === 0 ? 0 : Math.sign(change) * roundedMagnitude
 }
 
 function expectedScore(rating: number, opponentRating: number): number {

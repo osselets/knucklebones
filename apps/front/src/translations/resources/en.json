@@ -2,10 +2,69 @@
   "language": "English",
   "home": {
     "play": {
+      "ranked": "Play ranked",
       "friend": "Play against someone",
       "ai": "Play against an AI"
     },
     "footer": "The original Knucklebones game in Cult of the Lamb was created by Massive Monster.\nThis is a fan-site and not an official implementation by Massive Monster.\nYou can find the original game on the <0>Cult of the Lamb</0> website."
+  },
+  "ranked": {
+    "identity-warning": "Ranked progress belongs to this browser identity. Save your recovery phrase before clearing browser data.",
+    "rating": "Rating: {{rating}}",
+    "rating-loading": "Loading rating…",
+    "match": {
+      "label": "Ranked · Best of 1",
+      "opponent-rating": "Opponent rating: {{rating}}"
+    },
+    "turn": {
+      "player": "{{player}}'s turn",
+      "time-left": "Time left to play",
+      "timeouts": "Timeouts: {{count}} / {{maximum}}"
+    },
+    "result": {
+      "rating-change": "Rating: {{before}} → {{after}} ({{change}})",
+      "rating-error": "Your new rating couldn't be loaded.",
+      "play-again": "Find another ranked match",
+      "rematch": "Play again",
+      "requesting-rematch": "Requesting…",
+      "waiting-rematch": "Waiting…",
+      "rematch-pending": "Waiting for your opponent to play again.",
+      "opponent-rematch": "Your opponent wants to play again!",
+      "opponent-left": "Your opponent has left the room.",
+      "rematch-error": "We couldn't request a rematch. Try again."
+    },
+    "resign": {
+      "action": "Resign",
+      "title": "Resign this ranked match?",
+      "warning": "Resigning ends the game immediately and counts as a rated loss.",
+      "confirm": "Confirm resignation",
+      "resigning": "Resigning…",
+      "error": "We couldn't resign from this match. Try again."
+    },
+    "queue": {
+      "title": "Ranked matchmaking",
+      "joining": "Joining the queue…",
+      "looking": "Looking for an opponent",
+      "elapsed": "Waiting time: {{duration}}",
+      "in-queue": "In queue",
+      "playing": "Playing now",
+      "slow": "This is taking longer than we'd like.",
+      "scarce": "There might not be enough players available for matchmaking right now.",
+      "best-effort": "Close ratings are preferred, but finding a match quickly comes first.",
+      "match-found": "Match found!",
+      "rating-difference": "Rating difference: {{difference}}",
+      "accept-countdown": "{{seconds}}s",
+      "accept-progress": "Time left to accept",
+      "accept": "Accept",
+      "accepting": "Accepting…",
+      "decline": "Decline",
+      "declining": "Declining…",
+      "waiting-for-accept": "Waiting for your opponent to accept",
+      "accept-error": "We couldn't accept the match. Try again.",
+      "decline-error": "We couldn't decline the match. Try again.",
+      "join-error": "We couldn't join ranked matchmaking. Retrying…",
+      "connection-error": "The matchmaking connection was interrupted. Reconnecting…"
+    }
   },
   "guide": {
     "label": "How to play",
@@ -75,6 +134,23 @@
       "tie": "This is a tie! Nobody wins!",
       "you-win": "You won the game with {{points}} points!",
       "opponent-win": "{{player}} won the game with {{points}} points!"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "Your opponent resigned. You win!",
+        "opponent-win": "You resigned. {{player}} wins.",
+        "spectator": "{{loser}} resigned. {{winner}} wins."
+      },
+      "disconnect": {
+        "you-win": "Your opponent disconnected. You win!",
+        "opponent-win": "You disconnected. {{player}} wins.",
+        "spectator": "{{loser}} disconnected. {{winner}} wins."
+      },
+      "timeout": {
+        "you-win": "Your opponent timed out three times. You win!",
+        "opponent-win": "You timed out three times. {{player}} wins.",
+        "spectator": "{{loser}} timed out three times. {{winner}} wins."
+      }
     }
   },
   "loading": "Waiting for game to start",
@@ -95,6 +171,8 @@
       "secret-warning": "Anyone with this code can add a device to your identity. Keep it private.",
       "export-title": "Copy from this device",
       "code-label": "Player identity transfer code",
+      "qr-label": "Player identity transfer QR code",
+      "qr-description": "Scan this QR code on your other device, then paste the scanned transfer code.",
       "copy": "Copy transfer code",
       "copied": "Copied!",
       "show": "Show code",
@@ -116,9 +194,7 @@
       "copy": "Copy recovery phrase",
       "show": "Show phrase",
       "hide": "Hide phrase",
-      "saved": "I've saved it",
       "generate": "Create a recovery phrase",
-      "regenerate": "Replace recovery phrase",
       "use-title": "Recover an identity",
       "placeholder": "Paste a recovery phrase",
       "revoke-others": "Revoke every other device after recovery",

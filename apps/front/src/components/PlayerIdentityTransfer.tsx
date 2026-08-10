@@ -6,6 +6,7 @@ import {
   EyeSlashIcon,
   IdentificationIcon
 } from '@heroicons/react/24/outline'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   createIdentityTransferCode,
   parseIdentityTransferCode,
@@ -18,7 +19,6 @@ import {
   rotateIdentityRecovery
 } from '../utils/api'
 import {
-  confirmRecoveryPhrase,
   getPendingRecoveryPhrase,
   storePendingRecoveryPhrase,
   storePlayerCredentials
@@ -150,12 +150,6 @@ export function PlayerIdentityTransfer() {
     }
   }
 
-  function acknowledgeRecoveryPhrase() {
-    confirmRecoveryPhrase()
-    setRecoveryPhrase(undefined)
-    setIsRecoveryVisible(false)
-  }
-
   async function recoverPlayerIdentity() {
     const normalizedPhrase = recoveryInput.trim().toLowerCase()
     if (!recoveryPhraseSchema.safeParse(normalizedPhrase).success) {
@@ -184,7 +178,9 @@ export function PlayerIdentityTransfer() {
     <ShortcutModal
       icon={<IdentificationIcon />}
       label={t('identity.transfer.label')}
-      isInitiallyOpen={recoveryPhrase !== undefined}
+      onOpen={() => {
+        if (transferCode === '') void issueTransferCode()
+      }}
     >
       <div className='flex max-w-lg flex-col gap-6'>
         <Modal.Title>{t('identity.transfer.title')}</Modal.Title>
@@ -207,6 +203,20 @@ export function PlayerIdentityTransfer() {
             aria-label={t('identity.transfer.code-label')}
             className='rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
           />
+          {isCodeVisible && transferCode !== '' && (
+            <div className='flex flex-col items-center gap-2'>
+              <div
+                role='img'
+                aria-label={t('identity.transfer.qr-label')}
+                className='rounded-lg border-2 border-slate-200 bg-white p-3'
+              >
+                <QRCodeSVG value={transferCode} size={192} />
+              </div>
+              <p className='text-center text-sm text-slate-600 dark:text-slate-300'>
+                {t('identity.transfer.qr-description')}
+              </p>
+            </div>
+          )}
           <div className='flex flex-wrap gap-2'>
             <Button
               disabled={isExporting}
@@ -258,9 +268,10 @@ export function PlayerIdentityTransfer() {
               {importError}
             </p>
           )}
-          <label className='flex items-start gap-2'>
+          <label className='flex cursor-pointer items-start gap-2'>
             <input
               type='checkbox'
+              className='mx-0 mt-1 size-4 shrink-0 cursor-pointer'
               checked={revokeOtherDevicesOnTransfer}
               onChange={(event) =>
                 setRevokeOtherDevicesOnTransfer(event.target.checked)
@@ -305,22 +316,17 @@ export function PlayerIdentityTransfer() {
                       : 'identity.recovery.show'
                   )}
                 </Button>
-                <Button variant='secondary' onClick={acknowledgeRecoveryPhrase}>
-                  {t('identity.recovery.saved')}
-                </Button>
               </div>
             </>
           )}
-          <Button
-            disabled={isRotatingRecovery}
-            onClick={() => void rotateRecoveryPhrase()}
-          >
-            {t(
-              recoveryPhrase === undefined
-                ? 'identity.recovery.generate'
-                : 'identity.recovery.regenerate'
-            )}
-          </Button>
+          {recoveryPhrase === undefined && (
+            <Button
+              disabled={isRotatingRecovery}
+              onClick={() => void rotateRecoveryPhrase()}
+            >
+              {t('identity.recovery.generate')}
+            </Button>
+          )}
 
           <h4 className='font-semibold'>{t('identity.recovery.use-title')}</h4>
           <textarea
@@ -331,9 +337,10 @@ export function PlayerIdentityTransfer() {
             rows={3}
             className='resize-none rounded-md border-2 border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800'
           />
-          <label className='flex items-start gap-2'>
+          <label className='flex cursor-pointer items-start gap-2'>
             <input
               type='checkbox'
+              className='mx-0 mt-1 size-4 shrink-0 cursor-pointer'
               checked={revokeOtherDevicesOnRecovery}
               onChange={(event) =>
                 setRevokeOtherDevicesOnRecovery(event.target.checked)

@@ -143,12 +143,45 @@ describe('GameState play validation', () => {
     ).toBe('game-ended')
   })
 
+  it('ends a BO1 as a draw when the completed board is tied', () => {
+    const playerOne = new Player('player-one', 'Player One', undefined, 6, [
+      [1, 2, 3],
+      [1, 2, 3],
+      [4, 5]
+    ])
+    const playerTwo = new Player('player-two', 'Player Two', undefined, 1, [
+      [6, 6],
+      [3],
+      []
+    ])
+    const gameState = new GameState({
+      playerOne,
+      playerTwo,
+      nextPlayer: playerOne,
+      outcome: 'ongoing',
+      boType: 1
+    })
+
+    gameState.applyPlay({ author: 'player-one', column: 2, dice: 6 })
+
+    expect(gameState.outcome).toBe('game-ended')
+    expect(gameState.finishReason).toBe('completed')
+    expect(gameState.winnerId).toBeUndefined()
+    expect(gameState.outcomeHistory).toEqual([
+      {
+        playerOne: { id: 'player-one', score: 27 },
+        playerTwo: { id: 'player-two', score: 27 }
+      }
+    ])
+  })
+
   it('records an authoritative forfeit outcome', () => {
     const gameState = createGameState()
 
     expect(gameState.finishByForfeit('player-one')).toBe(true)
     expect(gameState.outcome).toBe('game-ended')
     expect(gameState.finishReason).toBe('forfeit')
+    expect(gameState.forfeitReason).toBe('disconnect')
     expect(gameState.winnerId).toBe('player-two')
     expect(gameState.outcomeHistory).toEqual([
       {
@@ -157,6 +190,16 @@ describe('GameState play validation', () => {
       }
     ])
     expect(gameState.finishByForfeit('player-one')).toBe(false)
+  })
+
+  it('distinguishes a resignation from a disconnect forfeit', () => {
+    const gameState = createGameState()
+
+    expect(gameState.finishByForfeit('player-one', 'resignation')).toBe(true)
+    expect(gameState.forfeitReason).toBe('resignation')
+    expect(GameState.fromJson(gameState.toJson()).forfeitReason).toBe(
+      'resignation'
+    )
   })
 
   it('records a no-contest without a winner or rated history', () => {

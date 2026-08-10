@@ -4,9 +4,11 @@ import {
   type BoType,
   type Difficulty,
   type GameFinishReason,
+  type GameForfeitReason,
   type Outcome,
   type OutcomeHistoryEntry,
-  type PlayerOutcome
+  type PlayerOutcome,
+  type RankedTurnState
 } from '../types'
 
 const playerIdSchema = z.string().check(z.minLength(1))
@@ -37,6 +39,18 @@ export const gameFinishReasonSchema = z.enum([
   'forfeit',
   'no-contest'
 ]) satisfies z.ZodMiniType<GameFinishReason>
+
+export const gameForfeitReasonSchema = z.enum([
+  'resignation',
+  'disconnect',
+  'timeout'
+]) satisfies z.ZodMiniType<GameForfeitReason>
+
+const rankedTurnStateSchema = z.object({
+  expiresAt: z.int().check(z.minimum(0)),
+  playerOneTimeouts: z.int().check(z.minimum(0)),
+  playerTwoTimeouts: z.int().check(z.minimum(0))
+}) satisfies z.ZodMiniType<RankedTurnState>
 
 export const logSchema = z.object({
   content: z.string(),
@@ -85,6 +99,8 @@ export const gameStateSchema = z.object({
   winnerId: z.optional(playerIdSchema),
   outcome: outcomeSchema,
   finishReason: z.optional(gameFinishReasonSchema),
+  forfeitReason: z.optional(gameForfeitReasonSchema),
   outcomeHistory: z.array(outcomeHistoryEntrySchema),
-  rematchVote: z.optional(playerIdSchema)
+  rematchVote: z.optional(playerIdSchema),
+  rankedTurn: z.optional(rankedTurnStateSchema)
 }) satisfies z.ZodMiniType<IGameState>

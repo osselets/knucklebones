@@ -1,16 +1,66 @@
+import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link, useNavigate } from 'react-router-dom'
 import { PlayIcon } from '@heroicons/react/24/outline'
 import { t } from 'i18next'
 import { useIsOnDesktop } from '../hooks/detectDevice'
+import { useLocalizedPath } from '../hooks/useLocalizedPath'
+import { useRoomKey } from '../hooks/useRoomKey'
+import {
+  getRankedProfile,
+  getRankedRematchStatus,
+  requestRankedRematch
+} from '../utils/api'
+import { getStoredPlayerId } from '../utils/identityStorage'
+import {
+  getStoredRankedMatchAssignment,
+  storeRankedMatchAssignment
+} from '../utils/rankedMatchStorage'
 import { Button } from './Button'
 import { useGame, type InGameContext } from './GameContext'
 import { ShortcutModal } from './ShortcutModal'
 
-type GetWinMessageArgs = Pick<InGameContext, 'outcome' | 'winner'>
+type GetWinMessageArgs = Pick<
+  InGameContext,
+  | 'finishReason'
+  | 'forfeitReason'
+  | 'outcome'
+  | 'playerOne'
+  | 'playerSide'
+  | 'playerTwo'
+  | 'winner'
+>
 
-function getWinMessage({ outcome, winner }: GetWinMessageArgs) {
+function getWinMessage({
+  finishReason,
+  forfeitReason,
+  outcome,
+  playerOne,
+  playerSide,
+  playerTwo,
+  winner
+}: GetWinMessageArgs) {
   if (outcome !== 'ongoing') {
     if (winner !== undefined) {
+      if (
+        outcome === 'game-ended' &&
+        finishReason === 'forfeit' &&
+        forfeitReason !== undefined
+      ) {
+        if (playerSide === 'spectator') {
+          const loser = winner.id === playerOne.id ? playerTwo : playerOne
+          return t(`game.forfeit.${forfeitReason}.spectator` as const, {
+            loser: loser.inGameName,
+            winner: winner.inGameName
+          })
+        }
+        return t(
+          `game.forfeit.${forfeitReason}.${
+            winner.isPlayerOne ? 'you-win' : 'opponent-win'
+          }` as const,
+          { player: winner.inGameName }
+        )
+      }
       const gameScope = outcome === 'round-ended' ? 'round' : 'game'
       const playerWin = winner.isPlayerOne ? 'you-win' : 'opponent-win'
       return t(`game.${gameScope}.${playerWin}` as const, {
@@ -71,10 +121,14 @@ export function GameOutcome() {
   const {
     outcome,
     winner,
+    finishReason,
+    forfeitReason,
+    isLoading,
     playerSide,
     playerOne,
     playerTwo,
     rematchVote,
+    presenceByPlayerId,
     boType,
     voteRematch,
     voteContinueBo,
@@ -84,8 +138,41 @@ export function GameOutcome() {
   const hasVoted = rematchVote === playerOne.id
   const isOnDesktop = useIsOnDesktop()
   const { t } = useTranslation()
+  const roomKey = useRoomKey()
+  const rankedAssignment = React.useMemo(
+    () => getStoredRankedMatchAssignment(roomKey),
+    [roomKey]
+  )
+  const [rankedRating, setRankedRating] = React.useState<number>()
+  const [rankedRatingError, setRankedRatingError] = React.useState(false)
+
+  React.useEffect(() => {
+    let cancelled = false
+    if (
+      outcome === 'game-ended' &&
+      rankedAssignment !== undefined &&
+      !isLoading
+    ) {
+      void getRankedProfile()
+        .then((profile) => {
+          if (!cancelled) {
+            setRankedRating(profile.rating)
+            setRankedRatingError(false)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRankedRatingError(true)
+          }
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [isLoading, outcome, rankedAssignment])
 
   if (outcome === 'ongoing') {
+    if (rankedAssignment !== undefined) return null
     // On peut mettre un VS semi-transparent dans le fond de la partie
     // pour rappeler cet élément sans pour autant que ça prenne de l'espace dans
     // le layout.
@@ -94,8 +181,29 @@ export function GameOutcome() {
 
   const content = (
     <div className='grid justify-items-center gap-2 font-semibold'>
-      <p>{getWinMessage({ outcome, winner })}</p>
-      {!isSpectator && (
+      <p>
+        {getWinMessage({
+          finishReason,
+          forfeitReason,
+          outcome,
+          playerOne,
+          playerSide,
+          playerTwo,
+          winner
+        })}
+      </p>
+      {!isSpectator && rankedAssignment !== undefined ? (
+        <RankedResultRating
+          assignment={rankedAssignment}
+          rating={rankedRating}
+          hasError={rankedRatingError}
+          opponentAvailable={
+            forfeitReason !== 'timeout' &&
+            presenceByPlayerId[playerTwo.id] !== false
+          }
+          opponentRequested={rematchVote === playerTwo.id}
+        />
+      ) : !isSpectator ? (
         <VoteButtons
           boType={boType}
           hasVoted={hasVoted}
@@ -110,9 +218,10 @@ export function GameOutcome() {
             void voteRematch()
           }}
         />
-      )}
+      ) : null}
 
       {!isSpectator &&
+        rankedAssignment === undefined &&
         (hasVoted ? (
           <p>{t('game.waiting-rematch', { player: playerTwo.inGameName })}</p>
         ) : (
@@ -125,7 +234,7 @@ export function GameOutcome() {
     </div>
   )
 
-  if (isOnDesktop) {
+  if (isOnDesktop || isSpectator) {
     return content
   }
 
@@ -137,5 +246,140 @@ export function GameOutcome() {
     >
       {content}
     </ShortcutModal>
+  )
+}
+
+function RankedResultRating({
+  assignment,
+  hasError,
+  opponentAvailable,
+  opponentRequested,
+  rating
+}: {
+  assignment: NonNullable<ReturnType<typeof getStoredRankedMatchAssignment>>
+  hasError: boolean
+  opponentAvailable: boolean
+  opponentRequested: boolean
+  rating?: number
+}) {
+  const { t } = useTranslation()
+  const localizedPath = useLocalizedPath()
+  const navigate = useNavigate()
+  const roomKey = useRoomKey()
+  const playerId = getStoredPlayerId()
+  const [rematchStatus, setRematchStatus] = React.useState<
+    'idle' | 'requesting' | 'waiting' | 'unavailable'
+  >('idle')
+  const [rematchError, setRematchError] = React.useState(false)
+  const previousRating =
+    playerId === assignment.playerOneId
+      ? assignment.playerOneRating
+      : assignment.playerTwoRating
+  const change = rating === undefined ? undefined : rating - previousRating
+
+  const handleRematchStatus = React.useCallback(
+    (status: Awaited<ReturnType<typeof getRankedRematchStatus>>): boolean => {
+      if (status.status === 'matched') {
+        storeRankedMatchAssignment(status.match)
+        navigate(localizedPath(`/room/${status.match.roomKey}`), {
+          state: { playerType: 'human', boType: 1 }
+        })
+        return true
+      }
+      setRematchStatus(
+        status.status === 'opponent-unavailable' ? 'unavailable' : 'waiting'
+      )
+      return false
+    },
+    [localizedPath, navigate]
+  )
+
+  React.useEffect(() => {
+    if (rematchStatus !== 'waiting') {
+      return
+    }
+
+    let disposed = false
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const poll = async () => {
+      try {
+        const status = await getRankedRematchStatus(roomKey)
+        if (!disposed && !handleRematchStatus(status)) {
+          timeout = setTimeout(() => void poll(), 500)
+        }
+      } catch {
+        if (!disposed) {
+          setRematchError(true)
+          timeout = setTimeout(() => void poll(), 1_000)
+        }
+      }
+    }
+    timeout = setTimeout(() => void poll(), 500)
+    return () => {
+      disposed = true
+      clearTimeout(timeout)
+    }
+  }, [handleRematchStatus, rematchStatus, roomKey])
+
+  async function requestRematch() {
+    setRematchStatus('requesting')
+    setRematchError(false)
+    try {
+      handleRematchStatus(await requestRankedRematch(roomKey))
+    } catch {
+      setRematchStatus('idle')
+      setRematchError(true)
+    }
+  }
+
+  const isOpponentUnavailable =
+    rematchStatus === 'unavailable' || !opponentAvailable
+
+  return (
+    <div className='flex flex-col items-center gap-2'>
+      <p>
+        {hasError
+          ? t('ranked.result.rating-error')
+          : rating === undefined || change === undefined
+            ? t('ranked.rating-loading')
+            : t('ranked.result.rating-change', {
+                before: previousRating,
+                after: rating,
+                change: change > 0 ? `+${change}` : String(change)
+              })}
+      </p>
+      <div className='flex flex-wrap justify-center gap-2'>
+        <Button
+          disabled={
+            isOpponentUnavailable ||
+            rematchStatus === 'requesting' ||
+            rematchStatus === 'waiting'
+          }
+          onClick={() => void requestRematch()}
+        >
+          {t(
+            rematchStatus === 'requesting'
+              ? 'ranked.result.requesting-rematch'
+              : rematchStatus === 'waiting'
+                ? 'ranked.result.waiting-rematch'
+                : 'ranked.result.rematch'
+          )}
+        </Button>
+        <Button as={Link} to={localizedPath('/ranked')}>
+          {t('ranked.result.play-again')}
+        </Button>
+      </div>
+      {isOpponentUnavailable ? (
+        <p>{t('ranked.result.opponent-left')}</p>
+      ) : opponentRequested && rematchStatus === 'idle' ? (
+        <p>{t('ranked.result.opponent-rematch')}</p>
+      ) : rematchStatus === 'waiting' ? (
+        <p>{t('ranked.result.rematch-pending')}</p>
+      ) : rematchError ? (
+        <p className='text-red-700 dark:text-red-400'>
+          {t('ranked.result.rematch-error')}
+        </p>
+      ) : null}
+    </div>
   )
 }

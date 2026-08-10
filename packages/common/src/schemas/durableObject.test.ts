@@ -4,7 +4,9 @@ import { Player } from '../classes/Player'
 import {
   idempotentInitializeGameResultSchema,
   idempotentPlayGameResultSchema,
-  playGameCommandSchema
+  idempotentResignGameResultSchema,
+  playGameCommandSchema,
+  resignGameCommandSchema
 } from './durableObject'
 
 function createSerializedGameState() {
@@ -39,6 +41,15 @@ describe('Durable Object result contracts', () => {
         expectedRevision: -1
       }).success
     ).toBe(false)
+
+    expect(
+      resignGameCommandSchema.parse({
+        mutationId: '11111111-1111-4111-8111-111111111111',
+        playerId: '22222222-2222-4222-8222-222222222222'
+      })
+    ).toMatchObject({
+      playerId: '22222222-2222-4222-8222-222222222222'
+    })
   })
 
   it('accepts applied, replayed, and conflicting mutation results', () => {
@@ -67,6 +78,15 @@ describe('Durable Object result contracts', () => {
         idempotencyStatus: 'conflict'
       })
     ).toEqual({ idempotencyStatus: 'conflict' })
+    expect(
+      idempotentResignGameResultSchema.parse({
+        idempotencyStatus: 'applied',
+        value: { status: 'updated', gameState }
+      })
+    ).toMatchObject({
+      idempotencyStatus: 'applied',
+      value: { status: 'updated' }
+    })
   })
 
   it('rejects malformed command results', () => {

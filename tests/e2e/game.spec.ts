@@ -13,14 +13,15 @@ async function waitForHome(page: Page) {
   await expect(
     page.getByRole('button', { name: 'Play against an AI' })
   ).toBeVisible()
-
-  const acknowledgeRecovery = page.getByRole('button', {
-    name: "I've saved it"
-  })
-  if (await acknowledgeRecovery.isVisible()) {
-    await acknowledgeRecovery.click()
-    await page.keyboard.press('Escape')
-  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          localStorage.getItem('knucklebones.identity.v1.deviceCredential') !==
+          null
+      )
+    )
+    .toBe(true)
 }
 
 async function readIdentity(page: Page): Promise<StoredIdentity> {
@@ -150,6 +151,41 @@ test('starts a hard BO1 AI game with valid versioned state updates', async ({
   }
 })
 
+test('keeps an AI game open when switching languages', async ({ page }) => {
+  let gameSocketCount = 0
+  page.on('websocket', (webSocket) => {
+    if (webSocket.url().includes('/websocket?')) gameSocketCount++
+  })
+
+  await waitForHome(page)
+  await chooseGame(page, 'Play against an AI')
+  await page.getByRole('radio', { name: 'Hard' }).click()
+  await page.getByRole('radio', { name: 'Best of 1' }).click()
+  await page.getByRole('link', { name: 'Start game' }).click()
+
+  await expect(page.getByText('Round 1 of 1')).toBeVisible()
+  await expect.poll(() => gameSocketCount).toBe(1)
+  const roomPath = new URL(page.url()).pathname.replace(/^\/en/, '')
+  const documentMarker = await page.evaluate(() => {
+    const marker = crypto.randomUUID()
+    ;(window as Window & { documentMarker?: string }).documentMarker = marker
+    return marker
+  })
+
+  await page.getByRole('link', { name: 'English' }).click()
+
+  await expect(page).toHaveURL(`/fr${roomPath}`)
+  expect(
+    await page.evaluate(
+      () => (window as Window & { documentMarker?: string }).documentMarker
+    )
+  ).toBe(documentMarker)
+  await expect(page.getByText('Manche 1 sur 1')).toBeVisible()
+  await expect(page.getByText('IA (Difficile)')).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(gameSocketCount).toBe(1)
+})
+
 test('synchronizes a human game across independent browser identities', async ({
   browser
 }) => {
@@ -204,6 +240,163 @@ test('synchronizes a human game across independent browser identities', async ({
   } finally {
     await firstContext.close()
     await secondContext.close()
+  }
+})
+
+test('matches two ranked identities and starts their assigned BO1 room', async ({
+  browser
+}) => {
+  const firstContext = await browser.newContext()
+  const secondContext = await browser.newContext()
+  const firstPlayer = await firstContext.newPage()
+  const secondPlayer = await secondContext.newPage()
+
+  try {
+    await Promise.all([waitForHome(firstPlayer), waitForHome(secondPlayer)])
+    await Promise.all([
+      firstPlayer.getByRole('link', { name: 'Play ranked' }).click(),
+      secondPlayer.getByRole('link', { name: 'Play ranked' }).click()
+    ])
+    await Promise.all([
+      firstPlayer.getByRole('button', { name: 'Accept' }).click(),
+      secondPlayer.getByRole('button', { name: 'Accept' }).click()
+    ])
+
+    await Promise.all([
+      firstPlayer.waitForURL(/\/room\/[0-9a-f-]+$/),
+      secondPlayer.waitForURL(/\/room\/[0-9a-f-]+$/)
+    ])
+    expect(new URL(firstPlayer.url()).pathname).toBe(
+      new URL(secondPlayer.url()).pathname
+    )
+
+    for (const player of [firstPlayer, secondPlayer]) {
+      await expect(player.getByText('Round 1 of 1')).toBeVisible()
+      await expect(player.getByText('Ranked · Best of 1')).toBeVisible()
+      await expect(player.getByText('Opponent rating: 1200')).toBeVisible()
+      await expect(
+        player.getByText('Waiting for game to start...')
+      ).toHaveCount(0)
+    }
+
+    const firstColumns = firstPlayer.locator('div[role="button"]')
+    const secondColumns = secondPlayer.locator('div[role="button"]')
+    await expect
+      .poll(
+        async () => (await firstColumns.count()) + (await secondColumns.count())
+      )
+      .toBe(3)
+
+    const currentPlayer =
+      (await firstColumns.count()) === 3 ? firstPlayer : secondPlayer
+    const nextPlayer =
+      currentPlayer === firstPlayer ? secondPlayer : firstPlayer
+    await currentPlayer.locator('div[role="button"]').first().click()
+    await expect(currentPlayer.locator('div[role="button"]')).toHaveCount(0)
+    await expect(nextPlayer.locator('div[role="button"]')).toHaveCount(3)
+
+    await firstPlayer.getByRole('button', { name: 'Resign' }).click()
+    await firstPlayer
+      .getByRole('button', { name: 'Confirm resignation' })
+      .click()
+    await expect(firstPlayer.getByText(/You resigned\./)).toBeVisible()
+    await expect(
+      secondPlayer.getByText('Your opponent resigned. You win!')
+    ).toBeVisible()
+    const completedRoomPath = new URL(firstPlayer.url()).pathname
+    for (const player of [firstPlayer, secondPlayer]) {
+      await expect(
+        player.getByRole('link', { name: 'Find another ranked match' })
+      ).toBeVisible()
+      await expect(player.getByText(/Rating: 1200 →/)).toBeVisible()
+    }
+
+    await Promise.all([
+      firstPlayer.getByRole('button', { name: 'Play again' }).click(),
+      secondPlayer.getByRole('button', { name: 'Play again' }).click()
+    ])
+    await Promise.all([
+      firstPlayer.waitForURL(
+        (url) =>
+          /\/room\/[0-9a-f-]+$/.test(url.pathname) &&
+          url.pathname !== completedRoomPath
+      ),
+      secondPlayer.waitForURL(
+        (url) =>
+          /\/room\/[0-9a-f-]+$/.test(url.pathname) &&
+          url.pathname !== completedRoomPath
+      )
+    ])
+    expect(new URL(firstPlayer.url()).pathname).not.toBe(completedRoomPath)
+    expect(new URL(firstPlayer.url()).pathname).toBe(
+      new URL(secondPlayer.url()).pathname
+    )
+    await expect(firstPlayer.getByText('Opponent rating: 1216')).toBeVisible()
+    await expect(secondPlayer.getByText('Opponent rating: 1184')).toBeVisible()
+  } finally {
+    await firstContext.close()
+    await secondContext.close()
+  }
+})
+
+test('returns an accepting player to the queue when the opponent misses the ready check', async ({
+  browser
+}) => {
+  const playerContext = await browser.newContext()
+  const opponentContext = await browser.newContext()
+  const player = await playerContext.newPage()
+  const opponent = await opponentContext.newPage()
+
+  try {
+    await Promise.all([waitForHome(player), waitForHome(opponent)])
+    const opponentIdentity = await readIdentity(opponent)
+
+    await player.getByRole('link', { name: 'Play ranked' }).click()
+    await expect(
+      player.getByRole('heading', { name: 'Ranked matchmaking' })
+    ).toBeVisible()
+    await expect(
+      player.getByText('In queue').locator('..').getByText('1')
+    ).toBeVisible()
+    await expect(
+      player.getByText('Playing now').locator('..').getByRole('definition')
+    ).toHaveText(/^\d+$/)
+
+    const opponentJoinStatus = await opponent.evaluate(
+      async ({ credential }) => {
+        const response = await fetch(
+          'http://localhost:8787/v1/matchmaking/join',
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${credential}` }
+          }
+        )
+        return response.status
+      },
+      { credential: opponentIdentity.playerCredential }
+    )
+    expect(opponentJoinStatus).toBe(200)
+
+    await player.getByRole('button', { name: 'Accept' }).click()
+    await expect(player.getByText(/Waiting for your opponent/)).toBeVisible()
+    await expect(player.getByText(/Looking for an opponent/)).toBeVisible({
+      timeout: 20_000
+    })
+
+    const opponentStatus = await opponent.evaluate(
+      async ({ credential }) => {
+        const response = await fetch(
+          'http://localhost:8787/v1/matchmaking/status',
+          { headers: { Authorization: `Bearer ${credential}` } }
+        )
+        return (await response.json()) as { status: string }
+      },
+      { credential: opponentIdentity.playerCredential }
+    )
+    expect(opponentStatus.status).toBe('idle')
+  } finally {
+    await playerContext.close()
+    await opponentContext.close()
   }
 })
 
@@ -283,6 +476,11 @@ test('keeps the same identity and home route across language changes', async ({
   expect(await readIdentity(page)).toEqual(identity)
 
   await page.getByRole('link', { name: 'Français' }).click()
+  await expect(page.getByRole('button', { name: '與 AI 對戰' })).toBeVisible()
+  await expect(page).toHaveURL(/\/zh-tw\/$/)
+  expect(await readIdentity(page)).toEqual(identity)
+
+  await page.getByRole('link', { name: '正體中文（臺灣）' }).click()
   await expect(
     page.getByRole('button', { name: 'Play against an AI' })
   ).toBeVisible()
@@ -305,6 +503,9 @@ test('transfers an identity between independent browsers', async ({
     await waitForHome(source)
     const sourceIdentity = await readIdentity(source)
     await source.getByRole('button', { name: 'Transfer identity' }).click()
+    await expect(
+      source.getByLabel('Player identity transfer code')
+    ).toHaveValue(/^knucklebones-transfer-v1\./)
     await source.getByRole('button', { name: 'Show code' }).click()
     await expect(
       source.getByLabel('Player identity transfer code')
@@ -364,6 +565,12 @@ test('recovers an identity once and rotates its recovery phrase', async ({
     await expect(
       source.getByLabel('Player identity recovery phrase')
     ).toHaveValue(/^knucklebones-recovery-v1\./)
+    await expect(
+      source.getByRole('button', { name: "I've saved it" })
+    ).toHaveCount(0)
+    await expect(
+      source.getByRole('button', { name: 'Replace recovery phrase' })
+    ).toHaveCount(0)
     const recoveryPhrase = await source
       .getByLabel('Player identity recovery phrase')
       .inputValue()
@@ -377,6 +584,7 @@ test('recovers an identity once and rotates its recovery phrase', async ({
       target.waitForEvent('load'),
       target.getByRole('button', { name: 'Recover this identity' }).click()
     ])
+    await target.getByRole('button', { name: 'Transfer identity' }).click()
     await expect(
       target.getByLabel('Player identity recovery phrase')
     ).toHaveValue(/^knucklebones-recovery-v1\./)

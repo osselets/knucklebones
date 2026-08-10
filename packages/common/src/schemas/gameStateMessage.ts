@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 import { type IGameState } from '../interfaces'
 import {
+  type ApiErrorDetails,
   type GameErrorEvent,
   type GamePresenceEvent,
   type GameReconnectDeadlineEvent,
@@ -106,6 +107,15 @@ export function toGameStateMessage(
     type: 'game.state',
     ...(requestId !== undefined && { requestId }),
     payload: { roomKey, gameState }
+  }
+}
+
+export function toGameErrorMessage(payload: ApiErrorDetails): GameErrorEvent {
+  return {
+    version: PROTOCOL_VERSION,
+    type: 'game.error',
+    requestId: payload.requestId,
+    payload
   }
 }
 

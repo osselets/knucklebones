@@ -1,4 +1,4 @@
-import { DEFAULT_RATING_POOL } from '@knucklebones/common'
+import { DEFAULT_RATING_POOL, RANKED_QUEUE_KEY } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type AuthenticatedRequestWithProps } from '../types/itty'
 import { apiError } from '../utils/http'
@@ -57,6 +57,19 @@ export async function getMatchmakingStatus(
   )
 }
 
+export async function acceptMatchmaking(
+  request: Request & MatchmakingRequest,
+  cloudflareEnvironment: CloudflareEnvironment
+): Promise<Response> {
+  return await fetchMatchmakingObject(
+    request,
+    request.principal.playerId,
+    cloudflareEnvironment,
+    '/accept',
+    { method: 'POST' }
+  )
+}
+
 export async function leaveMatchmaking(
   request: Request & MatchmakingRequest,
   cloudflareEnvironment: CloudflareEnvironment
@@ -77,9 +90,10 @@ async function fetchMatchmakingObject(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const id = cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.idFromName(
-    `${DEFAULT_RATING_POOL}:bo1`
-  )
+  const id =
+    cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.idFromName(
+      RANKED_QUEUE_KEY
+    )
   const matchmaking = cloudflareEnvironment.MATCHMAKING_DURABLE_OBJECT.get(id)
   const headers = new Headers(init?.headers)
   headers.set('X-Player-Id', playerId)

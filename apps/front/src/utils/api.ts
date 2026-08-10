@@ -8,10 +8,16 @@ import {
   identityRecoverySchema,
   type IdentityTransfer,
   identityTransferSchema,
+  type MatchmakingStatus,
+  matchmakingStatusSchema,
   type PlayerCredentials,
   playerCredentialsSchema,
   type PlayerIdentityBootstrap,
   playerIdentityBootstrapSchema,
+  type RankedProfile,
+  type RankedRematchStatus,
+  rankedRematchStatusSchema,
+  rankedProfileSchema,
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
@@ -19,8 +25,21 @@ import {
   getStoredDeviceCredential,
   getStoredDisplayName
 } from './identityStorage'
+import { ensurePlayerIdentity } from './playerIdentity'
 
 type Method = 'GET' | 'POST' | 'DELETE'
+
+export class ApiRequestError extends Error {
+  status: number
+  code?: string
+
+  constructor(status: number, message: string, code?: string) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.code = code
+  }
+}
 
 interface IdentificationParams {
   roomKey: string
@@ -28,7 +47,7 @@ interface IdentificationParams {
 }
 
 export async function createPlayer(): Promise<PlayerIdentityBootstrap> {
-  const response = await sendApiRequest('/players', 'POST')
+  const response = await sendApiRequest('/players', 'POST', undefined, null)
   const result = playerIdentityBootstrapSchema.safeParse(await response.json())
 
   if (!result.success) {
@@ -126,6 +145,87 @@ export async function createWebSocketTicket({
   return result.data
 }
 
+export async function getRankedProfile(): Promise<RankedProfile> {
+  const response = await sendApiRequest('/v1/ranked/profile', 'GET')
+  const result = rankedProfileSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid ranked profile.')
+  }
+
+  return result.data
+}
+
+export async function joinMatchmaking(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/join', 'POST')
+}
+
+export async function getMatchmakingStatus(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/status', 'GET')
+}
+
+export async function acceptMatchmaking(): Promise<MatchmakingStatus> {
+  return await getMatchmakingResponse('/v1/matchmaking/accept', 'POST')
+}
+
+export async function leaveMatchmaking({
+  keepalive = false
+}: { keepalive?: boolean } = {}): Promise<void> {
+  await sendApiRequest(
+    '/v1/matchmaking/queue',
+    'DELETE',
+    undefined,
+    undefined,
+    undefined,
+    keepalive
+  )
+}
+
+export async function requestRankedRematch(
+  roomKey: string
+): Promise<RankedRematchStatus> {
+  const response = await sendApiRequest(
+    `/v1/rooms/${roomKey}/ranked-rematch`,
+    'POST',
+    undefined,
+    undefined,
+    crypto.randomUUID()
+  )
+  return parseRankedRematchStatus(await response.json())
+}
+
+export async function getRankedRematchStatus(
+  roomKey: string
+): Promise<RankedRematchStatus> {
+  const response = await sendApiRequest(
+    `/v1/rooms/${roomKey}/ranked-rematch`,
+    'GET'
+  )
+  return parseRankedRematchStatus(await response.json())
+}
+
+function parseRankedRematchStatus(value: unknown): RankedRematchStatus {
+  const result = rankedRematchStatusSchema.safeParse(value)
+  if (!result.success) {
+    throw new Error('The server returned an invalid ranked rematch status.')
+  }
+  return result.data
+}
+
+async function getMatchmakingResponse(
+  path: string,
+  method: 'GET' | 'POST'
+): Promise<MatchmakingStatus> {
+  const response = await sendApiRequest(path, method)
+  const result = matchmakingStatusSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid matchmaking status.')
+  }
+
+  return result.data
+}
+
 // À synchroniser avec les types de requêtes côté back
 interface InitGameRequestParams extends Omit<GameSettings, 'boType'> {
   boType?: GameSettings['boType']
@@ -169,6 +269,13 @@ export async function play(
   const path = `/v1/rooms/${roomKey}/play`
   await sendMutationRequest(path, 'POST', { column })
 }
+
+export async function resignGame({
+  roomKey
+}: Pick<IdentificationParams, 'roomKey'>): Promise<void> {
+  await sendMutationRequest(`/v1/rooms/${roomKey}/resign`, 'POST')
+}
+
 interface UpdateDisplayNameRequestParams {
   displayName: string
 }
@@ -198,9 +305,18 @@ async function sendApiRequest(
   path: string,
   method: Method,
   body?: unknown,
-  credential = getStoredDeviceCredential(),
-  mutationId?: string
+  credential?: string | null,
+  mutationId?: string,
+  keepalive = false
 ) {
+  if (credential === undefined) {
+    credential = getStoredDeviceCredential()
+    if (credential === null) {
+      await ensurePlayerIdentity()
+      credential = getStoredDeviceCredential()
+    }
+  }
+
   const headers = {
     Accept: 'application/json',
     ...(credential !== null && {
@@ -219,6 +335,7 @@ async function sendApiRequest(
       response = await fetch(`${import.meta.env.VITE_WORKER_URL}${path}`, {
         method,
         headers,
+        ...(keepalive && { keepalive: true }),
         ...(body !== undefined && { body: JSON.stringify(body) })
       })
     } catch (error) {
@@ -246,8 +363,10 @@ async function sendApiRequest(
         ? `${result.data.error.code}: ${result.data.error.message}`
         : `${response.status}:${response.statusText}`
 
-      throw new Error(
-        `[${details}] There was an error while doing a network call. Please try again.`
+      throw new ApiRequestError(
+        response.status,
+        `[${details}] There was an error while doing a network call. Please try again.`,
+        result.success ? result.data.error.code : undefined
       )
     }
   }

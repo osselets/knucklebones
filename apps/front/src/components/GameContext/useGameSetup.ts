@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import useWebSocketImport, { ReadyState } from 'react-use-websocket'
 import {
   AI_PLAYER_ID,
@@ -13,19 +13,23 @@ import {
   PROTOCOL_VERSION,
   type GameSettings
 } from '@knucklebones/common'
+import { useLocalizedPath } from '../../hooks/useLocalizedPath'
 import { useRoomKey } from '../../hooks/useRoomKey'
 import {
+  ApiRequestError,
   createWebSocketTicket,
   deleteDisplayName,
   updateDisplayName,
   initGame,
   play,
   reportClientProtocolDiagnostic,
+  resignGame,
   voteRematch
 } from '../../utils/api'
 import { getStoredPlayerId } from '../../utils/identityStorage'
 import { getPlayerFromId, getPlayerSide } from '../../utils/player'
-import { getWebSocketUrl, preparePlayers } from './utils'
+import { ensurePlayerIdentity } from '../../utils/playerIdentity'
+import { getWebSocketUrl, preparePlayers, prepareRankedTurn } from './utils'
 
 // react-use-websocket 4.13 publishes a CommonJS object containing its default
 // export. Vite 8 exposes that object directly when the importer is ESM.
@@ -38,9 +42,13 @@ const useWebSocket =
 
 export function useGameSetup() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const localizedPath = useLocalizedPath()
   const [gameState, setGameState] = React.useState<IGameState | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [identityError, setIdentityError] = React.useState<string | null>(null)
+  const [identityRetryAttempt, setIdentityRetryAttempt] = React.useState(0)
   const [presenceByPlayerId, setPresenceByPlayerId] = React.useState<
     Record<string, boolean>
   >({})
@@ -49,23 +57,62 @@ export function useGameSetup() {
   const roomKey = useRoomKey()
   const latestRevision = React.useRef({ roomKey, value: -1 })
   const state = useLocation().state as GameSettings | undefined
-  const playerId = getStoredPlayerId()!
+  const [playerId, setPlayerId] = React.useState(
+    () => getStoredPlayerId() ?? undefined
+  )
+  React.useEffect(() => {
+    if (playerId !== undefined) {
+      return
+    }
+
+    let disposed = false
+    void ensurePlayerIdentity()
+      .then(({ playerId: nextPlayerId }) => {
+        if (!disposed) {
+          setPlayerId(nextPlayerId)
+        }
+      })
+      .catch((error) => {
+        if (!disposed) {
+          const message =
+            error instanceof Error ? error.message : t('identity.error')
+          setIdentityError(message)
+          setErrorMessage(message)
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [playerId, t, identityRetryAttempt])
   const getAuthenticatedWebSocketUrl = React.useCallback(async () => {
-    const { ticket } = await createWebSocketTicket({ roomKey, playerId })
+    const { ticket } = await createWebSocketTicket({
+      roomKey,
+      playerId: playerId!
+    })
     return getWebSocketUrl(roomKey, ticket)
   }, [playerId, roomKey])
   const { lastJsonMessage, readyState } = useWebSocket(
-    getAuthenticatedWebSocketUrl
+    playerId === undefined ? null : getAuthenticatedWebSocketUrl,
+    {
+      shouldReconnect: () => true,
+      retryOnError: true,
+      reconnectInterval: (attempt) => Math.min(1_000 * 2 ** attempt, 15_000)
+    }
   )
 
   const isGameStateReady = gameState !== null
 
-  const playerSide = isGameStateReady
-    ? getPlayerSide(playerId, gameState)
-    : 'spectator'
+  const playerSide =
+    isGameStateReady && playerId !== undefined
+      ? getPlayerSide(playerId, gameState)
+      : 'spectator'
   const [playerOne, playerTwo] = isGameStateReady
     ? preparePlayers(playerSide, gameState)
     : []
+  const rankedTurn = isGameStateReady
+    ? prepareRankedTurn(playerSide, gameState.rankedTurn)
+    : undefined
 
   const winner =
     gameState?.winnerId !== undefined
@@ -117,6 +164,10 @@ export function useGameSetup() {
             return nextDeadlines
           })
         } else if (serverEvent.data.type === 'game.error') {
+          if (serverEvent.data.payload.code === 'RANKED_ASSIGNMENT_EXPIRED') {
+            navigate(localizedPath('/ranked'), { replace: true })
+            return
+          }
           setErrorMessage(serverEvent.data.payload.message)
         }
         return
@@ -161,6 +212,18 @@ export function useGameSetup() {
         }
       }
 
+      const isTimedOutPlayer =
+        nextGameState.outcome === 'game-ended' &&
+        nextGameState.finishReason === 'forfeit' &&
+        nextGameState.forfeitReason === 'timeout' &&
+        nextGameState.winnerId !== playerId &&
+        (nextGameState.playerOne.id === playerId ||
+          nextGameState.playerTwo.id === playerId)
+      if (isTimedOutPlayer) {
+        navigate(localizedPath('/'), { replace: true })
+        return
+      }
+
       setGameState(nextGameState)
       if (nextGameState.outcome !== 'ongoing') {
         setReconnectDeadlineByPlayerId({})
@@ -168,7 +231,7 @@ export function useGameSetup() {
       setIsLoading(false)
       setErrorMessage(null)
     }
-  }, [lastJsonMessage, roomKey, t])
+  }, [lastJsonMessage, localizedPath, navigate, playerId, roomKey, t])
 
   React.useEffect(() => {
     setPresenceByPlayerId({})
@@ -176,7 +239,7 @@ export function useGameSetup() {
   }, [roomKey])
 
   React.useEffect(() => {
-    if (readyState === ReadyState.OPEN) {
+    if (readyState === ReadyState.OPEN && playerId !== undefined) {
       initGame(
         { roomKey, playerId },
         { playerType: 'human', boType: state?.boType }
@@ -195,10 +258,18 @@ export function useGameSetup() {
           }
         })
         .catch((error) => {
+          if (
+            error instanceof ApiRequestError &&
+            error.status === 409 &&
+            error.code === 'RANKED_ASSIGNMENT_EXPIRED'
+          ) {
+            navigate(localizedPath('/ranked'), { replace: true })
+            return
+          }
           setErrorMessage(error.message)
         })
     }
-  }, [roomKey, playerId, readyState, state])
+  }, [roomKey, playerId, readyState, state, navigate, localizedPath])
 
   async function sendPlay(column: number) {
     const dice = playerOne?.dice
@@ -208,10 +279,11 @@ export function useGameSetup() {
       const body = {
         column,
         dice,
-        author: playerId
+        author: playerId!
       }
 
       const previousGameState = gameState
+      const previousRevision = previousGameState?.revision
 
       const realGameState = GameState.fromJson(gameState!)
       realGameState.applyPlay(body, false)
@@ -219,11 +291,21 @@ export function useGameSetup() {
 
       setGameState(mutatedGameState)
 
-      await play({ roomKey, playerId }, { column }).catch((error) => {
-        setErrorMessage(error.message)
-        setGameState(previousGameState)
-        setIsLoading(false)
-      })
+      await play({ roomKey, playerId: playerId! }, { column }).catch(
+        (error) => {
+          setErrorMessage(error.message)
+          // Only roll the optimistic move back if no newer authoritative state
+          // was applied while the request was in flight. Otherwise the server
+          // state (or the next broadcast) wins.
+          const isLatest =
+            latestRevision.current.roomKey === roomKey &&
+            latestRevision.current.value === (previousRevision ?? -1)
+          if (isLatest) {
+            setGameState(previousGameState)
+          }
+          setIsLoading(false)
+        }
+      )
     }
   }
 
@@ -231,36 +313,57 @@ export function useGameSetup() {
     setErrorMessage(null)
   }
 
+  function retryIdentity() {
+    setIdentityError(null)
+    setErrorMessage(null)
+    setIdentityRetryAttempt((attempt) => attempt + 1)
+  }
+
   // Mouais à voir comment on peut repenser les options ici
 
   async function _voteRematch() {
-    await voteRematch({ roomKey, playerId }).catch((error) => {
+    await voteRematch({ roomKey, playerId: playerId! }).catch((error) => {
       setErrorMessage(error.message)
     })
   }
 
+  async function resign(): Promise<boolean> {
+    try {
+      await resignGame({ roomKey })
+      return true
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : t('ranked.resign.error')
+      )
+      return false
+    }
+  }
+
   async function voteContinueBo() {
-    await voteRematch({ roomKey, playerId }).catch((error) => {
+    await voteRematch({ roomKey, playerId: playerId! }).catch((error) => {
       setErrorMessage(error.message)
     })
   }
 
   async function voteContinueIndefinitely() {
-    await voteRematch({ roomKey, playerId }, { boType: 'indefinite' }).catch(
-      (error) => {
-        setErrorMessage(error.message)
-      }
-    )
+    await voteRematch(
+      { roomKey, playerId: playerId! },
+      { boType: 'indefinite' }
+    ).catch((error) => {
+      setErrorMessage(error.message)
+    })
   }
 
   async function _updateDisplayName(newDisplayName: string) {
     if (isEmptyOrBlank(newDisplayName)) {
-      await deleteDisplayName({ roomKey, playerId }).catch((error) => {
-        setErrorMessage(error.message)
-      })
+      await deleteDisplayName({ roomKey, playerId: playerId! }).catch(
+        (error) => {
+          setErrorMessage(error.message)
+        }
+      )
     } else {
       await updateDisplayName(
-        { roomKey, playerId },
+        { roomKey, playerId: playerId! },
         { displayName: newDisplayName }
       ).catch((error) => {
         setErrorMessage(error.message)
@@ -269,15 +372,24 @@ export function useGameSetup() {
   }
 
   // Easy way to do a type guard
-  if (!isGameStateReady) {
+  if (identityError !== null) {
+    return {
+      status: 'identity-error' as const,
+      errorMessage: identityError,
+      retryIdentity
+    }
+  }
+  if (!isGameStateReady || playerId === undefined) {
     return null
   }
 
   return {
+    status: 'ready' as const,
     ...gameState,
     isLoading,
     playerOne,
     playerTwo,
+    rankedTurn,
     playerId,
     playerSide,
     winner,
@@ -289,6 +401,7 @@ export function useGameSetup() {
     voteContinueBo,
     voteContinueIndefinitely,
     voteRematch: _voteRematch,
+    resign,
     updateDisplayName: _updateDisplayName
   }
 }

@@ -19,7 +19,7 @@ export function Footer() {
       <div className='flex flex-row justify-center gap-4'>
         <a
           className='text-slate-900 transition-all hover:text-slate-900/80 dark:text-slate-200 dark:hover:text-slate-50/80'
-          href='https://github.com/Poooel/knucklebones'
+          href='https://github.com/osselets/knucklebones'
           target='_blank'
           rel='noreferrer'
         >

@@ -152,6 +152,23 @@ export class WebSocketDurableObject {
           this.broadcast(JSON.stringify(event.data))
           return new Response(null, { status: 200 })
         }
+        case '/disconnect-player': {
+          const playerId = request.headers.get('X-Player-Id')
+          if (
+            request.method !== 'POST' ||
+            !playerIdSchema.safeParse(playerId).success
+          ) {
+            return apiError({
+              status: 400,
+              code: 'INVALID_PLAYER_DISCONNECT_REQUEST',
+              message: 'The player disconnect request is invalid.',
+              requestId
+            })
+          }
+
+          this.disconnectPlayer(playerId!)
+          return new Response(null, { status: 204 })
+        }
         default:
           return apiError({
             status: 404,
@@ -255,6 +272,16 @@ export class WebSocketDurableObject {
     this.state.getWebSockets().forEach((webSocket) => {
       try {
         webSocket.send(message)
+      } catch (error) {
+        this.sentry.captureException(error)
+      }
+    })
+  }
+
+  private disconnectPlayer(playerId: string): void {
+    this.state.getWebSockets(`player:${playerId}`).forEach((webSocket) => {
+      try {
+        webSocket.close(1008, 'Ranked match forfeited after three timeouts.')
       } catch (error) {
         this.sentry.captureException(error)
       }
