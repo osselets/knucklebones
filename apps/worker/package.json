@@ -5,7 +5,10 @@
   "type": "module",
   "module": "./dist/index.mjs",
   "scripts": {
-    "dev": "NODE_ENV=development wrangler dev"
+    "db:migrate:local": "wrangler d1 migrations apply PLAYERS_DB --local",
+    "db:reset:local": "node ./scripts/reset-local-state.mjs && pnpm db:migrate:local",
+    "dev": "NODE_ENV=development wrangler dev",
+    "dev:test": "pnpm db:migrate:local && NODE_ENV=development wrangler dev"
   },
   "dependencies": {
     "@knucklebones/common": "workspace:*",

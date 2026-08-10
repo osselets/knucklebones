@@ -24,3 +24,7 @@ dist-ssr
 .env.local.development
 *.wrangler
 .env
+
+# Test output
+playwright-report
+test-results

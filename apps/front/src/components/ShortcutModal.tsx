@@ -13,6 +13,7 @@ interface ShortcutActionProps {
 
 interface ToolbarModalProps extends ShortcutProps {
   isInitiallyOpen?: boolean
+  onOpen?(): void
   renderTrigger?(args: ShortcutActionProps): React.ReactNode
 }
 
@@ -29,12 +30,14 @@ export function ShortcutModal({
       {label}
     </Button>
   ),
-  isInitiallyOpen = false
+  isInitiallyOpen = false,
+  onOpen
 }: React.PropsWithChildren<ToolbarModalProps>) {
   const [isModalOpen, setIsModalOpen] = React.useState(isInitiallyOpen)
 
   function openModal() {
     setIsModalOpen(true)
+    onOpen?.()
   }
 
   return (

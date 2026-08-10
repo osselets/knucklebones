@@ -2,10 +2,69 @@
   "language": "Français",
   "home": {
     "play": {
+      "ranked": "Jouer en classé",
       "friend": "Jouer contre quelqu'un",
       "ai": "Jouer contre une IA"
     },
     "footer": "Le jeu Knucklebones est une création originale de l'entité Massive Monster.\nLe présent site est une réalisation de fans et ne constitue en aucun cas une implémentation officielle de la part de Massive Monster.\nPour accéder au jeu original, nous vous invitons à consulter le site internet officiel de <0>Cult of the Lamb</0>."
+  },
+  "ranked": {
+    "identity-warning": "Votre progression classée appartient à l'identité de ce navigateur. Sauvegardez votre phrase de récupération avant d'effacer ses données.",
+    "rating": "Classement : {{rating}}",
+    "rating-loading": "Chargement du classement…",
+    "match": {
+      "label": "Classé · Une manche gagnante",
+      "opponent-rating": "Classement adverse : {{rating}}"
+    },
+    "turn": {
+      "player": "Au tour de {{player}}",
+      "time-left": "Temps restant pour jouer",
+      "timeouts": "Délais dépassés : {{count}} / {{maximum}}"
+    },
+    "result": {
+      "rating-change": "Classement : {{before}} → {{after}} ({{change}})",
+      "rating-error": "Impossible de charger votre nouveau classement.",
+      "play-again": "Rechercher une autre partie classée",
+      "rematch": "Rejouer",
+      "requesting-rematch": "Demande…",
+      "waiting-rematch": "En attente…",
+      "rematch-pending": "En attente de votre adversaire pour rejouer.",
+      "opponent-rematch": "Votre adversaire veut rejouer !",
+      "opponent-left": "Votre adversaire a quitté la salle.",
+      "rematch-error": "Impossible de demander une revanche. Réessayez."
+    },
+    "resign": {
+      "action": "Abandonner",
+      "title": "Abandonner cette partie classée ?",
+      "warning": "L'abandon termine immédiatement la partie et compte comme une défaite classée.",
+      "confirm": "Confirmer l'abandon",
+      "resigning": "Abandon en cours…",
+      "error": "Impossible d'abandonner cette partie. Réessayez."
+    },
+    "queue": {
+      "title": "Recherche de partie classée",
+      "joining": "Connexion à la file…",
+      "looking": "Recherche d'un adversaire",
+      "elapsed": "Temps d'attente : {{duration}}",
+      "in-queue": "Dans la file",
+      "playing": "En jeu actuellement",
+      "slow": "Cela prend plus de temps que nous le souhaiterions.",
+      "scarce": "Il n'y a peut-être pas assez de joueurs disponibles pour le matchmaking en ce moment.",
+      "best-effort": "Les classements proches sont privilégiés, mais trouver rapidement une partie reste prioritaire.",
+      "match-found": "Partie trouvée !",
+      "rating-difference": "Écart de classement : {{difference}}",
+      "accept-countdown": "{{seconds}} s",
+      "accept-progress": "Temps restant pour accepter",
+      "accept": "Accepter",
+      "accepting": "Acceptation…",
+      "decline": "Refuser",
+      "declining": "Refus…",
+      "waiting-for-accept": "En attente de l'acceptation de votre adversaire",
+      "accept-error": "Impossible d'accepter la partie. Réessayez.",
+      "decline-error": "Impossible de refuser la partie. Réessayez.",
+      "join-error": "Impossible de rejoindre la file classée. Nouvelle tentative…",
+      "connection-error": "La connexion à la file a été interrompue. Reconnexion…"
+    }
   },
   "guide": {
     "label": "Comment jouer",
@@ -76,7 +135,74 @@
       "tie": "Égalité ! Personne n'a gagné !",
       "you-win": "Vous avez gagné la partie avec {{points}} points !",
       "opponent-win": "{{player}} a gagné la partie avec {{points}} points !"
+    },
+    "forfeit": {
+      "resignation": {
+        "you-win": "Votre adversaire a abandonné. Vous gagnez !",
+        "opponent-win": "Vous avez abandonné. {{player}} gagne.",
+        "spectator": "{{loser}} a abandonné. {{winner}} gagne."
+      },
+      "disconnect": {
+        "you-win": "Votre adversaire s'est déconnecté. Vous gagnez !",
+        "opponent-win": "Vous vous êtes déconnecté. {{player}} gagne.",
+        "spectator": "{{loser}} s'est déconnecté. {{winner}} gagne."
+      },
+      "timeout": {
+        "you-win": "Votre adversaire a dépassé le délai trois fois. Vous gagnez !",
+        "opponent-win": "Vous avez dépassé le délai trois fois. {{player}} gagne.",
+        "spectator": "{{loser}} a dépassé le délai trois fois. {{winner}} gagne."
+      }
     }
   },
-  "loading": "En attente du début de la partie"
+  "loading": "En attente du début de la partie",
+  "reconnect": {
+    "deadline": "{{player}} s'est déconnecté. Il lui reste {{seconds}} secondes pour se reconnecter."
+  },
+  "errors": {
+    "unsupported-protocol": "Cette version du jeu n'est plus compatible. Actualisez la page pour continuer."
+  },
+  "identity": {
+    "loading": "Création de votre identité de joueur…",
+    "error": "Impossible de créer votre identité de joueur.",
+    "retry": "Réessayer",
+    "transfer": {
+      "label": "Transférer l'identité",
+      "title": "Transférer votre identité de joueur",
+      "warning": "Knucklebones ne propose pas de comptes. Votre identité de joueur existe uniquement dans ce navigateur. Effacer les données du site la supprimera si vous ne l'avez pas transférée auparavant.",
+      "secret-warning": "Toute personne possédant ce code peut ajouter un appareil à votre identité. Gardez-le secret.",
+      "export-title": "Copier depuis cet appareil",
+      "code-label": "Code de transfert de l'identité du joueur",
+      "qr-label": "QR code de transfert de l'identité du joueur",
+      "qr-description": "Scannez ce QR code sur votre autre appareil, puis collez le code de transfert obtenu.",
+      "copy": "Copier le code de transfert",
+      "copied": "Copié !",
+      "show": "Afficher le code",
+      "hide": "Masquer le code",
+      "expiry": "Les codes de transfert expirent après 10 minutes et ne peuvent être utilisés qu'une seule fois.",
+      "import-title": "Utiliser un code sur cet appareil",
+      "import-warning": "Cette opération remplace l'identité de joueur actuellement enregistrée dans ce navigateur.",
+      "import-placeholder": "Collez un code de transfert",
+      "import": "Utiliser cette identité",
+      "revoke-others": "Révoquer cette identité sur tous les autres appareils après le transfert",
+      "invalid": "Ce code de transfert est invalide.",
+      "error": "Ce code de transfert a expiré, a déjà été utilisé ou est invalide.",
+      "create-error": "Impossible de créer un code de transfert. Réessayez."
+    },
+    "recovery": {
+      "title": "Phrase de récupération",
+      "warning": "Enregistrez cette phrase dans un endroit privé. C'est le seul moyen de récupérer votre identité si tous les appareils autorisés sont perdus. Toute personne qui la possède peut prendre le contrôle de votre identité.",
+      "phrase-label": "Phrase de récupération de l'identité du joueur",
+      "copy": "Copier la phrase de récupération",
+      "show": "Afficher la phrase",
+      "hide": "Masquer la phrase",
+      "generate": "Créer une phrase de récupération",
+      "use-title": "Récupérer une identité",
+      "placeholder": "Collez une phrase de récupération",
+      "revoke-others": "Révoquer tous les autres appareils après la récupération",
+      "use": "Récupérer cette identité",
+      "invalid": "Cette phrase de récupération est invalide.",
+      "error": "Cette phrase de récupération est invalide ou a déjà été remplacée.",
+      "rotate-error": "Impossible de créer une phrase de récupération. Réessayez."
+    }
+  }
 }

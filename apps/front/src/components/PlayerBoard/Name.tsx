@@ -6,10 +6,12 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { isEmptyOrBlank } from '@knucklebones/common'
+import { storeDisplayName } from '../../utils/identityStorage'
 import {
   MAX_NAME_LENGTH,
   type PlayerNameProps,
-  getName
+  getName,
+  randomName
 } from '../../utils/name'
 import { IconButton } from '../IconButton'
 
@@ -57,32 +59,23 @@ export function Name({
     setIsBeingEdited(false)
 
     if (isEmptyOrBlank(name)) {
-      // If the name is empty, we want to remove the display name from local storage
-      localStorage.removeItem('displayName')
-
-      if (computedName === id) {
-        // If the name displayed was equal to id, and the name is now empty
-        // default back to id as we don't want an empty name
-        setName(id)
-      } else {
-        // If the name displayed was not the id (so it was the displayName)
-        // and the name is now empty, send an empty displayName to the backend
-        // as the player is trying to remove their displayName
-        updateDisplayName!('')
-      }
+      const generatedName = randomName()
+      storeDisplayName(generatedName)
+      setName(generatedName)
+      updateDisplayName!(generatedName)
     } else {
       if (computedName === id) {
         if (name !== id) {
           // If the name displayed was the id, and the new name
           // is different from the id the player is trying to set a
           // displayName, so set it in local storage and send it to the backend
-          localStorage.setItem('displayName', name)
+          storeDisplayName(name)
           updateDisplayName!(name)
         }
       } else {
         if (name !== displayName) {
           // Same case as above, but the player is trying to update their displayName
-          localStorage.setItem('displayName', name)
+          storeDisplayName(name)
           updateDisplayName!(name)
         }
       }

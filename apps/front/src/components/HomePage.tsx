@@ -2,7 +2,9 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { type PlayerType } from '@knucklebones/common'
+import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../svgs/logo.svg'
+import { ensurePlayerIdentity } from '../utils/playerIdentity'
 import { Button } from './Button'
 import { Footer } from './Footer'
 import { GameSettingsModal } from './GameSettings'
@@ -11,6 +13,11 @@ export function HomePage() {
   const [playerType, setPlayerType] = React.useState<PlayerType>()
   const [isEditingGameSettings, setEditingGameSettings] = React.useState(false)
   const { t } = useTranslation()
+  const localizedPath = useLocalizedPath()
+
+  React.useEffect(() => {
+    void ensurePlayerIdentity()
+  }, [])
 
   function openGameSettings(playerType: PlayerType) {
     setEditingGameSettings(true)
@@ -31,6 +38,9 @@ export function HomePage() {
           </h1>
         </div>
         <div className='flex flex-col gap-4 md:gap-8'>
+          <Button as={Link} size='large' to={localizedPath('/ranked')}>
+            {t('home.play.ranked')}
+          </Button>
           <Button
             size='large'
             onClick={() => {
@@ -47,7 +57,7 @@ export function HomePage() {
           >
             {t('home.play.ai')}
           </Button>
-          <Button as={Link} size='large' to='/how-to-play'>
+          <Button as={Link} size='large' to={localizedPath('/how-to-play')}>
             {t('guide.label')}
           </Button>
         </div>

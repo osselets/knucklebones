@@ -14,7 +14,22 @@ export function preparePlayers(
   ]
 }
 
-export function getWebSocketUrl(roomKey: string) {
+export function prepareRankedTurn(
+  playerSide: PlayerSide,
+  rankedTurn: IGameState['rankedTurn']
+): IGameState['rankedTurn'] {
+  if (rankedTurn === undefined || playerSide !== 'player-two') {
+    return rankedTurn
+  }
+
+  return {
+    ...rankedTurn,
+    playerOneTimeouts: rankedTurn.playerTwoTimeouts,
+    playerTwoTimeouts: rankedTurn.playerOneTimeouts
+  }
+}
+
+export function getWebSocketUrl(roomKey: string, ticket: string) {
   let hostname = import.meta.env.VITE_WORKER_URL
 
   if (hostname.startsWith('http://')) {
@@ -23,5 +38,5 @@ export function getWebSocketUrl(roomKey: string) {
     hostname = hostname.replace('https', 'wss')
   }
 
-  return `${hostname}/${roomKey}/websocket`
+  return `${hostname}/${roomKey}/websocket?ticket=${ticket}`
 }

@@ -15,6 +15,12 @@ function Dot({ isShown }: { isShown: boolean }) {
   )
 }
 
+export function LoadingDots({ dotsShown }: { dotsShown: number }) {
+  return Array.from({ length: 3 }).map((_, index) => (
+    <Dot isShown={dotsShown > index} key={index} />
+  ))
+}
+
 export function Loading() {
   const [dotsShown, setDotsShown] = React.useState(0)
   const { t } = useTranslation()
@@ -34,9 +40,7 @@ export function Loading() {
     <div className='flex flex-col items-center justify-center gap-8'>
       <h2 className='text-center text-3xl font-semibold md:text-5xl'>
         {t('loading')}
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Dot isShown={dotsShown > i} key={i} />
-        ))}
+        <LoadingDots dotsShown={dotsShown} />
       </h2>
       <QRCode />
     </div>

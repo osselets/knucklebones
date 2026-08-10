@@ -1,28 +1,32 @@
-import { error, status } from 'itty-router'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
 import {
-  broadcastGameState,
-  getGameState,
-  saveGameState
-} from '../utils/endpoints'
+  type AuthenticatedMutationRoomRequestWithProps,
+  type MutationRequestWithProps
+} from '../types/itty'
+import { executeDisplayNameUpdate } from './displayName'
 
 export async function deleteDisplayName(
-  request: BaseRequestWithProps,
-  cloudflareEnvironment: CloudflareEnvironment
+  request: MutationRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
 ) {
-  const gameState = await getGameState(request)
+  return await executeDisplayNameUpdate(
+    request,
+    undefined,
+    cloudflareEnvironment,
+    context
+  )
+}
 
-  if (gameState.playerOne?.id === request.playerId) {
-    gameState.playerOne.displayName = undefined
-  } else if (gameState.playerTwo?.id === request.playerId) {
-    gameState.playerTwo.displayName = undefined
-  } else {
-    return error(400, 'Unexpected playerId received.')
-  }
-
-  await saveGameState(gameState, request)
-  await broadcastGameState(gameState, request, cloudflareEnvironment)
-
-  return status(200)
+export async function deleteRoomDisplayName(
+  request: Request & AuthenticatedMutationRoomRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  return await executeDisplayNameUpdate(
+    request,
+    undefined,
+    cloudflareEnvironment,
+    context
+  )
 }

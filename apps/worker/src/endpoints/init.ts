@@ -1,19 +1,32 @@
 import { status } from 'itty-router'
-import { type Difficulty, Player, type BoType } from '@knucklebones/common'
+import {
+  AI_PLAYER_ID,
+  GameState,
+  idempotentInitializeGameResultSchema,
+  initGameQuerySchema,
+  initializeRoomSchema,
+  type BoType,
+  type Difficulty
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
-import { type BaseRequestWithProps } from '../types/itty'
+import {
+  type AuthenticatedMutationRoomRequestWithProps,
+  type MutationRequestWithProps
+} from '../types/itty'
 import { makeAiPlay } from '../utils/ai'
 import {
   broadcastGameState,
-  getGameState,
-  getLobby,
-  isGameStateInitialized,
-  saveGameState,
-  saveLobby
+  getGameStateDurableObject
 } from '../utils/endpoints'
+import {
+  type GameSettingsQuery,
+  parseGameSettingsQuery
+} from '../utils/gameSettings'
+import { apiError } from '../utils/http'
+import { idempotencyConflict } from '../utils/idempotency'
 
-export interface InitRequest extends BaseRequestWithProps {
-  query?: { displayName?: string; difficulty?: Difficulty; boType?: BoType }
+export interface InitRequest extends MutationRequestWithProps {
+  query?: GameSettingsQuery & { displayName?: string }
 }
 
 export async function init(
@@ -21,43 +34,135 @@ export async function init(
   cloudflareEnvironment: CloudflareEnvironment,
   context: ExecutionContext
 ) {
-  if (await isGameStateInitialized(request)) {
-    const gameState = await getGameState(request)
+  const query = initGameQuerySchema.safeParse(request.query ?? {})
+  if (!query.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_GAME_SETTINGS',
+      message: 'The game settings are invalid.',
+      requestId: request.requestId
+    })
+  }
 
-    if (gameState.addSpectator(request.playerId)) {
-      await saveGameState(gameState, request)
-    }
+  const gameSettings = parseGameSettingsQuery(request.query)
 
-    await broadcastGameState(gameState, request, cloudflareEnvironment)
-  } else {
-    const lobby = await getLobby(request)
+  if (!gameSettings.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_GAME_SETTINGS',
+      message: 'The game settings are invalid.',
+      requestId: request.requestId
+    })
+  }
 
-    const player = new Player(
-      request.playerId,
-      request.query?.displayName,
-      request.query?.difficulty
-    )
+  return await executeInitializeGame(
+    request,
+    {
+      playerId: request.playerId,
+      displayName: query.data.displayName,
+      difficulty: gameSettings.value.difficulty,
+      boType: gameSettings.value.boType
+    },
+    cloudflareEnvironment,
+    context
+  )
+}
 
-    if (request.query?.boType !== undefined) {
-      lobby.setBoType(request.query.boType)
-    }
+export async function initializeRoom(
+  request: Request & AuthenticatedMutationRoomRequestWithProps,
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  const body = initializeRoomSchema.safeParse(
+    await request.json().catch(() => undefined)
+  )
+  if (!body.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_INITIALIZE_GAME_REQUEST',
+      message: 'The game initialization request is invalid.',
+      requestId: request.requestId
+    })
+  }
 
-    if (lobby.addPlayer(player)) {
-      await saveLobby(lobby, request)
-    }
+  return await executeInitializeGame(
+    request,
+    {
+      playerId:
+        body.data.playerType === 'ai'
+          ? AI_PLAYER_ID
+          : request.principal.playerId,
+      displayName:
+        body.data.playerType === 'human' ? body.data.displayName : undefined,
+      difficulty:
+        body.data.playerType === 'ai' ? body.data.difficulty : undefined,
+      boType: body.data.boType
+    },
+    cloudflareEnvironment,
+    context
+  )
+}
 
-    if (lobby.isReady()) {
-      const gameState = lobby.toGameState()
+async function executeInitializeGame(
+  request: AuthenticatedMutationRoomRequestWithProps,
+  player: {
+    playerId: string
+    displayName?: string
+    difficulty?: Difficulty
+    boType?: BoType
+  },
+  cloudflareEnvironment: CloudflareEnvironment,
+  context: ExecutionContext
+) {
+  const result = idempotentInitializeGameResultSchema.parse(
+    await getGameStateDurableObject(request).initializeGame({
+      mutationId: request.mutationId,
+      ...player
+    })
+  )
 
-      await saveGameState(gameState, request)
-      await broadcastGameState(gameState, request, cloudflareEnvironment)
+  if (result.idempotencyStatus === 'conflict') {
+    return idempotencyConflict(request.requestId)
+  }
 
-      if (
-        gameState.playerTwo.isAi() &&
-        gameState.nextPlayer.equals(gameState.playerTwo)
-      ) {
-        makeAiPlay(gameState, request, cloudflareEnvironment, context)
-      }
+  const mutation = result.value
+
+  if (mutation.status === 'not-assigned') {
+    return apiError({
+      status: 403,
+      code: 'NOT_ASSIGNED_TO_RANKED_MATCH',
+      message: 'This player is not assigned to the ranked match.',
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'invalid-ranked-settings') {
+    return apiError({
+      status: 409,
+      code: 'RANKED_SETTINGS_LOCKED',
+      message: 'Ranked match settings cannot be changed.',
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'ranked-assignment-expired') {
+    return apiError({
+      status: 409,
+      code: 'RANKED_ASSIGNMENT_EXPIRED',
+      message: 'The ranked match assignment has expired.',
+      requestId: request.requestId
+    })
+  }
+
+  if (mutation.status === 'created' || mutation.status === 'existing') {
+    const gameState = GameState.fromJson(mutation.gameState)
+    await broadcastGameState(mutation.gameState, request, cloudflareEnvironment)
+
+    if (
+      gameState.playerTwo.isAi() &&
+      gameState.nextPlayer.equals(gameState.playerTwo)
+    ) {
+      makeAiPlay(gameState, request, cloudflareEnvironment, context)
     }
   }
 

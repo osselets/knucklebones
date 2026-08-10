@@ -7,8 +7,15 @@ vars = { ENVIRONMENT = "development" }
 
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
+  { name = "MATCHMAKING_DURABLE_OBJECT", class_name = "MatchmakingDurableObject" },
   { name = "WEB_SOCKET_DURABLE_OBJECT", class_name = "WebSocketDurableObject" }
 ]
+
+[[d1_databases]]
+binding = "PLAYERS_DB"
+database_name = "knucklebones-players-staging"
+database_id = "e51a1fd5-710e-42d5-b889-4b336cd1d83a"
+migrations_dir = "migrations"
 
 [[migrations]]
 tag = "v1"
@@ -22,14 +29,25 @@ new_classes = ["WebSocketStore"]
 tag = "v3"
 renamed_classes = [{from = "GameStateStore", to = "GameStateDurableObject"}, {from = "WebSocketStore", to = "WebSocketDurableObject"}]
 
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["MatchmakingDurableObject"]
+
 [env.staging]
 name = "knucklebones-worker-staging"
 route = { pattern = "staging.api.knucklebones.io", custom_domain = true, zone_name = "knucklebones.io" }
 vars = { ENVIRONMENT = "staging" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
+  { name = "MATCHMAKING_DURABLE_OBJECT", class_name = "MatchmakingDurableObject" },
   { name = "WEB_SOCKET_DURABLE_OBJECT", class_name = "WebSocketDurableObject" }
 ]
+
+[[env.staging.d1_databases]]
+binding = "PLAYERS_DB"
+database_name = "knucklebones-players-staging"
+database_id = "e51a1fd5-710e-42d5-b889-4b336cd1d83a"
+migrations_dir = "migrations"
 
 [env.production]
 name = "knucklebones-worker-production"
@@ -37,5 +55,12 @@ route = { pattern = "api.knucklebones.io", custom_domain = true, zone_name = "kn
 vars = { ENVIRONMENT = "production" }
 durable_objects.bindings = [
   { name = "GAME_STATE_DURABLE_OBJECT", class_name = "GameStateDurableObject" },
+  { name = "MATCHMAKING_DURABLE_OBJECT", class_name = "MatchmakingDurableObject" },
   { name = "WEB_SOCKET_DURABLE_OBJECT", class_name = "WebSocketDurableObject" }
 ]
+
+[[env.production.d1_databases]]
+binding = "PLAYERS_DB"
+database_name = "knucklebones-players-production"
+database_id = "ddbd6ad1-c524-41bc-b1d1-b0621fa8d70f"
+migrations_dir = "migrations"
