@@ -61,24 +61,26 @@ export function HomePage() {
           <Button as={Link} size='large' to={localizedPath('/how-to-play')}>
             {t('guide.label')}
           </Button>
-          <Button
-            as={Link}
-            size='large'
-            to={localizedPath('/profile')}
-            aria-label={t('profile.label')}
-            title={t('profile.label')}
-          >
-            <UserCircleIcon className='h-8 w-8 md:h-10 md:w-10' />
-          </Button>
-          <Button
-            as={Link}
-            size='large'
-            to={localizedPath('/leaderboard')}
-            aria-label={t('leaderboard.label')}
-            title={t('leaderboard.label')}
-          >
-            <TrophyIcon className='h-8 w-8 md:h-10 md:w-10' />
-          </Button>
+          <div className='grid grid-cols-2 gap-4 md:gap-8'>
+            <Button
+              as={Link}
+              size='large'
+              to={localizedPath('/profile')}
+              aria-label={t('profile.label')}
+              title={t('profile.label')}
+            >
+              <UserCircleIcon className='h-8 w-8 md:h-10 md:w-10' />
+            </Button>
+            <Button
+              as={Link}
+              size='large'
+              to={localizedPath('/leaderboard')}
+              aria-label={t('leaderboard.label')}
+              title={t('leaderboard.label')}
+            >
+              <TrophyIcon className='h-8 w-8 md:h-10 md:w-10' />
+            </Button>
+          </div>
         </div>
         <div className='absolute bottom-0 flex flex-col gap-2 p-2'>
           <Footer />
