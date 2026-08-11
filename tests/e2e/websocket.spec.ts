@@ -21,7 +21,9 @@ async function createPlayer(
   request: APIRequestContext
 ): Promise<PlayerCredentials> {
   return (await (
-    await request.post(`${workerUrl}/players`)
+    await request.post(`${workerUrl}/players`, {
+      data: { displayName: 'E2E Player' }
+    })
   ).json()) as PlayerCredentials
 }
 
@@ -58,9 +60,7 @@ async function closeSocket(socket: WebSocket): Promise<void> {
 test('WebSocket tickets are authenticated, one-time, and reject client messages', async ({
   request
 }) => {
-  const player = (await (
-    await request.post(`${workerUrl}/players`)
-  ).json()) as { playerId: string; credential: string }
+  const player = await createPlayer(request)
   expect(player.playerId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
   )
