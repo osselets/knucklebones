@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from 'vitest'
 import { createTestHarness, type TestHarness } from 'wrangler'
 import {
   apiErrorBodySchema,
@@ -1477,25 +1485,28 @@ describe('ranked matchmaking', () => {
       matchmakingStatusSchema.parse(await playerTwoJoin.json()).status
     ).toBe('waiting')
 
-    await new Promise((resolve) => setTimeout(resolve, 650))
-
     const environment = await server.getWorker().getEnv()
-    const activeMatch = await environment.PLAYERS_DB.prepare(
-      `SELECT player_one_id, player_two_id
-       FROM active_ranked_matches
-       WHERE player_one_id IN (?, ?) OR player_two_id IN (?, ?)`
+    await vi.waitFor(
+      async () => {
+        const activeMatch = await environment.PLAYERS_DB.prepare(
+          `SELECT player_one_id, player_two_id
+           FROM active_ranked_matches
+           WHERE player_one_id IN (?, ?) OR player_two_id IN (?, ?)`
+        )
+          .bind(
+            playerOne.playerId,
+            playerTwo.playerId,
+            playerOne.playerId,
+            playerTwo.playerId
+          )
+          .first<{ player_one_id: string; player_two_id: string }>()
+        expect(activeMatch).toEqual({
+          player_one_id: playerOne.playerId,
+          player_two_id: playerTwo.playerId
+        })
+      },
+      { timeout: 3_000, interval: 50 }
     )
-      .bind(
-        playerOne.playerId,
-        playerTwo.playerId,
-        playerOne.playerId,
-        playerTwo.playerId
-      )
-      .first<{ player_one_id: string; player_two_id: string }>()
-    expect(activeMatch).toEqual({
-      player_one_id: playerOne.playerId,
-      player_two_id: playerTwo.playerId
-    })
   })
 
   it('does not reset the selection window when a player joins twice', async () => {
@@ -1658,10 +1669,22 @@ describe('ranked matchmaking', () => {
       playerType: 'human',
       boType: 1
     })
+
+    expect(outsiderClaim.status).toBe(403)
+    await expect(outsiderClaim.json()).resolves.toMatchObject({
+      error: { code: 'NOT_ASSIGNED_TO_RANKED_MATCH' }
+    })
+
     const wrongSettings = await initialize(playerOne, {
       playerType: 'human',
       boType: 3
     })
+
+    expect(wrongSettings.status).toBe(409)
+    await expect(wrongSettings.json()).resolves.toMatchObject({
+      error: { code: 'RANKED_SETTINGS_LOCKED' }
+    })
+
     const playerTwoClaim = await initialize(playerTwo, {
       playerType: 'human',
       boType: 1
@@ -1671,14 +1694,6 @@ describe('ranked matchmaking', () => {
       boType: 1
     })
 
-    expect(outsiderClaim.status).toBe(403)
-    await expect(outsiderClaim.json()).resolves.toMatchObject({
-      error: { code: 'NOT_ASSIGNED_TO_RANKED_MATCH' }
-    })
-    expect(wrongSettings.status).toBe(409)
-    await expect(wrongSettings.json()).resolves.toMatchObject({
-      error: { code: 'RANKED_SETTINGS_LOCKED' }
-    })
     expect(playerTwoClaim.status).toBe(200)
     expect(playerOneClaim.status).toBe(200)
 
