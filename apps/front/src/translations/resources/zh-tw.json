@@ -64,6 +64,30 @@
       "decline-error": "無法拒絕配對，請再試一次。",
       "join-error": "無法加入排名配對，正在重試…",
       "connection-error": "配對連線中斷，正在重新連線…"
+    },
+    "stats": {
+      "title": "排名統計",
+      "subtitle": "排名配對的即時與歷史活動。",
+      "loading": "正在載入排名統計…",
+      "error": "無法載入排名統計，正在重試…",
+      "refresh-error": "最新資料更新失敗，目前仍顯示先前的數值。",
+      "updated": "更新時間：{{time}}",
+      "indicators": {
+        "players": "排名玩家",
+        "matches": "已完成對局",
+        "wins": "玩家勝場",
+        "draws": "玩家平手",
+        "losses": "玩家敗場",
+        "average-elo-gain": "平均 Elo 增益",
+        "active-players": "目前遊玩中",
+        "queued-players": "目前排隊中"
+      },
+      "graphs": {
+        "players": "排名玩家 · 最近 30 天",
+        "players-value": "玩家",
+        "queue": "排隊人數 · 每 15 分鐘峰值 · 最近 24 小時",
+        "queue-value": "排隊玩家"
+      }
     }
   },
   "guide": {

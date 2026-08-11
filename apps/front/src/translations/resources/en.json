@@ -64,6 +64,30 @@
       "decline-error": "We couldn't decline the match. Try again.",
       "join-error": "We couldn't join ranked matchmaking. Retrying…",
       "connection-error": "The matchmaking connection was interrupted. Reconnecting…"
+    },
+    "stats": {
+      "title": "Ranked statistics",
+      "subtitle": "Live and historical activity across ranked matchmaking.",
+      "loading": "Loading ranked statistics…",
+      "error": "Ranked statistics could not be loaded. Retrying…",
+      "refresh-error": "The latest refresh failed. The previous values are still shown.",
+      "updated": "Updated {{time}}",
+      "indicators": {
+        "players": "Ranked players",
+        "matches": "Matches played",
+        "wins": "Player wins",
+        "draws": "Player draws",
+        "losses": "Player losses",
+        "average-elo-gain": "Average Elo gain",
+        "active-players": "Playing now",
+        "queued-players": "In queue now"
+      },
+      "graphs": {
+        "players": "Ranked players · Last 30 days",
+        "players-value": "Players",
+        "queue": "Queue size · 15-minute peak · Last 24 hours",
+        "queue-value": "Queued players"
+      }
     }
   },
   "guide": {

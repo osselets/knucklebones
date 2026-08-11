@@ -64,6 +64,30 @@
       "decline-error": "Impossible de refuser la partie. Réessayez.",
       "join-error": "Impossible de rejoindre la file classée. Nouvelle tentative…",
       "connection-error": "La connexion à la file a été interrompue. Reconnexion…"
+    },
+    "stats": {
+      "title": "Statistiques classées",
+      "subtitle": "Activité en direct et historique du matchmaking classé.",
+      "loading": "Chargement des statistiques classées…",
+      "error": "Impossible de charger les statistiques classées. Nouvelle tentative…",
+      "refresh-error": "La dernière actualisation a échoué. Les valeurs précédentes restent affichées.",
+      "updated": "Mis à jour le {{time}}",
+      "indicators": {
+        "players": "Joueurs classés",
+        "matches": "Parties jouées",
+        "wins": "Victoires des joueurs",
+        "draws": "Égalités des joueurs",
+        "losses": "Défaites des joueurs",
+        "average-elo-gain": "Gain Elo moyen",
+        "active-players": "En train de jouer",
+        "queued-players": "Dans la file"
+      },
+      "graphs": {
+        "players": "Joueurs classés · 30 derniers jours",
+        "players-value": "Joueurs",
+        "queue": "Taille de la file · Pic sur 15 min · 24 dernières heures",
+        "queue-value": "Joueurs dans la file"
+      }
     }
   },
   "guide": {
