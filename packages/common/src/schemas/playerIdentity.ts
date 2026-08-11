@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 import {
+  type CreatePlayerRequest,
   type IdentityTransfer,
   type IdentityRecovery,
   type IdentityRecoveryPhrase,
@@ -12,10 +13,15 @@ import {
 import {
   credentialIdSchema,
   credentialSchema,
+  displayNameSchema,
   playerCredentialSchema,
   playerIdSchema,
   recoveryPhraseSchema
 } from './identifiers'
+
+export const createPlayerRequestSchema = z.strictObject({
+  displayName: displayNameSchema
+}) satisfies z.ZodMiniType<CreatePlayerRequest>
 
 export const playerCredentialsSchema = z.object({
   playerId: playerIdSchema,

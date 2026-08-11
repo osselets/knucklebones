@@ -75,11 +75,9 @@ vi.mock('../../utils/api', () => ({
     }
   },
   createWebSocketTicket: vi.fn(),
-  deleteDisplayName: vi.fn(),
   initGame: vi.fn(),
   play: vi.fn(),
   reportClientProtocolDiagnostic: vi.fn(),
-  updateDisplayName: vi.fn(),
   voteRematch: vi.fn()
 }))
 vi.mock('../../utils/playerIdentity', async (importOriginal) => ({

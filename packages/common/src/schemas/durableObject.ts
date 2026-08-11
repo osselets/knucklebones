@@ -6,8 +6,7 @@ import {
   type PlayGameResult,
   type PresenceUpdateResult,
   type RematchGameResult,
-  type ResignGameResult,
-  type UpdateDisplayNameResult
+  type ResignGameResult
 } from '../types'
 import { gameStateSchema } from './gameState'
 import { boTypeSchema, difficultySchema } from './gameState'
@@ -47,12 +46,6 @@ export const rematchGameCommandSchema = z.object({
 export const resignGameCommandSchema = z.object({
   mutationId: mutationIdSchema,
   playerId: playerIdSchema
-})
-
-export const updateDisplayNameCommandSchema = z.object({
-  mutationId: mutationIdSchema,
-  playerId: playerIdSchema,
-  displayName: z.optional(displayNameSchema)
 })
 
 const updatedGameStateResultSchema = z.object({
@@ -99,11 +92,6 @@ export const resignGameResultSchema = z.union([
   updatedGameStateResultSchema
 ]) satisfies z.ZodMiniType<ResignGameResult>
 
-export const updateDisplayNameResultSchema = z.union([
-  z.object({ status: z.literal('unknown-player') }),
-  updatedGameStateResultSchema
-]) satisfies z.ZodMiniType<UpdateDisplayNameResult>
-
 export const playGameResultSchema = z.union([
   z.object({
     status: z.literal('rejected'),
@@ -139,7 +127,6 @@ export const gameStateMutationResultSchema = z.union([
   initializeGameResultSchema,
   rematchGameResultSchema,
   resignGameResultSchema,
-  updateDisplayNameResultSchema,
   playGameResultSchema
 ]) satisfies z.ZodMiniType<GameStateMutationResult>
 
@@ -161,9 +148,6 @@ export const idempotentRematchGameResultSchema = idempotentResultSchema(
 )
 export const idempotentResignGameResultSchema = idempotentResultSchema(
   resignGameResultSchema
-)
-export const idempotentUpdateDisplayNameResultSchema = idempotentResultSchema(
-  updateDisplayNameResultSchema
 )
 export const idempotentPlayGameResultSchema =
   idempotentResultSchema(playGameResultSchema)

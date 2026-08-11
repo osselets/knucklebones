@@ -16,6 +16,8 @@ describe('RankedStatsPage', () => {
         wins: 42,
         draws: 12,
         losses: 42,
+        forfeits: 9,
+        noContests: 3,
         averageEloGain: 14.5
       },
       current: { activePlayers: 8, queuedPlayers: 3 },
@@ -38,9 +40,17 @@ describe('RankedStatsPage', () => {
     expect(await screen.findByText('ranked.stats.title')).toBeVisible()
     expect(screen.getByText('125')).toBeVisible()
     expect(screen.getByText('48')).toBeVisible()
+    expect(
+      screen.getByText('ranked.stats.indicators.forfeits').parentElement
+    ).toHaveTextContent('9')
+    expect(
+      screen.getByText('ranked.stats.indicators.no-contests').parentElement
+    ).toHaveTextContent('3')
     expect(screen.getByText('14.5')).toBeVisible()
     expect(screen.getByText('8')).toBeVisible()
-    expect(screen.getByText('3')).toBeVisible()
+    expect(
+      screen.getByText('ranked.stats.indicators.queued-players').parentElement
+    ).toHaveTextContent('3')
     expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute(
       'content',
       'noindex'

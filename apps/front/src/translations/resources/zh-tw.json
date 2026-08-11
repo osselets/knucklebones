@@ -16,7 +16,8 @@
     "retry": "再試一次",
     "name": {
       "label": "顯示名稱",
-      "save": "儲存"
+      "save": "儲存",
+      "error": "無法儲存您的顯示名稱。"
     },
     "statistics": {
       "elo": "Elo",
@@ -24,6 +25,20 @@
       "losses": "敗場",
       "draws": "平手"
     }
+  },
+  "leaderboard": {
+    "label": "排行榜",
+    "title": "排行榜",
+    "loading": "正在載入排行榜…",
+    "error": "無法載入排行榜。",
+    "retry": "再試一次",
+    "empty": "目前沒有已排名的玩家。",
+    "podium": "排名前三的玩家",
+    "rank": "排名",
+    "player": "玩家",
+    "elo": "Elo",
+    "your-position": "您的排名",
+    "unranked": "未排名"
   },
   "ranked": {
     "identity-warning": "排名進度綁定於此瀏覽器的玩家身分。清除瀏覽器資料前，請先保存復原短語。",
@@ -95,6 +110,8 @@
         "wins": "玩家勝場",
         "draws": "玩家平手",
         "losses": "玩家敗場",
+        "forfeits": "因棄權結束的對局",
+        "no-contests": "無結果對局",
         "average-elo-gain": "平均 Elo 增益",
         "active-players": "目前遊玩中",
         "queued-players": "目前排隊中"

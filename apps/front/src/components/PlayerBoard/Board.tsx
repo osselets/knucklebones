@@ -24,8 +24,7 @@ interface BoardProps {
 interface PlayerBoardProps extends IPlayer, BoardProps {
   isNextPlayer: boolean
   outcome: Outcome
-  isDisplayNameEditable?: boolean
-  updateDisplayName?(displayName: string): void
+  isCurrentPlayer?: boolean
 }
 
 const MAX_COLUMNS = 3
@@ -100,8 +99,7 @@ export function PlayerBoard({
   canPlay,
   isNextPlayer,
   onColumnClick,
-  updateDisplayName,
-  isDisplayNameEditable = false,
+  isCurrentPlayer = false,
   outcome
 }: PlayerBoardProps) {
   const { t } = useTranslation()
@@ -117,9 +115,7 @@ export function PlayerBoard({
         id={id}
         difficulty={difficulty}
         displayName={displayName}
-        isPlayerOne={isPlayerOne}
-        updateDisplayName={updateDisplayName}
-        isEditable={isDisplayNameEditable}
+        isCurrentPlayer={isCurrentPlayer}
       />
       <div
         className={clsx('grid-cols-3-central grid gap-4 md:gap-8', {

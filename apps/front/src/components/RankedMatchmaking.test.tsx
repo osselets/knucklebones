@@ -81,6 +81,7 @@ describe('RankedMatchmaking', () => {
     sessionStorage.clear()
     vi.mocked(getRankedProfile).mockResolvedValue({
       playerId: playerOneId,
+      displayName: 'Player One',
       ratingPool: 'classic',
       rating: 1200,
       gamesPlayed: 0,

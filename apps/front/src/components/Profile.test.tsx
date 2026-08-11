@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { getRankedProfile } from '../utils/api'
+import { getRankedProfile, updateRankedProfile } from '../utils/api'
 import { ensurePlayerIdentity } from '../utils/playerIdentity'
 import { ProfilePage } from './Profile'
 
@@ -11,7 +11,10 @@ vi.mock('react-i18next', () => ({
     i18n: { language: 'en' }
   })
 }))
-vi.mock('../utils/api', () => ({ getRankedProfile: vi.fn() }))
+vi.mock('../utils/api', () => ({
+  getRankedProfile: vi.fn(),
+  updateRankedProfile: vi.fn()
+}))
 vi.mock('../utils/playerIdentity', () => ({
   ensurePlayerIdentity: vi.fn()
 }))
@@ -24,6 +27,7 @@ describe('ProfilePage', () => {
     })
     vi.mocked(getRankedProfile).mockReset().mockResolvedValue({
       playerId: '22222222-2222-4222-8222-222222222222',
+      displayName: 'Current Name',
       ratingPool: 'classic',
       rating: 1248,
       gamesPlayed: 14,
@@ -31,7 +35,7 @@ describe('ProfilePage', () => {
       losses: 4,
       draws: 2
     })
-    localStorage.setItem('knucklebones.identity.v1.displayName', 'Current Name')
+    vi.mocked(updateRankedProfile).mockReset().mockResolvedValue()
   })
 
   it('shows ranked statistics and saves a new display name', async () => {
@@ -50,9 +54,7 @@ describe('ProfilePage', () => {
     await user.type(nameInput, 'New Name')
     await user.click(screen.getByRole('button', { name: 'profile.name.save' }))
 
-    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
-      'New Name'
-    )
+    expect(updateRankedProfile).toHaveBeenCalledWith('New Name')
     expect(
       screen.getByRole('button', { name: 'profile.name.save' })
     ).toBeDisabled()
@@ -63,6 +65,7 @@ describe('ProfilePage', () => {
       .mockRejectedValueOnce(new Error('Unavailable'))
       .mockResolvedValueOnce({
         playerId: '22222222-2222-4222-8222-222222222222',
+        displayName: 'Current Name',
         ratingPool: 'classic',
         rating: 1200,
         gamesPlayed: 0,

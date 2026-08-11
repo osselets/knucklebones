@@ -14,6 +14,8 @@ import {
   playerCredentialsSchema,
   type PlayerIdentityBootstrap,
   playerIdentityBootstrapSchema,
+  type RankedLeaderboard,
+  rankedLeaderboardSchema,
   type RankedProfile,
   type RankedStats,
   type RankedRematchStatus,
@@ -23,10 +25,7 @@ import {
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
-import {
-  getStoredDeviceCredential,
-  getStoredDisplayName
-} from './identityStorage'
+import { getStoredDeviceCredential } from './identityStorage'
 import { ensurePlayerIdentity } from './playerIdentity'
 
 type Method = 'GET' | 'POST' | 'DELETE'
@@ -48,8 +47,15 @@ interface IdentificationParams {
   playerId: string
 }
 
-export async function createPlayer(): Promise<PlayerIdentityBootstrap> {
-  const response = await sendApiRequest('/players', 'POST', undefined, null)
+export async function createPlayer(
+  displayName: string
+): Promise<PlayerIdentityBootstrap> {
+  const response = await sendApiRequest(
+    '/players',
+    'POST',
+    { displayName },
+    null
+  )
   const result = playerIdentityBootstrapSchema.safeParse(await response.json())
 
   if (!result.success) {
@@ -158,6 +164,21 @@ export async function getRankedProfile(): Promise<RankedProfile> {
   return result.data
 }
 
+export async function updateRankedProfile(displayName: string): Promise<void> {
+  await sendApiRequest('/v1/ranked/profile', 'POST', { displayName })
+}
+
+export async function getRankedLeaderboard(): Promise<RankedLeaderboard> {
+  const response = await sendApiRequest('/v1/ranked/leaderboard', 'GET')
+  const result = rankedLeaderboardSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned an invalid ranked leaderboard.')
+  }
+
+  return result.data
+}
+
 export async function getRankedStats(): Promise<RankedStats> {
   const response = await sendApiRequest(
     '/v1/ranked/stats',
@@ -252,15 +273,10 @@ export async function initGame(
   { roomKey }: IdentificationParams,
   { boType, difficulty, playerType }: InitGameRequestParams
 ) {
-  const displayName = getStoredDisplayName()
   const body =
     playerType === 'ai'
       ? { playerType, difficulty, boType }
-      : {
-          playerType,
-          boType,
-          ...(displayName !== null && { displayName })
-        }
+      : { playerType, boType }
 
   await sendMutationRequest(`/v1/rooms/${roomKey}/init`, 'POST', body)
 }
@@ -292,22 +308,6 @@ export async function resignGame({
   roomKey
 }: Pick<IdentificationParams, 'roomKey'>): Promise<void> {
   await sendMutationRequest(`/v1/rooms/${roomKey}/resign`, 'POST')
-}
-
-interface UpdateDisplayNameRequestParams {
-  displayName: string
-}
-export async function updateDisplayName(
-  { roomKey }: IdentificationParams,
-  { displayName }: UpdateDisplayNameRequestParams
-) {
-  await sendMutationRequest(`/v1/rooms/${roomKey}/display-name`, 'POST', {
-    displayName
-  })
-}
-
-export async function deleteDisplayName({ roomKey }: IdentificationParams) {
-  await sendMutationRequest(`/v1/rooms/${roomKey}/display-name`, 'DELETE')
 }
 
 async function sendMutationRequest(

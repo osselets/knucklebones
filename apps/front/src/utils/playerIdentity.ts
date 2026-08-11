@@ -6,9 +6,7 @@ import { ApiRequestError, createPlayer, verifyPlayer } from './api'
 import {
   clearStoredIdentity,
   getStoredDeviceCredential,
-  getStoredDisplayName,
   getStoredPlayerId,
-  storeDisplayName,
   storeIdentity,
   storePendingRecoveryPhrase
 } from './identityStorage'
@@ -60,7 +58,6 @@ async function initializePlayerIdentity(): Promise<PlayerCredentials> {
         return await createAndStorePlayerIdentity()
       }
     }
-    ensurePlayerDisplayName()
     return storedCredentials
   }
 
@@ -68,15 +65,8 @@ async function initializePlayerIdentity(): Promise<PlayerCredentials> {
 }
 
 async function createAndStorePlayerIdentity(): Promise<PlayerCredentials> {
-  const credentials = await createPlayer()
+  const credentials = await createPlayer(randomName())
   storePlayerCredentials(credentials)
   storePendingRecoveryPhrase(credentials.recoveryPhrase)
-  ensurePlayerDisplayName()
   return credentials
-}
-
-function ensurePlayerDisplayName(): void {
-  if (getStoredDisplayName() === null) {
-    storeDisplayName(randomName())
-  }
 }

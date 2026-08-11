@@ -36,10 +36,7 @@ import {
   rankedMatchAssignmentSchema,
   roomKeySchema,
   toGameReconnectDeadlineMessage,
-  toGameStateMessage,
-  type UpdateDisplayNameResult,
-  updateDisplayNameCommandSchema,
-  updateDisplayNameResultSchema
+  toGameStateMessage
 } from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type IttyDurableObjectNamespace } from '../types/itty'
@@ -918,46 +915,6 @@ export class GameStateDurableObject extends createDurable({
     gameState.finishByForfeit(playerId, 'resignation')
     this.reconnectDeadlines = {}
     return { status: 'updated', gameState: this.commitGameState(gameState) }
-  }
-
-  updateDisplayName(
-    mutationId: string,
-    playerId: string,
-    displayName?: string
-  ): IdempotentMutationResult<UpdateDisplayNameResult> {
-    const command = updateDisplayNameCommandSchema.parse({
-      mutationId,
-      playerId,
-      displayName
-    })
-
-    return this.runIdempotently(
-      command.mutationId,
-      'update-display-name',
-      { playerId: command.playerId, displayName: command.displayName },
-      updateDisplayNameResultSchema,
-      () => this.applyDisplayNameUpdate(command.playerId, command.displayName)
-    )
-  }
-
-  private applyDisplayNameUpdate(
-    playerId: string,
-    displayName?: string
-  ): UpdateDisplayNameResult {
-    const gameState = this.getInitializedGameState()
-
-    if (gameState.playerOne.id === playerId) {
-      gameState.playerOne.displayName = displayName
-    } else if (gameState.playerTwo.id === playerId) {
-      gameState.playerTwo.displayName = displayName
-    } else {
-      return { status: 'unknown-player' }
-    }
-
-    return {
-      status: 'updated',
-      gameState: this.commitGameState(gameState)
-    }
   }
 
   private readPlayerGameState(playerId: string): GameState | undefined {

@@ -93,6 +93,7 @@ describe('GameOutcome ranked rating', () => {
     vi.mocked(getRankedProfile).mockReset()
     vi.mocked(getRankedProfile).mockResolvedValue({
       playerId: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Player One',
       ratingPool: 'classic',
       rating: 1184,
       gamesPlayed: 1,

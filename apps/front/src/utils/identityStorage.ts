@@ -1,18 +1,15 @@
 const PLAYER_ID_KEY = 'knucklebones.identity.v1.playerId'
 const PLAYER_CREDENTIAL_KEY = 'knucklebones.identity.v1.deviceCredential'
-const DISPLAY_NAME_KEY = 'knucklebones.identity.v1.displayName'
 const PENDING_RECOVERY_PHRASE_KEY =
   'knucklebones.identity.v1.pendingRecoveryPhrase'
 const RECOVERY_CONFIRMED_KEY = 'knucklebones.identity.v1.recoveryConfirmed'
 
 const LEGACY_PLAYER_ID_KEY = 'playerId'
 const LEGACY_PLAYER_CREDENTIAL_KEY = 'playerCredential'
-const LEGACY_DISPLAY_NAME_KEY = 'displayName'
 
 export function migrateLegacyIdentityStorage(): void {
   migrateKey(LEGACY_PLAYER_ID_KEY, PLAYER_ID_KEY)
   migrateKey(LEGACY_PLAYER_CREDENTIAL_KEY, PLAYER_CREDENTIAL_KEY)
-  migrateKey(LEGACY_DISPLAY_NAME_KEY, DISPLAY_NAME_KEY)
 }
 
 export function getStoredPlayerId(): string | null {
@@ -39,16 +36,6 @@ export function clearStoredIdentity(): void {
   localStorage.removeItem(RECOVERY_CONFIRMED_KEY)
   localStorage.removeItem(LEGACY_PLAYER_ID_KEY)
   localStorage.removeItem(LEGACY_PLAYER_CREDENTIAL_KEY)
-}
-
-export function getStoredDisplayName(): string | null {
-  migrateLegacyIdentityStorage()
-  return localStorage.getItem(DISPLAY_NAME_KEY)
-}
-
-export function storeDisplayName(displayName: string): void {
-  localStorage.setItem(DISPLAY_NAME_KEY, displayName)
-  localStorage.removeItem(LEGACY_DISPLAY_NAME_KEY)
 }
 
 export function getPendingRecoveryPhrase(): string | undefined {

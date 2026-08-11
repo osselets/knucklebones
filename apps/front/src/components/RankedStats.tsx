@@ -170,6 +170,8 @@ export function RankedStatsPage() {
     ['wins', stats.totals.wins],
     ['draws', stats.totals.draws],
     ['losses', stats.totals.losses],
+    ['forfeits', stats.totals.forfeits],
+    ['no-contests', stats.totals.noContests],
     ['average-elo-gain', stats.totals.averageEloGain],
     ['active-players', stats.current.activePlayers],
     ['queued-players', stats.current.queuedPlayers]

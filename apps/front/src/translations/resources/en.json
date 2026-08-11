@@ -16,7 +16,8 @@
     "retry": "Try again",
     "name": {
       "label": "Display name",
-      "save": "Save"
+      "save": "Save",
+      "error": "Your display name could not be saved."
     },
     "statistics": {
       "elo": "Elo",
@@ -24,6 +25,20 @@
       "losses": "Losses",
       "draws": "Draws"
     }
+  },
+  "leaderboard": {
+    "label": "Leaderboard",
+    "title": "Leaderboard",
+    "loading": "Loading the leaderboard…",
+    "error": "The leaderboard could not be loaded.",
+    "retry": "Try again",
+    "empty": "No players are ranked yet.",
+    "podium": "Top three ranked players",
+    "rank": "Rank",
+    "player": "Player",
+    "elo": "Elo",
+    "your-position": "Your position",
+    "unranked": "Unranked"
   },
   "ranked": {
     "identity-warning": "Ranked progress belongs to this browser identity. Save your recovery phrase before clearing browser data.",
@@ -95,6 +110,8 @@
         "wins": "Player wins",
         "draws": "Player draws",
         "losses": "Player losses",
+        "forfeits": "Matches ended by forfeit",
+        "no-contests": "No-contest matches",
         "average-elo-gain": "Average Elo gain",
         "active-players": "Playing now",
         "queued-players": "In queue now"

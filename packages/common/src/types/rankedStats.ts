@@ -11,6 +11,8 @@ export interface RankedStats {
     wins: number
     draws: number
     losses: number
+    forfeits: number
+    noContests: number
     averageEloGain: number
   }
   current: {

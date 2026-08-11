@@ -1,123 +1,16 @@
-import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  PencilSquareIcon,
-  CheckIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline'
-import { isEmptyOrBlank } from '@knucklebones/common'
-import { storeDisplayName } from '../../utils/identityStorage'
-import {
-  MAX_NAME_LENGTH,
-  type PlayerNameProps,
-  getName,
-  randomName
-} from '../../utils/name'
-import { IconButton } from '../IconButton'
+import { type PlayerNameProps, getName } from '../../utils/name'
 
 interface NameProps extends PlayerNameProps {
-  isPlayerOne: boolean
-  updateDisplayName?(displayName: string): void
-  isEditable: boolean
+  isCurrentPlayer: boolean
 }
 
-export function Name({
-  isPlayerOne,
-  updateDisplayName,
-  isEditable,
-  ...player
-}: NameProps) {
-  const computedName = getName(player)
-  const { id, displayName } = player
-  const [isBeingEdited, setIsBeingEdited] = React.useState(false)
-  const [name, setName] = React.useState(computedName)
+export function Name({ isCurrentPlayer, ...player }: NameProps) {
   const { t } = useTranslation()
-
-  React.useEffect(() => {
-    setName(computedName)
-  }, [computedName])
-
-  function handleOnKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      onDisplayNameSubmit()
-    } else if (e.key === 'Escape') {
-      onDisplayNameCancel()
-    }
-  }
-
-  function handleOnChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // Avoid players using ridiculously long names
-    setName(e.target.value.substring(0, MAX_NAME_LENGTH))
-  }
-
-  function handleOnFocus(e: React.FocusEvent<HTMLInputElement, Element>) {
-    // Select all input when focused
-    e.target.select()
-  }
-
-  function onDisplayNameSubmit() {
-    setIsBeingEdited(false)
-
-    if (isEmptyOrBlank(name)) {
-      const generatedName = randomName()
-      storeDisplayName(generatedName)
-      setName(generatedName)
-      updateDisplayName!(generatedName)
-    } else {
-      if (computedName === id) {
-        if (name !== id) {
-          // If the name displayed was the id, and the new name
-          // is different from the id the player is trying to set a
-          // displayName, so set it in local storage and send it to the backend
-          storeDisplayName(name)
-          updateDisplayName!(name)
-        }
-      } else {
-        if (name !== displayName) {
-          // Same case as above, but the player is trying to update their displayName
-          storeDisplayName(name)
-          updateDisplayName!(name)
-        }
-      }
-    }
-  }
-
-  function onDisplayNameCancel() {
-    setIsBeingEdited(false)
-    setName(computedName)
-  }
-
-  function onEditClick() {
-    setIsBeingEdited(true)
-  }
-
-  if (isBeingEdited) {
-    return (
-      <div className='flex items-center gap-2'>
-        <input
-          type='text'
-          value={name}
-          className='rounded-lg bg-slate-200 p-2 dark:bg-slate-700'
-          onChange={handleOnChange}
-          onKeyDown={handleOnKeyDown}
-          autoFocus
-          onFocus={handleOnFocus}
-        />
-        <IconButton icon={<CheckIcon />} onClick={onDisplayNameSubmit} />
-        <IconButton icon={<XMarkIcon />} onClick={onDisplayNameCancel} />
-      </div>
-    )
-  } else {
-    return (
-      <div className='flex flex-wrap items-center justify-center gap-2'>
-        <p className='text-center break-all'>
-          {name}
-          {isPlayerOne && isEditable && ` (${t('game.you')})`}
-        </p>
-        {isEditable && (
-          <IconButton icon={<PencilSquareIcon />} onClick={onEditClick} />
-        )}
-      </div>
-    )
-  }
+  return (
+    <p className='text-center break-all'>
+      {getName(player)}
+      {isCurrentPlayer && ` (${t('game.you')})`}
+    </p>
+  )
 }

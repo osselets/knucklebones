@@ -1,5 +1,9 @@
 export const AI_PLAYER_ID = 'beep-boop'
 
+export interface CreatePlayerRequest {
+  displayName: string
+}
+
 export interface PlayerCredentials {
   playerId: string
   credential: string
