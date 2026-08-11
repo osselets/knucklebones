@@ -32,12 +32,6 @@ export const roomRouteParamsSchema = z.object({
   playerId: playerIdSchema
 })
 
-export const displayNameRouteParamsSchema = z.object({
-  roomKey: roomKeySchema,
-  playerId: playerIdSchema,
-  displayName: displayNameSchema
-})
-
 export const playRouteParamsSchema = z.object({
   roomKey: roomKeySchema,
   playerId: playerIdSchema,
@@ -52,7 +46,6 @@ export const playIntentSchema = z.strictObject({
 export const initializeRoomSchema = z.union([
   z.strictObject({
     playerType: z.literal('human'),
-    displayName: z.optional(displayNameSchema),
     boType: z.optional(boTypeSchema)
   }),
   z.strictObject({
@@ -76,6 +69,4 @@ export const gameSettingsQuerySchema = z.object({
   difficulty: z.optional(z.enum(['easy', 'medium', 'hard']))
 })
 
-export const initGameQuerySchema = z.extend(gameSettingsQuerySchema, {
-  displayName: z.optional(displayNameSchema)
-})
+export const initGameQuerySchema = gameSettingsQuerySchema

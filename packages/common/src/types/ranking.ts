@@ -18,10 +18,30 @@ export interface EloRatingUpdate {
 
 export interface RankedProfile {
   playerId: string
+  displayName: string
   ratingPool: RatingPool
   rating: number
   gamesPlayed: number
   wins: number
   draws: number
   losses: number
+}
+
+export interface RankedLeaderboardEntry {
+  rank: number
+  playerId: string
+  displayName: string
+  rating: number
+}
+
+export interface CurrentRankedLeaderboardEntry {
+  rank: number | null
+  playerId: string
+  displayName: string
+  rating: number
+}
+
+export interface RankedLeaderboard {
+  topPlayers: RankedLeaderboardEntry[]
+  currentPlayer: CurrentRankedLeaderboardEntry
 }

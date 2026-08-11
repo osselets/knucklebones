@@ -1,4 +1,7 @@
-import { type PlayerIdentityBootstrap } from '@knucklebones/common'
+import {
+  createPlayerRequestSchema,
+  type PlayerIdentityBootstrap
+} from '@knucklebones/common'
 import { type CloudflareEnvironment } from '../types/cloudflareEnvironment'
 import { type RequestWithId } from '../types/itty'
 import {
@@ -6,6 +9,7 @@ import {
   createRecoveryPhrase,
   hashCredential
 } from '../utils/credentials'
+import { apiError } from '../utils/http'
 import { enforceRateLimit } from '../utils/rateLimit'
 
 export async function createPlayer(
@@ -21,6 +25,18 @@ export async function createPlayer(
     return rateLimit
   }
 
+  const body = createPlayerRequestSchema.safeParse(
+    await request.json().catch(() => undefined)
+  )
+  if (!body.success) {
+    return apiError({
+      status: 400,
+      code: 'INVALID_CREATE_PLAYER_REQUEST',
+      message: 'The player creation request is invalid.',
+      requestId: request.requestId
+    })
+  }
+
   const playerId = crypto.randomUUID()
   const { credentialId, credential, secretHash } =
     await createDeviceCredential()
@@ -29,8 +45,10 @@ export async function createPlayer(
 
   await cloudflareEnvironment.PLAYERS_DB.batch([
     cloudflareEnvironment.PLAYERS_DB.prepare(
-      'INSERT INTO players (player_id, credential_hash, created_at) VALUES (?, ?, ?)'
-    ).bind(playerId, secretHash, createdAt),
+      `INSERT INTO players
+        (player_id, credential_hash, display_name, created_at)
+       VALUES (?, ?, ?, ?)`
+    ).bind(playerId, secretHash, body.data.displayName, createdAt),
     cloudflareEnvironment.PLAYERS_DB.prepare(
       `INSERT INTO device_credentials
         (credential_id, player_id, secret_hash, created_at)

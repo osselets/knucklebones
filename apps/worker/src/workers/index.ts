@@ -5,9 +5,7 @@ import {
   acceptMatchmaking,
   createPlayer,
   createWebSocketTicket,
-  deleteRoomDisplayName,
-  deleteDisplayName,
-  displayName,
+  getRankedLeaderboard,
   getRankedProfile,
   getRankedStats,
   getRankedRematchStatus,
@@ -31,7 +29,7 @@ import {
   revokeOtherDeviceCredentials,
   rotateDeviceCredential,
   rotateIdentityRecovery,
-  updateRoomDisplayName,
+  updateRankedProfile,
   verifyPlayer,
   webSocket
 } from '../endpoints'
@@ -75,7 +73,9 @@ router
   .delete('/v1/identity/credentials/:credentialId', revokeDeviceCredential)
   .get('/v1/ranked/stats', getRankedStats)
   .all('/v1/ranked/*', authenticatePlayerRequest)
+  .get('/v1/ranked/leaderboard', getRankedLeaderboard)
   .get('/v1/ranked/profile', getRankedProfile)
+  .post('/v1/ranked/profile', updateRankedProfile)
   .all('/v1/matchmaking/*', authenticatePlayerRequest)
   .post('/v1/matchmaking/join', joinMatchmaking)
   .get('/v1/matchmaking/status', getMatchmakingStatus)
@@ -105,16 +105,6 @@ router
     requestRankedRematch
   )
   .post('/v1/rooms/:roomKey/resign', withAuthenticatedMutationId, resignRoom)
-  .post(
-    '/v1/rooms/:roomKey/display-name',
-    withAuthenticatedMutationId,
-    updateRoomDisplayName
-  )
-  .delete(
-    '/v1/rooms/:roomKey/display-name',
-    withAuthenticatedMutationId,
-    deleteRoomDisplayName
-  )
   .all(
     '/:roomKey/:playerId/*',
     withDurables({ parse: true }),
@@ -124,14 +114,6 @@ router
   .post('/:roomKey/:playerId/init', withMutationId, init)
   .post('/:roomKey/:playerId/play/:column/:dice', withMutationId, play)
   .post('/:roomKey/:playerId/rematch', withMutationId, rematch)
-  .post(
-    '/:roomKey/:playerId/displayName/:displayName',
-    withMutationId,
-    displayName
-  )
-
-  .delete('/:roomKey/:playerId/displayName', withMutationId, deleteDisplayName)
-
   .all('*', (request: RequestWithId) =>
     apiError({
       status: 404,

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { TrophyIcon, UserCircleIcon } from '@heroicons/react/24/outline'
 import { type PlayerType } from '@knucklebones/common'
 import { useLocalizedPath } from '../hooks/useLocalizedPath'
 import KnucklebonesLogo from '../svgs/logo.svg'
@@ -69,6 +69,15 @@ export function HomePage() {
             title={t('profile.label')}
           >
             <UserCircleIcon className='h-8 w-8 md:h-10 md:w-10' />
+          </Button>
+          <Button
+            as={Link}
+            size='large'
+            to={localizedPath('/leaderboard')}
+            aria-label={t('leaderboard.label')}
+            title={t('leaderboard.label')}
+          >
+            <TrophyIcon className='h-8 w-8 md:h-10 md:w-10' />
           </Button>
         </div>
         <div className='absolute bottom-0 flex flex-col gap-2 p-2'>

@@ -12,6 +12,7 @@ import {
   playerIdentityBootstrapSchema,
   type PresenceUpdateResult,
   rankedMatchSettlementResultSchema,
+  rankedLeaderboardSchema,
   rankedProfileSchema,
   rankedStatsSchema,
   webSocketTicketSchema,
@@ -55,8 +56,18 @@ async function request(path: string, init?: RequestInit) {
   return await server.getWorker().fetch(path, init)
 }
 
-async function createPlayer(): Promise<PlayerCredentials> {
-  const response = await request('/players', { method: 'POST' })
+async function readJson(response: Response): Promise<unknown> {
+  return await response.json()
+}
+
+async function createPlayer(
+  displayName = 'Test Player'
+): Promise<PlayerCredentials> {
+  const response = await request('/players', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName })
+  })
   expect(response.status).toBe(201)
   return playerCredentialsSchema.parse(await response.json())
 }
@@ -65,6 +76,21 @@ async function setRating(playerId: string, rating: number): Promise<void> {
   const environment = await server.getWorker().getEnv()
   const result = await environment.PLAYERS_DB.prepare(
     'UPDATE player_ratings SET rating = ? WHERE player_id = ?'
+  )
+    .bind(rating, playerId)
+    .run()
+  expect(result.meta.changes).toBe(1)
+}
+
+async function setRankedRecord(
+  playerId: string,
+  rating: number
+): Promise<void> {
+  const environment = await server.getWorker().getEnv()
+  const result = await environment.PLAYERS_DB.prepare(
+    `UPDATE player_ratings
+     SET rating = ?, games_played = 1
+     WHERE player_id = ?`
   )
     .bind(rating, playerId)
     .run()
@@ -135,6 +161,98 @@ describe('client protocol diagnostics', () => {
 })
 
 describe('player identities and ranked profiles', () => {
+  it('stores and updates the public display name on the player profile', async () => {
+    const player = await createPlayer('Original 🧙')
+    const original = rankedProfileSchema.parse(
+      await readJson(
+        await request('/v1/ranked/profile', {
+          headers: authorization(player)
+        })
+      )
+    )
+
+    const updated = await request('/v1/ranked/profile', {
+      method: 'POST',
+      headers: {
+        ...authorization(player),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ displayName: '𝓟𝓸𝓮𝓵 🧙‍♂️' })
+    })
+    const next = rankedProfileSchema.parse(
+      await readJson(
+        await request('/v1/ranked/profile', {
+          headers: authorization(player)
+        })
+      )
+    )
+
+    expect(original.displayName).toBe('Original 🧙')
+    expect(updated.status).toBe(204)
+    expect(next.displayName).toBe('𝓟𝓸𝓮𝓵 🧙‍♂️')
+  })
+
+  it('shows new players as unranked on an empty leaderboard', async () => {
+    const player = await createPlayer('New Player')
+    const leaderboard = rankedLeaderboardSchema.parse(
+      await readJson(
+        await request('/v1/ranked/leaderboard', {
+          headers: authorization(player)
+        })
+      )
+    )
+
+    expect(leaderboard.topPlayers).toEqual([])
+    expect(leaderboard.currentPlayer).toEqual({
+      rank: null,
+      playerId: player.playerId,
+      displayName: 'New Player',
+      rating: 1200
+    })
+  })
+
+  it('returns the top ten and a current player outside the table', async () => {
+    const players: PlayerCredentials[] = []
+    for (let index = 0; index < 12; index++) {
+      const player = await createPlayer(`Player ${index + 1}`)
+      players.push(player)
+      await setRankedRecord(
+        player.playerId,
+        index < 2 ? 1500 : 1500 - index * 10
+      )
+    }
+
+    const leaderboard = rankedLeaderboardSchema.parse(
+      await readJson(
+        await request('/v1/ranked/leaderboard', {
+          headers: authorization(players[11])
+        })
+      )
+    )
+
+    expect(leaderboard.topPlayers).toHaveLength(10)
+    expect(leaderboard.topPlayers.slice(0, 2)).toMatchObject([
+      { rank: 1, rating: 1500 },
+      { rank: 1, rating: 1500 }
+    ])
+    expect(
+      leaderboard.topPlayers
+        .slice(0, 2)
+        .map(({ displayName }) => displayName)
+        .sort()
+    ).toEqual(['Player 1', 'Player 2'])
+    expect(leaderboard.topPlayers[2]).toMatchObject({
+      rank: 3,
+      displayName: 'Player 3',
+      rating: 1480
+    })
+    expect(leaderboard.currentPlayer).toMatchObject({
+      rank: 12,
+      displayName: 'Player 12',
+      rating: 1390
+    })
+  })
+
   it('rejects missing and cross-player credentials without mutating a room', async () => {
     const playerOne = await createPlayer()
     const playerTwo = await createPlayer()
@@ -356,7 +474,7 @@ describe('one-time identity transfers', () => {
   }
 
   it('issues a separate device credential for the same player', async () => {
-    const source = await createPlayer()
+    const source = await createPlayer('Transferred Name')
     const transfer = await issueTransfer(source)
     const response = await redeemTransfer(transfer.transferToken)
 
@@ -377,6 +495,14 @@ describe('one-time identity transfers', () => {
     ])
     expect(sourceVerification.status).toBe(204)
     expect(importedVerification.status).toBe(204)
+    const profile = rankedProfileSchema.parse(
+      await readJson(
+        await request('/v1/ranked/profile', {
+          headers: authorization(imported)
+        })
+      )
+    )
+    expect(profile.displayName).toBe('Transferred Name')
   })
 
   it('allows only one of two concurrent redemptions', async () => {
@@ -432,7 +558,11 @@ describe('one-time identity transfers', () => {
 
 describe('identity recovery', () => {
   async function createRecoveryIdentity() {
-    const response = await request('/players', { method: 'POST' })
+    const response = await request('/players', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'Recovery Player' })
+    })
     expect(response.status).toBe(201)
     return playerIdentityBootstrapSchema.parse(await response.json())
   }
@@ -607,16 +737,15 @@ describe('versioned authenticated room API', () => {
     }
   }
 
-  it('derives room actors from credentials and accepts settings in JSON', async () => {
-    const playerOne = await createPlayer()
-    const playerTwo = await createPlayer()
+  it('derives room actors and names from profiles and accepts settings in JSON', async () => {
+    const playerOne = await createPlayer('Player / One?')
+    const playerTwo = await createPlayer('Player Two')
     const roomKey = crypto.randomUUID()
 
     const first = await request(
       `/v1/rooms/${roomKey}/init`,
       mutationRequest(playerOne, {
         playerType: 'human',
-        displayName: 'Player / One?',
         boType: 1
       })
     )
@@ -624,22 +753,50 @@ describe('versioned authenticated room API', () => {
       `/v1/rooms/${roomKey}/init`,
       mutationRequest(playerTwo, { playerType: 'human', boType: 1 })
     )
-    const renamed = await request(
-      `/v1/rooms/${roomKey}/display-name`,
-      mutationRequest(playerOne, { displayName: 'Updated / Name?' })
-    )
     const ticket = await request(
       `/v1/rooms/${roomKey}/websocket-ticket`,
       mutationRequest(playerOne)
     )
 
+    const environment = await server.getWorker().getEnv()
+    const game = environment.GAME_STATE_DURABLE_OBJECT.get(
+      environment.GAME_STATE_DURABLE_OBJECT.idFromName(roomKey)
+    )
+    const stateResponse = await game.fetch(
+      'https://itty-durable/do/call/initializeGame',
+      {
+        headers: {
+          'do-name': roomKey,
+          'do-content': JSON.stringify([
+            {
+              mutationId: crypto.randomUUID(),
+              playerId: playerOne.playerId,
+              boType: 1
+            }
+          ])
+        }
+      }
+    )
+    const state = idempotentInitializeGameResultSchema.parse(
+      await stateResponse.json()
+    )
+
     expect(first.status).toBe(200)
     expect(second.status).toBe(200)
-    expect(renamed.status).toBe(200)
     expect(ticket.status).toBe(201)
     expect(webSocketTicketSchema.safeParse(await ticket.json()).success).toBe(
       true
     )
+    expect(state).toMatchObject({
+      idempotencyStatus: 'applied',
+      value: {
+        status: 'existing',
+        gameState: {
+          playerOne: { displayName: 'Player / One?' },
+          playerTwo: { displayName: 'Player Two' }
+        }
+      }
+    })
   })
 
   it('rejects malformed or identity-bearing room bodies', async () => {
@@ -648,6 +805,7 @@ describe('versioned authenticated room API', () => {
 
     for (const body of [
       { playerType: 'human', playerId: player.playerId },
+      { playerType: 'human', displayName: 'Room Name' },
       { playerType: 'ai' },
       { playerType: 'human', boType: 2 }
     ]) {
@@ -707,20 +865,10 @@ describe('versioned authenticated room API', () => {
       `/v1/rooms/${roomKey}/rematch`,
       mutationRequest(spectator, {})
     )
-    const displayName = await request(
-      `/v1/rooms/${roomKey}/display-name`,
-      mutationRequest(spectator, { displayName: 'Intruder' })
-    )
-
     expect(rematch.status).toBe(403)
     await expect(rematch.json()).resolves.toMatchObject({
       error: { code: 'NOT_A_PLAYER' }
     })
-    expect(displayName.status).toBe(403)
-    await expect(displayName.json()).resolves.toMatchObject({
-      error: { code: 'NOT_A_PLAYER' }
-    })
-
     const firstVote = await request(
       `/v1/rooms/${roomKey}/rematch`,
       mutationRequest(playerOne, {})
@@ -939,11 +1087,6 @@ describe('runtime request validation', () => {
       [
         'invalid move',
         `/${roomKey}/${player.playerId}/play/3/4.5`,
-        'INVALID_ROUTE_PARAMETERS'
-      ],
-      [
-        'blank display name',
-        `/${roomKey}/${player.playerId}/displayName/%20`,
         'INVALID_ROUTE_PARAMETERS'
       ]
     ] as const) {
@@ -1521,12 +1664,10 @@ describe('ranked matchmaking', () => {
     })
     const playerTwoClaim = await initialize(playerTwo, {
       playerType: 'human',
-      displayName: 'Player Two',
       boType: 1
     })
     const playerOneClaim = await initialize(playerOne, {
       playerType: 'human',
-      displayName: 'Player One',
       boType: 1
     })
 

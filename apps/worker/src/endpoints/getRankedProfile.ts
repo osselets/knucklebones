@@ -5,6 +5,7 @@ import { apiError } from '../utils/http'
 
 interface RankedProfileRow {
   player_id: string
+  display_name: string
   rating_pool: string
   rating: number
   games_played: number
@@ -19,9 +20,12 @@ export async function getRankedProfile(
 ): Promise<Response> {
   const playerId = request.principal.playerId
   const profile = await cloudflareEnvironment.PLAYERS_DB.prepare(
-    `SELECT player_id, rating_pool, rating, games_played, wins, draws, losses
-     FROM player_ratings
-     WHERE player_id = ? AND rating_pool = ?`
+    `SELECT ratings.player_id, players.display_name, ratings.rating_pool,
+            ratings.rating, ratings.games_played, ratings.wins,
+            ratings.draws, ratings.losses
+     FROM player_ratings AS ratings
+     INNER JOIN players ON players.player_id = ratings.player_id
+     WHERE ratings.player_id = ? AND ratings.rating_pool = ?`
   )
     .bind(playerId, DEFAULT_RATING_POOL)
     .first<RankedProfileRow>()
@@ -37,6 +41,7 @@ export async function getRankedProfile(
 
   const response = rankedProfileSchema.parse({
     playerId: profile.player_id,
+    displayName: profile.display_name,
     ratingPool: DEFAULT_RATING_POOL,
     rating: profile.rating,
     gamesPlayed: profile.games_played,

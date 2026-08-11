@@ -36,7 +36,7 @@ describe('ensurePlayerIdentity', () => {
     vi.mocked(verifyPlayer).mockResolvedValue()
   })
 
-  it('creates credentials and a friendly name for a new browser', async () => {
+  it('creates credentials with a friendly public name for a new browser', async () => {
     vi.mocked(createPlayer).mockResolvedValue(bootstrap)
 
     await expect(ensurePlayerIdentity()).resolves.toEqual(bootstrap)
@@ -44,35 +44,18 @@ describe('ensurePlayerIdentity', () => {
     expect(
       localStorage.getItem('knucklebones.identity.v1.pendingRecoveryPhrase')
     ).toBe(bootstrap.recoveryPhrase)
-    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
-      'BraveBlueFox'
-    )
+    expect(createPlayer).toHaveBeenCalledWith('BraveBlueFox')
   })
 
-  it('adds a friendly name to an existing UUID identity', async () => {
+  it('uses existing credentials without creating another public profile', async () => {
     localStorage.setItem('playerId', credentials.playerId)
     localStorage.setItem('playerCredential', credentials.credential)
 
     await ensurePlayerIdentity()
 
     expect(createPlayer).not.toHaveBeenCalled()
-    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
-      'BraveBlueFox'
-    )
     expect(localStorage.getItem('playerId')).toBeNull()
     expect(localStorage.getItem('playerCredential')).toBeNull()
-  })
-
-  it('preserves a user-selected display name', async () => {
-    localStorage.setItem('playerId', credentials.playerId)
-    localStorage.setItem('playerCredential', credentials.credential)
-    localStorage.setItem('displayName', 'Custom Name')
-
-    await ensurePlayerIdentity()
-
-    expect(localStorage.getItem('knucklebones.identity.v1.displayName')).toBe(
-      'Custom Name'
-    )
   })
 
   it('replaces a stale local credential after the development database resets', async () => {

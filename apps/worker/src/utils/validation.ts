@@ -1,6 +1,5 @@
 import {
   credentialIdSchema,
-  displayNameSchema,
   gamePlayerIdSchema,
   playerIdSchema,
   roomKeySchema
@@ -66,14 +65,6 @@ export function validateRequestPath(
       gamePlayerIdSchema.safeParse(segments[1]).success
 
     if (!isValid) {
-      return invalidRouteParameters(request.requestId)
-    }
-
-    if (
-      request.method === 'POST' &&
-      segments[2] === 'displayName' &&
-      !displayNameSchema.safeParse(segments[3]).success
-    ) {
       return invalidRouteParameters(request.requestId)
     }
   }

@@ -6,10 +6,8 @@ describe('operational events', () => {
 
   it('normalizes public identifiers out of route labels', () => {
     expect(
-      classifyRoute(
-        '/v1/rooms/11111111-1111-4111-8111-111111111111/display-name'
-      )
-    ).toBe('/v1/rooms/:roomKey/display-name')
+      classifyRoute('/v1/rooms/11111111-1111-4111-8111-111111111111/play')
+    ).toBe('/v1/rooms/:roomKey/play')
     expect(
       classifyRoute(
         '/v1/identity/credentials/22222222-2222-4222-8222-222222222222'

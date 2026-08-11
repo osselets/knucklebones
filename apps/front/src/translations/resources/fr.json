@@ -16,7 +16,8 @@
     "retry": "Réessayer",
     "name": {
       "label": "Nom d'affichage",
-      "save": "Enregistrer"
+      "save": "Enregistrer",
+      "error": "Impossible d'enregistrer votre nom d'affichage."
     },
     "statistics": {
       "elo": "Elo",
@@ -24,6 +25,20 @@
       "losses": "Défaites",
       "draws": "Égalités"
     }
+  },
+  "leaderboard": {
+    "label": "Classement",
+    "title": "Classement",
+    "loading": "Chargement du classement…",
+    "error": "Impossible de charger le classement.",
+    "retry": "Réessayer",
+    "empty": "Aucun joueur n'est encore classé.",
+    "podium": "Les trois meilleurs joueurs classés",
+    "rank": "Rang",
+    "player": "Joueur",
+    "elo": "Elo",
+    "your-position": "Votre position",
+    "unranked": "Non classé"
   },
   "ranked": {
     "identity-warning": "Votre progression classée appartient à l'identité de ce navigateur. Sauvegardez votre phrase de récupération avant d'effacer ses données.",

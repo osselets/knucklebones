@@ -9,7 +9,6 @@ import {
   GameState,
   getGameStateMessagePayload,
   type IGameState,
-  isEmptyOrBlank,
   PROTOCOL_VERSION,
   type GameSettings
 } from '@knucklebones/common'
@@ -18,8 +17,6 @@ import { useRoomKey } from '../../hooks/useRoomKey'
 import {
   ApiRequestError,
   createWebSocketTicket,
-  deleteDisplayName,
-  updateDisplayName,
   initGame,
   play,
   reportClientProtocolDiagnostic,
@@ -354,23 +351,6 @@ export function useGameSetup() {
     })
   }
 
-  async function _updateDisplayName(newDisplayName: string) {
-    if (isEmptyOrBlank(newDisplayName)) {
-      await deleteDisplayName({ roomKey, playerId: playerId! }).catch(
-        (error) => {
-          setErrorMessage(error.message)
-        }
-      )
-    } else {
-      await updateDisplayName(
-        { roomKey, playerId: playerId! },
-        { displayName: newDisplayName }
-      ).catch((error) => {
-        setErrorMessage(error.message)
-      })
-    }
-  }
-
   // Easy way to do a type guard
   if (identityError !== null) {
     return {
@@ -401,7 +381,6 @@ export function useGameSetup() {
     voteContinueBo,
     voteContinueIndefinitely,
     voteRematch: _voteRematch,
-    resign,
-    updateDisplayName: _updateDisplayName
+    resign
   }
 }

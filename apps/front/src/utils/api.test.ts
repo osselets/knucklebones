@@ -11,7 +11,6 @@ import {
   play,
   resignGame,
   requestRankedRematch,
-  updateDisplayName,
   voteRematch
 } from './api'
 
@@ -71,25 +70,20 @@ describe('mutation requests', () => {
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(
         Response.json({
           ticket: 'a'.repeat(64),
           expiresAt: Date.now() + 30_000
         })
       )
-    localStorage.setItem('displayName', 'Dice Friend')
-
     await initGame(room, { playerType: 'human', boType: 1 })
     await voteRematch(room, { boType: 3 })
-    await updateDisplayName(room, { displayName: 'A/B ? Player' })
     await resignGame(room)
     await createWebSocketTicket(room)
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       expect.stringContaining(`/v1/rooms/${room.roomKey}/init`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/rematch`),
-      expect.stringContaining(`/v1/rooms/${room.roomKey}/display-name`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/resign`),
       expect.stringContaining(`/v1/rooms/${room.roomKey}/websocket-ticket`)
     ])
@@ -99,13 +93,10 @@ describe('mutation requests', () => {
       )
     ).toBe(true)
     expect(fetchMock.mock.calls[0][1]?.body).toBe(
-      '{"playerType":"human","boType":1,"displayName":"Dice Friend"}'
+      '{"playerType":"human","boType":1}'
     )
     expect(fetchMock.mock.calls[1][1]?.body).toBe('{"boType":3}')
-    expect(fetchMock.mock.calls[2][1]?.body).toBe(
-      '{"displayName":"A/B ? Player"}'
-    )
-    expect(fetchMock.mock.calls[3][1]?.body).toBeUndefined()
+    expect(fetchMock.mock.calls[2][1]?.body).toBeUndefined()
   })
 
   it('reports a validated API error code and message', async () => {
@@ -166,6 +157,7 @@ describe('mutation requests', () => {
       .mockResolvedValueOnce(
         Response.json({
           playerId: room.playerId,
+          displayName: 'Ranked Player',
           ratingPool: 'classic',
           rating: 1200,
           gamesPlayed: 0,

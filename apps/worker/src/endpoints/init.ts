@@ -26,7 +26,7 @@ import { apiError } from '../utils/http'
 import { idempotencyConflict } from '../utils/idempotency'
 
 export interface InitRequest extends MutationRequestWithProps {
-  query?: GameSettingsQuery & { displayName?: string }
+  query?: GameSettingsQuery
 }
 
 export async function init(
@@ -59,7 +59,10 @@ export async function init(
     request,
     {
       playerId: request.playerId,
-      displayName: query.data.displayName,
+      displayName: await getPlayerDisplayName(
+        request.playerId,
+        cloudflareEnvironment
+      ),
       difficulty: gameSettings.value.difficulty,
       boType: gameSettings.value.boType
     },
@@ -93,7 +96,12 @@ export async function initializeRoom(
           ? AI_PLAYER_ID
           : request.principal.playerId,
       displayName:
-        body.data.playerType === 'human' ? body.data.displayName : undefined,
+        body.data.playerType === 'human'
+          ? await getPlayerDisplayName(
+              request.principal.playerId,
+              cloudflareEnvironment
+            )
+          : undefined,
       difficulty:
         body.data.playerType === 'ai' ? body.data.difficulty : undefined,
       boType: body.data.boType
@@ -101,6 +109,31 @@ export async function initializeRoom(
     cloudflareEnvironment,
     context
   )
+}
+
+interface PlayerDisplayNameRow {
+  display_name: string
+}
+
+async function getPlayerDisplayName(
+  playerId: string,
+  cloudflareEnvironment: CloudflareEnvironment
+): Promise<string | undefined> {
+  if (playerId === AI_PLAYER_ID) {
+    return undefined
+  }
+
+  const player = await cloudflareEnvironment.PLAYERS_DB.prepare(
+    'SELECT display_name FROM players WHERE player_id = ?'
+  )
+    .bind(playerId)
+    .first<PlayerDisplayNameRow>()
+
+  if (player === null) {
+    throw new Error('The game player profile was not found.')
+  }
+
+  return player.display_name
 }
 
 async function executeInitializeGame(

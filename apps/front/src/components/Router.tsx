@@ -5,6 +5,7 @@ import { Game } from './Game'
 import { GameProvider } from './GameContext'
 import { HomePage } from './HomePage'
 import { HowToPlayPage } from './HowToPlay'
+import { LeaderboardPage } from './Leaderboard'
 import { ProfilePage } from './Profile'
 import { RankedMatchmaking } from './RankedMatchmaking'
 
@@ -46,6 +47,7 @@ export function Router() {
       <Route path='/room/:roomKey' element={<GameRoute />} />
       <Route path='/how-to-play' element={<HowToPlayPage />} />
       <Route path='/profile' element={<ProfilePage />} />
+      <Route path='/leaderboard' element={<LeaderboardPage />} />
       <Route path='/ranked' element={<RankedMatchmaking />} />
       <Route path='/ranked-stats' element={<RankedStatsRoute />} />
       <Route path='/:language' element={<SupportedLanguageRoute />}>
@@ -53,6 +55,7 @@ export function Router() {
         <Route path='room/:roomKey' element={<GameRoute />} />
         <Route path='how-to-play' element={<HowToPlayPage />} />
         <Route path='profile' element={<ProfilePage />} />
+        <Route path='leaderboard' element={<LeaderboardPage />} />
         <Route path='ranked' element={<RankedMatchmaking />} />
         <Route path='ranked-stats' element={<RankedStatsRoute />} />
       </Route>

@@ -28,12 +28,6 @@ export interface ResignGameCommand {
   playerId: string
 }
 
-export interface UpdateDisplayNameCommand {
-  mutationId: string
-  playerId: string
-  displayName?: string
-}
-
 export type PresenceUpdateResult =
   | { status: 'disabled' | 'ignored' | 'unchanged' }
   | {
@@ -71,19 +65,12 @@ export type ResignGameResult =
     }
   | { status: 'updated'; gameState: IGameState }
 
-export type UpdateDisplayNameResult =
-  { status: 'unknown-player' } | { status: 'updated'; gameState: IGameState }
-
 export type PlayGameResult =
   | { status: 'rejected'; reason: PlayIntentRejectionReason }
   | { status: 'updated'; gameState: IGameState }
 
 export type GameStateMutationResult =
-  | InitializeGameResult
-  | RematchGameResult
-  | ResignGameResult
-  | UpdateDisplayNameResult
-  | PlayGameResult
+  InitializeGameResult | RematchGameResult | ResignGameResult | PlayGameResult
 
 export type IdempotentMutationResult<T> =
   | { idempotencyStatus: 'applied' | 'replayed'; value: T }
