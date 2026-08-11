@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 import {
   DEFAULT_RATING_POOL,
+  type MatchmakingPopulation,
   type MatchmakingStatus,
   RANKED_MATCH_FORMAT,
   RANKED_QUEUE_KEY,
@@ -25,17 +26,17 @@ export const rankedMatchAssignmentSchema = z.object({
   expiresAt: z.int().check(z.minimum(0))
 })
 
+export const matchmakingPopulationSchema = z.object({
+  queuedPlayers: z.int().check(z.minimum(0)),
+  activePlayers: z.int().check(z.minimum(0))
+}) satisfies z.ZodMiniType<MatchmakingPopulation>
+
 export const matchmakingStatusSchema = z.union([
   z.object({ status: z.literal('idle') }),
   z.object({
     status: z.literal('waiting'),
     joinedAt: z.int().check(z.minimum(0)),
-    population: z.optional(
-      z.object({
-        queuedPlayers: z.int().check(z.minimum(0)),
-        activePlayers: z.int().check(z.minimum(0))
-      })
-    )
+    population: z.optional(matchmakingPopulationSchema)
   }),
   z.object({
     status: z.literal('match-found'),

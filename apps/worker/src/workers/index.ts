@@ -9,6 +9,7 @@ import {
   deleteDisplayName,
   displayName,
   getRankedProfile,
+  getRankedStats,
   getRankedRematchStatus,
   getMatchmakingStatus,
   init,
@@ -72,6 +73,7 @@ router
   .post('/v1/identity/credentials/rotate', rotateDeviceCredential)
   .post('/v1/identity/credentials/revoke-others', revokeOtherDeviceCredentials)
   .delete('/v1/identity/credentials/:credentialId', revokeDeviceCredential)
+  .get('/v1/ranked/stats', getRankedStats)
   .all('/v1/ranked/*', authenticatePlayerRequest)
   .get('/v1/ranked/profile', getRankedProfile)
   .all('/v1/matchmaking/*', authenticatePlayerRequest)

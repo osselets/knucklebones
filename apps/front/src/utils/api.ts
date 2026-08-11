@@ -15,9 +15,11 @@ import {
   type PlayerIdentityBootstrap,
   playerIdentityBootstrapSchema,
   type RankedProfile,
+  type RankedStats,
   type RankedRematchStatus,
   rankedRematchStatusSchema,
   rankedProfileSchema,
+  rankedStatsSchema,
   type WebSocketTicket,
   webSocketTicketSchema
 } from '@knucklebones/common'
@@ -151,6 +153,22 @@ export async function getRankedProfile(): Promise<RankedProfile> {
 
   if (!result.success) {
     throw new Error('The server returned an invalid ranked profile.')
+  }
+
+  return result.data
+}
+
+export async function getRankedStats(): Promise<RankedStats> {
+  const response = await sendApiRequest(
+    '/v1/ranked/stats',
+    'GET',
+    undefined,
+    null
+  )
+  const result = rankedStatsSchema.safeParse(await response.json())
+
+  if (!result.success) {
+    throw new Error('The server returned invalid ranked statistics.')
   }
 
   return result.data
