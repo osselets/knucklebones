@@ -110,6 +110,8 @@
         "wins": "Victoires des joueurs",
         "draws": "Égalités des joueurs",
         "losses": "Défaites des joueurs",
+        "forfeits": "Parties terminées par forfait",
+        "no-contests": "Parties sans résultat",
         "average-elo-gain": "Gain Elo moyen",
         "active-players": "En train de jouer",
         "queued-players": "Dans la file"

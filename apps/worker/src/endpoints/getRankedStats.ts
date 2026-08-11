@@ -21,6 +21,8 @@ interface ProfileTotalsRow {
 
 interface MatchTotalsRow {
   matches: number
+  forfeits: number
+  no_contests: number
   average_elo_gain: number
 }
 
@@ -71,6 +73,10 @@ export async function getRankedStats(
         `SELECT
            COALESCE(SUM(CASE WHEN result <> 'no-contest' THEN 1 ELSE 0 END), 0)
              AS matches,
+           COALESCE(SUM(CASE WHEN finish_reason = 'forfeit' THEN 1 ELSE 0 END), 0)
+             AS forfeits,
+           COALESCE(SUM(CASE WHEN finish_reason = 'no-contest' THEN 1 ELSE 0 END), 0)
+             AS no_contests,
            COALESCE(AVG(CASE WHEN result <> 'no-contest' AND rating_delta <> 0
              THEN ABS(rating_delta) END), 0) AS average_elo_gain
          FROM rated_matches
@@ -123,6 +129,8 @@ export async function getRankedStats(
       wins: profileTotals.wins,
       draws: profileTotals.draws,
       losses: profileTotals.losses,
+      forfeits: matchTotals.forfeits,
+      noContests: matchTotals.no_contests,
       averageEloGain: matchTotals.average_elo_gain
     },
     current: population,

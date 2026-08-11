@@ -15,6 +15,8 @@ export const rankedStatsSchema = z.object({
     wins: nonNegativeIntegerSchema,
     draws: nonNegativeIntegerSchema,
     losses: nonNegativeIntegerSchema,
+    forfeits: nonNegativeIntegerSchema,
+    noContests: nonNegativeIntegerSchema,
     averageEloGain: z.number().check(z.minimum(0))
   }),
   current: z.object({

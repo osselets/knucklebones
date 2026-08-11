@@ -110,6 +110,8 @@
         "wins": "玩家勝場",
         "draws": "玩家平手",
         "losses": "玩家敗場",
+        "forfeits": "因棄權結束的對局",
+        "no-contests": "無結果對局",
         "average-elo-gain": "平均 Elo 增益",
         "active-players": "目前遊玩中",
         "queued-players": "目前排隊中"

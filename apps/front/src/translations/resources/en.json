@@ -110,6 +110,8 @@
         "wins": "Player wins",
         "draws": "Player draws",
         "losses": "Player losses",
+        "forfeits": "Matches ended by forfeit",
+        "no-contests": "No-contest matches",
         "average-elo-gain": "Average Elo gain",
         "active-players": "Playing now",
         "queued-players": "In queue now"

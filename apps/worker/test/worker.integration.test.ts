@@ -2543,6 +2543,8 @@ describe('public ranked statistics', () => {
       wins: 0,
       draws: 0,
       losses: 0,
+      forfeits: 0,
+      noContests: 0,
       averageEloGain: 0
     })
     expect(stats.current).toEqual({ activePlayers: 0, queuedPlayers: 1 })
