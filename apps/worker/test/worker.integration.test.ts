@@ -61,7 +61,8 @@ afterAll(async () => {
 })
 
 async function request(path: string, init?: RequestInit) {
-  return await server.getWorker().fetch(path, init)
+  const response = await server.getWorker().fetch(path, init)
+  return response.clone()
 }
 
 async function readJson(response: Response): Promise<unknown> {
