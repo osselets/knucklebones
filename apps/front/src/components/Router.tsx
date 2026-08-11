@@ -5,6 +5,7 @@ import { Game } from './Game'
 import { GameProvider } from './GameContext'
 import { HomePage } from './HomePage'
 import { HowToPlayPage } from './HowToPlay'
+import { ProfilePage } from './Profile'
 import { RankedMatchmaking } from './RankedMatchmaking'
 
 const RankedStatsPage = React.lazy(() =>
@@ -44,12 +45,14 @@ export function Router() {
       <Route path='/' element={<HomePage />} />
       <Route path='/room/:roomKey' element={<GameRoute />} />
       <Route path='/how-to-play' element={<HowToPlayPage />} />
+      <Route path='/profile' element={<ProfilePage />} />
       <Route path='/ranked' element={<RankedMatchmaking />} />
       <Route path='/ranked-stats' element={<RankedStatsRoute />} />
       <Route path='/:language' element={<SupportedLanguageRoute />}>
         <Route index element={<HomePage />} />
         <Route path='room/:roomKey' element={<GameRoute />} />
         <Route path='how-to-play' element={<HowToPlayPage />} />
+        <Route path='profile' element={<ProfilePage />} />
         <Route path='ranked' element={<RankedMatchmaking />} />
         <Route path='ranked-stats' element={<RankedStatsRoute />} />
       </Route>
