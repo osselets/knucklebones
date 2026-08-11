@@ -3,6 +3,7 @@ import {
   DEFAULT_RATING_POOL,
   type MatchmakingPopulation,
   type MatchmakingStatus,
+  matchmakingPopulationSchema,
   matchmakingStatusSchema,
   matchIdSchema,
   playerIdSchema,
@@ -23,6 +24,7 @@ import {
   releaseRankedMatch,
   reserveRankedMatch
 } from '../utils/rankedMatches'
+import { recordRankedQueueSize } from '../utils/rankedStats'
 
 const MATCHMAKING_STATE_KEY = 'matchmaking-state'
 const RATING_SELECTION_WINDOW_MS = 500
@@ -56,6 +58,7 @@ export class MatchmakingDurableObject {
   cloudflareEnvironment: CloudflareEnvironment
   sentry: Toucan
   activePlayerCountCache?: { value: number; expiresAt: number }
+  lastRecordedQueueSize?: number
 
   constructor(
     state: DurableObjectState,
@@ -74,6 +77,17 @@ export class MatchmakingDurableObject {
 
     try {
       const url = new URL(request.url)
+      if (request.method === 'GET' && url.pathname === '/population') {
+        const now = Date.now()
+        const state = await this.getActiveState(now)
+        await this.persistState(state, now)
+        return Response.json(
+          matchmakingPopulationSchema.parse(
+            await this.getPopulation(state, now)
+          ),
+          { headers: { 'Cache-Control': 'no-store' } }
+        )
+      }
       const playerId = request.headers.get('X-Player-Id')
 
       const parsedPlayerId = playerIdSchema.safeParse(playerId)
@@ -694,6 +708,19 @@ export class MatchmakingDurableObject {
     now: number
   ): Promise<void> {
     await this.state.storage.put(MATCHMAKING_STATE_KEY, state)
+    if (this.lastRecordedQueueSize !== state.waiting.length) {
+      try {
+        await recordRankedQueueSize(
+          this.cloudflareEnvironment.PLAYERS_DB,
+          RANKED_QUEUE_KEY,
+          state.waiting.length,
+          now
+        )
+        this.lastRecordedQueueSize = state.waiting.length
+      } catch (error) {
+        this.sentry.captureException(error)
+      }
+    }
     const nextAlarmAt = this.getNextAlarmAt(state, now)
     if (nextAlarmAt === undefined) {
       await this.state.storage.deleteAlarm()

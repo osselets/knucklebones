@@ -13,6 +13,7 @@ import {
   type PresenceUpdateResult,
   rankedMatchSettlementResultSchema,
   rankedProfileSchema,
+  rankedStatsSchema,
   webSocketTicketSchema,
   type PlayerCredentials
 } from '@knucklebones/common'
@@ -2379,5 +2380,33 @@ describe('ranked matchmaking', () => {
       player_one_id: blockedPlayer.playerId,
       player_two_id: existingOpponent.playerId
     })
+  })
+})
+
+describe('public ranked statistics', () => {
+  it('reports player and queue activity without authentication', async () => {
+    const player = await createPlayer()
+    const join = await request('/v1/matchmaking/join', {
+      method: 'POST',
+      headers: authorization(player)
+    })
+    expect(join.status).toBe(200)
+
+    const response = await request('/v1/ranked/stats')
+    expect(response.status).toBe(200)
+    const stats = rankedStatsSchema.parse(await response.json())
+
+    expect(stats.totals).toMatchObject({
+      players: 1,
+      matches: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      averageEloGain: 0
+    })
+    expect(stats.current).toEqual({ activePlayers: 0, queuedPlayers: 1 })
+    expect(stats.history.players).toHaveLength(30)
+    expect(stats.history.players.at(-1)?.value).toBe(1)
+    expect(stats.history.queue.at(-1)?.value).toBe(1)
   })
 })
