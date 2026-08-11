@@ -8,6 +8,23 @@
     },
     "footer": "Le jeu Knucklebones est une création originale de l'entité Massive Monster.\nLe présent site est une réalisation de fans et ne constitue en aucun cas une implémentation officielle de la part de Massive Monster.\nPour accéder au jeu original, nous vous invitons à consulter le site internet officiel de <0>Cult of the Lamb</0>."
   },
+  "profile": {
+    "label": "Profil du joueur",
+    "title": "Votre profil",
+    "loading": "Chargement de votre profil…",
+    "error": "Impossible de charger votre profil.",
+    "retry": "Réessayer",
+    "name": {
+      "label": "Nom d'affichage",
+      "save": "Enregistrer"
+    },
+    "statistics": {
+      "elo": "Elo",
+      "wins": "Victoires",
+      "losses": "Défaites",
+      "draws": "Égalités"
+    }
+  },
   "ranked": {
     "identity-warning": "Votre progression classée appartient à l'identité de ce navigateur. Sauvegardez votre phrase de récupération avant d'effacer ses données.",
     "rating": "Classement : {{rating}}",
