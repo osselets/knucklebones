@@ -12,6 +12,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         // https://vitejs.dev/guide/build.html#multi-page-app
+        'not-found': resolve(import.meta.dirname, '404.html'),
         app: resolve(import.meta.dirname, 'app/index.html'),
         default: resolve(import.meta.dirname, 'index.html'),
         en: resolve(import.meta.dirname, 'en/index.html'),

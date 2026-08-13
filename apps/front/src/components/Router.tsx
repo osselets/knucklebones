@@ -6,6 +6,7 @@ import { GameProvider } from './GameContext'
 import { HomePage } from './HomePage'
 import { HowToPlayPage } from './HowToPlay'
 import { LeaderboardPage } from './Leaderboard'
+import { NotFoundPage } from './NotFoundPage'
 import { ProfilePage } from './Profile'
 import { RankedMatchmaking } from './RankedMatchmaking'
 
@@ -36,7 +37,7 @@ function SupportedLanguageRoute() {
   return language !== undefined && isLanguageSupported(language) ? (
     <Outlet />
   ) : (
-    <Navigate to='/' replace />
+    <NotFoundPage />
   )
 }
 
@@ -53,6 +54,7 @@ export function Router() {
         <Route path='ranked' element={<RankedMatchmaking />} />
         <Route path='ranked-stats' element={<RankedStatsRoute />} />
       </Route>
+      <Route path='*' element={<NotFoundPage />} />
     </Routes>
   )
 }
