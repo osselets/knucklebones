@@ -8,6 +8,10 @@
     },
     "footer": "《進擊羔羊傳說》中的原版 Knucklebones 遊戲由 Massive Monster 創作。\n這是一個粉絲網站，並非 Massive Monster 的官方實現。\n您可以在 <0>《進擊羔羊傳說》</0> 網站上找到原版遊戲。"
   },
+  "not-found": {
+    "message": "這次擲骰運氣不太好！",
+    "home": "再擲一次"
+  },
   "profile": {
     "label": "玩家個人檔案",
     "title": "您的個人檔案",

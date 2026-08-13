@@ -8,6 +8,10 @@
     },
     "footer": "Le jeu Knucklebones est une création originale de l'entité Massive Monster.\nLe présent site est une réalisation de fans et ne constitue en aucun cas une implémentation officielle de la part de Massive Monster.\nPour accéder au jeu original, nous vous invitons à consulter le site internet officiel de <0>Cult of the Lamb</0>."
   },
+  "not-found": {
+    "message": "Pas de chance avec ces dés !",
+    "home": "Relancer les dés"
+  },
   "profile": {
     "label": "Profil du joueur",
     "title": "Votre profil",
