@@ -43,13 +43,7 @@ function SupportedLanguageRoute() {
 export function Router() {
   return (
     <Routes>
-      <Route path='/' element={<HomePage />} />
-      <Route path='/room/:roomKey' element={<GameRoute />} />
-      <Route path='/how-to-play' element={<HowToPlayPage />} />
-      <Route path='/profile' element={<ProfilePage />} />
-      <Route path='/leaderboard' element={<LeaderboardPage />} />
-      <Route path='/ranked' element={<RankedMatchmaking />} />
-      <Route path='/ranked-stats' element={<RankedStatsRoute />} />
+      <Route path='/' element={<Navigate to='/en/' replace />} />
       <Route path='/:language' element={<SupportedLanguageRoute />}>
         <Route index element={<HomePage />} />
         <Route path='room/:roomKey' element={<GameRoute />} />
@@ -59,7 +53,6 @@ export function Router() {
         <Route path='ranked' element={<RankedMatchmaking />} />
         <Route path='ranked-stats' element={<RankedStatsRoute />} />
       </Route>
-      {/* Handle 404 */}
     </Routes>
   )
 }

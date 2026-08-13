@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+>
+  <url>
+    <loc>https://knucklebones.io/en/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/" />
+  </url>
+  <url>
+    <loc>https://knucklebones.io/fr/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/" />
+  </url>
+  <url>
+    <loc>https://knucklebones.io/zh-tw/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/" />
+  </url>
+  <url>
+    <loc>https://knucklebones.io/en/how-to-play/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/how-to-play/" />
+  </url>
+  <url>
+    <loc>https://knucklebones.io/fr/how-to-play/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/how-to-play/" />
+  </url>
+  <url>
+    <loc>https://knucklebones.io/zh-tw/how-to-play/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://knucklebones.io/en/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://knucklebones.io/fr/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://knucklebones.io/zh-tw/how-to-play/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://knucklebones.io/en/how-to-play/" />
+  </url>
+</urlset>

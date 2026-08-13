@@ -1,12 +1,6 @@
-# Any user agent
 User-agent: *
-# Allow root page
-Allow: /$
-# Allow root page in supported languages
-Allow: /fr/$
-Allow: /en/$
-# Allow how to play page in supported language
-Allow: /fr/how-to-play$
-Allow: /en/how-to-play$
-# Disallow everything else
-Disallow: /
+Disallow: /en/room/
+Disallow: /fr/room/
+Disallow: /zh-tw/room/
+
+Sitemap: https://knucklebones.io/sitemap.xml

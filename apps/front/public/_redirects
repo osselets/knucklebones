@@ -1,0 +1,18 @@
+/ /en/ 308
+
+/en/profile /app/ 200
+/en/leaderboard /app/ 200
+/en/ranked /app/ 200
+/en/ranked-stats /app/ 200
+/fr/profile /app/ 200
+/fr/leaderboard /app/ 200
+/fr/ranked /app/ 200
+/fr/ranked-stats /app/ 200
+/zh-tw/profile /app/ 200
+/zh-tw/leaderboard /app/ 200
+/zh-tw/ranked /app/ 200
+/zh-tw/ranked-stats /app/ 200
+
+/en/room/* /app/ 200
+/fr/room/* /app/ 200
+/zh-tw/room/* /app/ 200

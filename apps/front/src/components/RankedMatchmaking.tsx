@@ -7,6 +7,7 @@ import {
   type RankedProfile
 } from '@knucklebones/common'
 import { useLocalizedPath } from '../hooks/useLocalizedPath'
+import { useNoIndex } from '../hooks/useNoIndex'
 import {
   acceptMatchmaking,
   getMatchmakingStatus,
@@ -42,6 +43,7 @@ export function getMatchmakingDelayMessage(
 }
 
 export function RankedMatchmaking() {
+  useNoIndex()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const localizedPath = useLocalizedPath()

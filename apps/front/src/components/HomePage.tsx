@@ -58,7 +58,7 @@ export function HomePage() {
           >
             {t('home.play.ai')}
           </Button>
-          <Button as={Link} size='large' to={localizedPath('/how-to-play')}>
+          <Button as={Link} size='large' to={localizedPath('/how-to-play/')}>
             {t('guide.label')}
           </Button>
           <div className='grid grid-cols-2 gap-4 md:gap-8'>
